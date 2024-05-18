@@ -20,6 +20,7 @@ contract ProjectProposal is Ownable {
         uint256 id;
         uint256 maxFlareAmount;
         uint256 batchRunTime;
+        uint256 snapshotDatetime;
         uint256 snapshotBlock;
         uint256 votingRuntime;
         Proposal[] proposals;
@@ -48,6 +49,9 @@ contract ProjectProposal is Ownable {
     
     //Notify of a new batch being added.
     event BatchAdded(string name, uint256 amountRequested);
+    
+    //Notify of a batch being killed.
+    event BatchKilled(uint256 batchId, string description);
 
     //Notify of a new proposal being added.
     event AddBatch(uint256 batchId, uint256 _flrAmount, uint256 _batchRuntime);
@@ -76,11 +80,11 @@ contract ProjectProposal is Ownable {
     }
 
     //Add a new batch (round).
-    function addBatch(uint256 _flrAmount, uint256 _batchRuntime, uint256 _votingRuntime) public onlyOwner{
+    function addBatch(uint256 _flrAmount, uint256 _batchRuntime, uint256 _snapshotDatetime, uint256 _votingRuntime) public onlyOwner{
         batchId++;
         uint256 snapshotBlock = block.number;
 
-        Batch memory newBatch = Batch(batchId, _flrAmount, _batchRuntime, _votingRuntime, snapshotBlock, []);
+        Batch memory newBatch = Batch(batchId, _flrAmount, _batchRuntime, _snapshotDatetime, snapshotBlock, _votingRuntime, []);
         batches[batchId] = newBatch;
 
         batchIds.push(batchId); //keep track of the batch ids.
@@ -93,6 +97,11 @@ contract ProjectProposal is Ownable {
         return batches[_id];
     }
 
+    //Get the latest batch.
+    function getLatestBatch() public view returns (Batch){
+        return batches[batchId];
+    }
+
      //Get all batches.
     function getAllBatches() public view returns (Batch[] memory){
         uint256 count = batchIds.length;
@@ -102,5 +111,21 @@ contract ProjectProposal is Ownable {
             allBatches[i] = batch;
         }
         return allBatches;
+    }
+
+    //Remove a batch.
+    function killBatch(uint256 _batchId) public onlyOwner{
+        //remove batch from mapping.
+        delete batches[_batchId]; 
+
+        //remove batch id from array.
+        for (uint256 i = 0; i < batchIds.length; i++) {
+            if (batchIds[i] == _batchId) {
+                batchIds[i] = batchIds[batchIds.length - 1];
+                batchIds.pop();
+                break;
+            }
+        }
+        emit BatchKilled(_batchId, "Batch killed successfully.");
     }
 }
