@@ -34,8 +34,14 @@ contract ProjectProposal is Ownable {
     //Map a wallet to an array of Proposals (a wallet might submit multiple).
     mapping(address=>Proposal[]) public proposals; 
     
-    //Get one proposal by propsal ID.
-    mapping(uint256 => Proposal) public proposalById;
+    //Maps IDs to a propsal.
+    mapping(uint256 => Proposal) public proposalsById;
+    
+    //Maps IDs to a batch.
+    mapping(uint256 => Batch) public batches;
+
+    //Keeps track of all batch IDs.
+    uint256[] public batchIds;
     
     //Notify of a new proposal being added.
     event ProposalAdded(string name, uint256 amountRequested);
@@ -53,14 +59,15 @@ contract ProjectProposal is Ownable {
         Proposal memory newProposal = Proposal(proposalId, _title, _description, _amountRequested, msg.sender, false);
 
         proposals[msg.sender].push(newProposal);
-        proposalById[proposalId] = newProposal;
+        proposalsById[proposalId] = newProposal;
+        batches[batchId].proposals.push(newProposal);
 
         emit ProposalAdded(_title, _amountRequested);
     }
 
      //Get a single proposal by ID.
     function getProposalById(uint256 _id) public view returns (Proposal){
-        return proposalById[_id];
+        return proposalsById[_id];
     }
 
     //Get all the proposals by address.
@@ -71,11 +78,29 @@ contract ProjectProposal is Ownable {
     //Add a new batch (round).
     function addBatch(uint256 _flrAmount, uint256 _batchRuntime, uint256 _votingRuntime) public onlyOwner{
         batchId++;
-
         uint256 snapshotBlock = block.number;
 
         Batch memory newBatch = Batch(batchId, _flrAmount, _batchRuntime, _votingRuntime, snapshotBlock, []);
+        batches[batchId] = newBatch;
+
+        batchIds.push(batchId); //keep track of the batch ids.
 
         emit BatchAdded(batchId, _flrAmount, _batchRuntime);
+    }
+
+     //Get a single batch by ID.
+    function getBatchById(uint256 _id) public view returns (Batch){
+        return batches[_id];
+    }
+
+     //Get all batches.
+    function getAllBatches() public view returns (Batch[] memory){
+        uint256 count = batchIds.length;
+        Batch[] memory allBatches = new Batch[](count);
+        for (uint256 i = 0; i < count; i++) {
+            Batch storage batch = batches[batchIds[i]];
+            allBatches[i] = batch;
+        }
+        return allBatches;
     }
 }
