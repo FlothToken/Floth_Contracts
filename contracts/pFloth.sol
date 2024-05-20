@@ -36,6 +36,8 @@ contract pFLOTH is ERC20, Ownable {
 
     // Withdraw function for the owner to withdraw FLR collected during presale
     function withdraw() external onlyOwner {
-        payable(msg.sender).transfer(address(this).balance);
+        (bool success,) = owner.call{value: address(this).balance}("");
+
+        require(success);
     }
 }
