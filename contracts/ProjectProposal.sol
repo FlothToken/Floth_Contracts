@@ -8,7 +8,7 @@ contract ProjectProposal is Ownable{
 
     /**
     *
-    * - Add an address to constructor argument that creates an IERC20Votes contract (Create interface which reduces the number of functions we need to pass) instead of making this it's own ERCVotes.
+    * - Add an address to constructor argument that creates an IERC20Votes contract (Create interface which reduces the number of functions we need to pass) instead of making this it's own ERCVotes. ✅
     *
     * Do we need a history of batches? This will determine if we need batchid tracings.
     *
