@@ -21,8 +21,8 @@ contract ProjectProposal is Ownable{
     * add receiver address to proposal ✅
     * Add complete batch function which sends funds to receiver address. - highest votes ✅
     * kill proposal function. ✅
-    * setters for propsals - title, description, amountrequested?, receiver address. - - check that proposer = sender.
-    * setter for current batch - maxFlareAmount; batchRunTime;  snapshotDatetime; snapshotBlock; votingRuntime; -- onlyowner.
+    * setters for propsals - title, description, amountrequested?, receiver address. - - check that proposer = sender. ✅
+    * setter for current batch - maxFlareAmount; batchRunTime;  snapshotDatetime; snapshotBlock; votingRuntime; -- onlyowner.  ✅
     */
 
     IFloth internal floth;
@@ -45,7 +45,7 @@ contract ProjectProposal is Ownable{
    struct Batch{
         uint256 id;
         uint256 maxFlareAmount;
-        uint256 batchRunTime;
+        uint256 batchRuntime;
         uint256 snapshotDatetime;
         uint256 snapshotBlock;
         uint256 votingRuntime;
@@ -139,6 +139,18 @@ contract ProjectProposal is Ownable{
         proposalToUpdate.amountRequested = _newAmountRequested;
     }
 
+    //Allow user to update the proposal receiver address.
+    function setProposalReceiverAddress(uint256 _proposalId , address _newAddress) external{
+        Proposal storage proposalToUpdate = proposals[_proposalId];
+
+        //Only proposer can update receiver address.
+        if(msg.sender != proposalToUpdate.proposer){
+            revert("Error: you must be the proposer of the proposal to update.");
+        }
+
+        proposalToUpdate.receiver = _newAddress;
+    }
+
      //Get a single proposal by ID.
     function getProposalById(uint256 _id) external view returns (Proposal){
         return proposals[_id];
@@ -186,7 +198,7 @@ contract ProjectProposal is Ownable{
         Batch storage newBatch = batches[batchId]; //Needed for mappings in structs to work.
         newBatch.id = batchId;
         newBatch.maxFlareAmount = _flrAmount;
-        newBatch.batchRunTime = _batchRuntime;
+        newBatch.batchRuntime = _batchRuntime;
         newBatch.snapshotDatetime = _snapshotDatetime;
         newBatch.snapshotBlock = block.number;
         newBatch.votingRuntime = _votingRuntime;
@@ -195,6 +207,51 @@ contract ProjectProposal is Ownable{
         batchIds.push(batchId); //Keep track of the batch ids.
 
         emit BatchAdded(batchId, _flrAmount, _batchRuntime);
+    }
+
+    //Allow owner to update the batch max flare amount.
+    function setBatchMaxFlare(uint256 _newBatchMaxFlare) external onlyOwner{
+        Batch storage batchToUpdate = getLatestBatch();
+
+         if(address(this).balance < _newBatchMaxFlare){
+            revert("Insufficient balance.");
+        }
+
+        batchToUpdate.maxFlareAmount = _newBatchMaxFlare;
+    }
+
+    //Allow owner to update the batch runtime.
+    function setBatchRuntime(uint256 _newBatchRuntime) external onlyOwner{
+        Batch storage batchToUpdate = getLatestBatch();
+
+        batchToUpdate.batchRuntime = _newBatchRuntime;
+    }
+
+    //Allow owner to update the batch snapshot date time.
+    function setBatchSnapshotDatetime(uint256 _newSnapshotDatetime) external onlyOwner{
+        Batch storage batchToUpdate = getLatestBatch();
+
+        if(block.timestamp < _newSnapshotDatetime){
+            revert("Error: time must be in the future.");
+        }
+
+        batchToUpdate.snapshotDatetime = _newSnapshotDatetime;
+    }
+
+    //Set the snapshot block.
+    function setBatchSnapshotBlock() external onlyOwner{
+        Batch storage batch = getLatestBatch();
+
+        if(batch.snapshotDatetime > block.timestamp){
+            batch.snapshotBlock = block.number;
+        }
+    }
+
+    //Allow owner to update the batch voting runtime.
+    function setBatchVotingRuntime(uint256 _newVotingRuntime) external onlyOwner{
+        Batch storage batchToUpdate = getLatestBatch();
+
+        batchToUpdate.votingRuntime = _newVotingRuntime;
     }
 
      //Get a single batch by ID.
@@ -216,15 +273,6 @@ contract ProjectProposal is Ownable{
             allBatches[i] = batch;
         }
         return allBatches;
-    }
-
-    //After the snapshot date time has passed for a batch, set the snapshot block.
-    function updateLatestBatch() external onlyOwner{
-        Batch storage batch = getLatestBatch();
-
-        if(batch.snapshotDatetime > block.timestamp){
-            batch.snapshotBlock = block.number;
-        }
     }
 
     //Remove a batch.
