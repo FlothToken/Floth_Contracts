@@ -19,7 +19,7 @@ contract ProjectProposal is Ownable{
     *change to external contracts where necessary ✅
 
     * add receiver address to proposal ✅
-    * Add complete batch function which sends funds to receiver address. - highest votes 
+    * Add complete batch function which sends funds to receiver address. - highest votes ✅
     * kill proposal function. ✅
     * setters for propsals - title, description, amountrequested?, receiver address. - - check that proposer = sender.
     * setter for current batch - maxFlareAmount; batchRunTime;  snapshotDatetime; snapshotBlock; votingRuntime; -- onlyowner.
@@ -101,6 +101,42 @@ contract ProjectProposal is Ownable{
         batches[batchId].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
 
         emit ProposalAdded(_title, _amountRequested);
+    }
+
+    //Allow user to update the proposal title.
+    function setProposalTitle(uint256 _proposalId , string memory _newTitle) external{
+        Proposal storage proposalToUpdate = proposals[_proposalId];
+
+        //Only proposer can update title.
+        if(msg.sender != proposalToUpdate.proposer){
+            revert("Error: you must be the proposer of the proposal to update.");
+        }
+
+        proposalToUpdate.title = _newTitle;
+    }
+
+    //Allow user to update the proposal description.
+    function setProposalDescription(uint256 _proposalId , string memory _newDescription) external{
+        Proposal storage proposalToUpdate = proposals[_proposalId];
+
+        //Only proposer can update description.
+        if(msg.sender != proposalToUpdate.proposer){
+            revert("Error: you must be the proposer of the proposal to update.");
+        }
+
+        proposalToUpdate.description = _newDescription;
+    }
+
+    //Allow user to update the proposal amount requested.
+    function setProposalAmountRequested(uint256 _proposalId , uint256 _newAmountRequested) external{
+        Proposal storage proposalToUpdate = proposals[_proposalId];
+
+        //Only proposer can update requested amount.
+        if(msg.sender != proposalToUpdate.proposer){
+            revert("Error: you must be the proposer of the proposal to update.");
+        }
+
+        proposalToUpdate.amountRequested = _newAmountRequested;
     }
 
      //Get a single proposal by ID.
@@ -236,10 +272,10 @@ contract ProjectProposal is Ownable{
         uint256 amountRequested = mostVotedProposal.amountRequested;
 
         if(address(this).balance < amountRequested){
-            revert("Insufficient balance");
+            revert("Insufficient balance.");
         }
 
-        //Send amount of FLOTH to user.
+        //Send amount requested to user.
         (bool success,) = recipient.call{value: amountRequested}("");
 
         require(success);
