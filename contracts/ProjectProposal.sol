@@ -19,7 +19,7 @@ contract ProjectProposal is Ownable{
     *change to external contracts where necessary ✅
 
     * add receiver address to proposal ✅
-    * Add complete batch function which sender funds to receiver address. - highest votes
+    * Add complete batch function which sends funds to receiver address. - highest votes 
     * kill proposal function. ✅
     * setters for propsals - title, description, amountrequested?, receiver address. - - check that proposer = sender.
     * setter for current batch - maxFlareAmount; batchRunTime;  snapshotDatetime; snapshotBlock; votingRuntime; -- onlyowner.
@@ -214,5 +214,34 @@ contract ProjectProposal is Ownable{
         uint256 votingPower = floth.getPastVotes(_address, snapshotBlock);
 
         return votingPower;
+    }
+
+    //When a batch is completed, call this to calculate proposal with most votes and send funds.
+    function batchComplete() external onlyOwner{
+        Proposal[] memory latestProposals = getLatestBatch().proposals;
+
+        if(latestProposals.length == 0){
+            revert("No proposals exist in the batch.");
+        }
+
+        //Check which proposal has the most votes.
+        Proposal memory mostVotedProposal = latestProposals[0];
+        for (uint256 i = 1; i < latestProposals.length; i++) {
+            if (latestProposals[i].votesReceived > mostVotedProposal.votesReceived) {
+                mostVotedProposal = latestProposals[i];
+            }
+        }
+
+        address recipient = mostVotedProposal.receiver;
+        uint256 amountRequested = mostVotedProposal.amountRequested;
+
+        if(address(this).balance < amountRequested){
+            revert("Insufficient balance");
+        }
+
+        //Send amount of FLOTH to user.
+        (bool success,) = recipient.call{value: amountRequested}("");
+
+        require(success);
     }
 }
