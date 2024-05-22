@@ -8,11 +8,11 @@ contract ProjectProposal is Ownable {
     /**
      * What does the front end need/TODO
      *
-     * - Create proposal function (name/amount requested/proposer and receiver set to msg.sender initially).
+     * - Create proposal function (name/amount requested/proposer and receiver set to msg.sender initially). ✅
      * - Change "round" to "round". ✅
      * - No description on chain. ✅
-     * - Remove setter for amount requested. - Kyle said to now keep.
-     * - Event emitted when proposal is created (creator proposal address, proposal id (make it more like a uid using keccak or something, use 16 bytes).
+     * - Remove setter for amount requested. -✅ Kyle said to now keep.
+     * - Event emitted when proposal is created (creator proposal address, proposal id (make it more like a uid using keccak or something, use 16 bytes).✅
      * - Can ONLY submit proposals during "submission window" during a round. Should be locked otherwise. Front end needs to read this lock.
      * - View function to get proposals and their votes and paginated, index 0 gives first x, index 1 give second x amount etc.
      * - Add winners array and remove the "accepted" bool. ✅
@@ -23,9 +23,9 @@ contract ProjectProposal is Ownable {
     *
     * - Add an address to constructor argument that creates an IERC20Votes contract (Create interface which reduces the number of functions we need to pass) instead of making this it's own ERCVotes. ✅
     *
-    * Do we need a history of round? This will determine if we need roundid tracings. - yes, may as well have this
+    * Do we need a history of round? This will determine if we need roundid tracings. - yes, may as well have this ✅
     *
-    * When are we taking snapshots? doing it 2 weeks after round opens could be tricky - We do need a snapshot function that can be called when round is ready for voting on.
+    * When are we taking snapshots? doing it 2 weeks after round opens could be tricky - We do need a snapshot function that can be called when round is ready for voting on. ✅🟠🟠🟠
     *
     *use reverts instead of require, revert errors. ✅
     *
@@ -63,6 +63,8 @@ contract ProjectProposal is Ownable {
         uint256 votingRuntime;
         Proposal[] proposals;
         mapping(address => uint256) proposalsPerWallet; //Tracks the number of proposals submitted by a wallet.
+        mapping(address => bool) hasVoted; //Tracks if a wallet has voted in a round.
+        mapping(address => uint256) currentVotingPower; //Tracks the current voting power per wallet.
     }
 
     //Tracks ID number for each proposal.
@@ -90,7 +92,7 @@ contract ProjectProposal is Ownable {
     uint256[] roundIds;
 
     //Notify of a new proposal being added.
-    event ProposalAdded(string name, uint256 amountRequested);
+    event ProposalAdded(address creator, uint16 proposalId, string title, uint256 amountRequested);
 
     //Notify of a proposal being killed.
     event ProposalKilled(uint256 proposalId);
@@ -100,9 +102,6 @@ contract ProjectProposal is Ownable {
 
     //Notify of a round being killed.
     event RoundKilled(uint256 roundId);
-
-    //Notify of a new proposal being added.
-    event AddRound(uint256 roundId, uint256 flrAmount, uint256 roundRuntime);
 
     //Notify of votes added to a proposal.
     event VotesAdded(uint256 proposalId, address wallet, uint256 numberofVotes);
@@ -131,7 +130,7 @@ contract ProjectProposal is Ownable {
         round[roundId].proposals.push(newProposal);
         round[roundId].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
 
-        emit ProposalAdded(_title, _amountRequested);
+        emit ProposalAdded(msg.sender, proposalId, _title, _amountRequested);
     }
 
     //Allow user to update the proposal receiver address.
@@ -153,16 +152,32 @@ contract ProjectProposal is Ownable {
 
     //Votes for a proposal within a round.
     function addVotesToProposal(uint256 _proposalId, uint256 _numberOfVotes) external {
-        //Check if the user has FLOTH and their voting power if greater than or equal to their votes.
-        if (floth.balanceOf(msg.sender) <= 0) {
+        //Check if the user has FLOTH.
+        if (floth.balanceOf(msg.sender) == 0) {
             revert("User doesn't have FLOTH.");
-        } else if (getVotingPower(msg.sender) >= _numberOfVotes) {
-            revert("Number of votes error.");
+        } 
+
+        Round storage currentRound = getLatestRound();
+        uint256 currentVotingPower = currentRound.currentVotingPower[msg.sender];
+
+        //Check if the users doesn't have a voting power set and they haven already voted in the round.
+         if(currentVotingPower == 0 && currentRound.hasVoted[msg.sender]){
+            revert("No voting power left in this round.");
+         }
+         else if(currentVotingPower == 0 && !currentRound.hasVoted[msg.sender]){
+            currentVotingPower = floth.getPastVotes(msg.sender, currentRound.snapshotBlock);
         }
 
+        //If the user doesn't have enough voting power, stop them from voting.
+        if(currentVotingPower < _numberOfVotes){
+           revert("Not enough voting power to vote that amount of votes.");
+        }
 
         Proposal storage proposal = getProposalById(_proposalId);
-        proposal.votesReceived += _numberOfVotes;
+        proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
+
+        currentVotingPower -= _numberOfVotes; //Reduce voting power in a round.
+        currentRound.hasVoted[msg.sender] = true; //Set that the user has voted in a round.
 
         //update their voting power.
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
@@ -223,14 +238,22 @@ contract ProjectProposal is Ownable {
         roundToUpdate.snapshotDatetime = _newSnapshotDatetime;
     }
 
-    //Set the snapshot block.
-    // function setRoundSnapshotBlock() external onlyOwner {
-    //     Round storage round = getLatestRound();
+    function setRoundSnapshotBlock() external onlyOwner {
+        Round storage round = getLatestRound();
 
-    //     if (round.snapshotDatetime > block.timestamp) {
-    //         round.snapshotBlock = block.number;
-    //     }
-    // }
+        if (round.snapshotDatetime > block.timestamp) {
+            round.snapshotBlock = block.number;
+        }
+      
+        round.snapshotBlock = block.number;
+    }
+
+    //Take a snapshot for the current round.
+    function takeSnapshot() external onlyOwner {
+        Round storage round = getLatestRound();
+
+        round.snapshotBlock = block.number;
+    }
 
     //Allow owner to update the round voting runtime.
     function setRoundVotingRuntime(
@@ -279,7 +302,7 @@ contract ProjectProposal is Ownable {
     }
 
     //Get voting power for a user.
-    function getVotingPower(address _address) external view returns (uint256) {
+    function getVotingPower(address _address) public view returns (uint256) {
         uint256 snapshotBlock = getLatestRound().snapshotBlock;
 
         uint256 votingPower = floth.getPastVotes(_address, snapshotBlock);
