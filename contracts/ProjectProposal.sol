@@ -9,13 +9,13 @@ contract ProjectProposal is Ownable {
      * What does the front end need/TODO
      *
      * - Create proposal function (name/amount requested/proposer and receiver set to msg.sender initially).
-     * - Change "batch" to "round".
-     * - No description on chain.
-     * - Remove setter for amount requested.
+     * - Change "round" to "round". ✅
+     * - No description on chain. ✅
+     * - Remove setter for amount requested. - Kyle said to now keep.
      * - Event emitted when proposal is created (creator proposal address, proposal id (make it more like a uid using keccak or something, use 16 bytes).
      * - Can ONLY submit proposals during "submission window" during a round. Should be locked otherwise. Front end needs to read this lock.
      * - View function to get proposals and their votes and paginated, index 0 gives first x, index 1 give second x amount etc.
-     * - Add winners array and remove the "accepted" bool.
+     * - Add winners array and remove the "accepted" bool. ✅
      * - Add AccessControl for role permissoning to the contract. Roles: ADMIN, SNAPSHOTTER, ROUND_MANAGER
      */
 
@@ -23,19 +23,18 @@ contract ProjectProposal is Ownable {
     *
     * - Add an address to constructor argument that creates an IERC20Votes contract (Create interface which reduces the number of functions we need to pass) instead of making this it's own ERCVotes. ✅
     *
-    * Do we need a history of batches? This will determine if we need batchid tracings. - yes, may as well have this
+    * Do we need a history of round? This will determine if we need roundid tracings. - yes, may as well have this
     *
-    * When are we taking snapshots? doing it 2 weeks after batch opens could be tricky - We do need a snapshot function that can be called when round is ready for voting on.
+    * When are we taking snapshots? doing it 2 weeks after round opens could be tricky - We do need a snapshot function that can be called when round is ready for voting on.
     *
     *use reverts instead of require, revert errors. ✅
     *
     *change to external contracts where necessary ✅
 
     * add receiver address to proposal ✅
-    * Add complete batch function which sends funds to receiver address. - highest votes ✅
+    * Add complete round function which sends funds to receiver address. - highest votes ✅
     * kill proposal function. ✅
-    * setters for propsals - title, description, amountrequested?, receiver address. - - check that proposer = sender. ✅
-    * setter for current batch - maxFlareAmount; batchRunTime;  snapshotDatetime; snapshotBlock; votingRuntime; -- onlyowner.  ✅
+    * setter for current round - maxFlareAmount; roundRunTime;  snapshotDatetime; snapshotBlock; votingRuntime; -- onlyowner.  ✅
     */
 
     IFloth internal floth;
@@ -47,18 +46,18 @@ contract ProjectProposal is Ownable {
     struct Proposal {
         uint256 id;
         string title;
-        string description;
         uint256 amountRequested;
         uint256 votesReceived;
         address proposer; //The wallet that submitted the proposal.
         address receiver; //The wallet that will receive the funds.
-        bool accepted;
+        bool fundsClaimedIfWinner; //Tracked here incase funds are not claimed before new round begins.
     }
 
-    struct Batch {
+    struct Round {
         uint256 id;
         uint256 maxFlareAmount;
-        uint256 batchRuntime;
+        uint256 roundStarttime;
+        uint256 roundRuntime;
         uint256 snapshotDatetime;
         uint256 snapshotBlock;
         uint256 votingRuntime;
@@ -69,35 +68,41 @@ contract ProjectProposal is Ownable {
     //Tracks ID number for each proposal.
     uint256 proposalId = 0;
 
-    //Tracks ID number for each batch.
-    uint256 batchId = 0;
-
-    //Map a wallet to an array of Proposals (a wallet might submit multiple).
-    // mapping(address=>Proposal[]) public proposals; //Removed and moved to the Batch struct.
+    //Tracks ID number for each round.
+    uint256 roundId = 0;
 
     //Maps IDs to a proposal.
     mapping(uint256 => Proposal) proposals;
 
-    //Maps IDs to a batch.
-    mapping(uint256 => Batch) batches;
+    //Maps address to a bool for proposal winners.
+    mapping(address => bool) hasWinningProposal;
 
-    //Keeps track of all batch IDs.
-    uint256[] batchIds;
+    //Maps winning address to winning proposals.
+    mapping(address => Proposal) winningProposals;
+
+    //Maps winning roundID to winning proposals.
+    mapping(uint256 => Proposal) winningProposalsById;
+
+    //Maps IDs to a round.
+    mapping(uint256 => Round) rounds;
+
+    //Keeps track of all round IDs.
+    uint256[] roundIds;
 
     //Notify of a new proposal being added.
     event ProposalAdded(string name, uint256 amountRequested);
 
     //Notify of a proposal being killed.
-    event ProposalKilled(uint256 proposalId, string description);
+    event ProposalKilled(uint256 proposalId);
 
-    //Notify of a new batch being added.
-    event BatchAdded(string name, uint256 amountRequested);
+    //Notify of a new round being added.
+    event RoundAdded(string name, uint256 amountRequested);
 
-    //Notify of a batch being killed.
-    event BatchKilled(uint256 batchId, string description);
+    //Notify of a round being killed.
+    event RoundKilled(uint256 roundId);
 
     //Notify of a new proposal being added.
-    event AddBatch(uint256 batchId, uint256 flrAmount, uint256 batchRuntime);
+    event AddRound(uint256 roundId, uint256 flrAmount, uint256 roundRuntime);
 
     //Notify of votes added to a proposal.
     event VotesAdded(uint256 proposalId, address wallet, uint256 numberofVotes);
@@ -105,93 +110,34 @@ contract ProjectProposal is Ownable {
     //Add a new proposal using the users input - doesn't require to be owner.
     function addProposal(
         string memory _title,
-        string memory _description,
         uint256 _amountRequested,
-        address _receiver
     ) external {
         proposalId++;
 
         Proposal memory newProposal = Proposal(
             proposalId,
             _title,
-            _description,
             _amountRequested,
             msg.sender,
-            _receiver,
+            msg.sender, //receiver set to msg.sender by default.
             false
         );
 
-        // proposals[msg.sender].push(newProposal); //Removed and moved to Batch struct.
+        // proposals[msg.sender].push(newProposal); //Removed and moved to Round struct.
         proposals[proposalId] = newProposal;
-        batches[batchId].proposals.push(newProposal);
-        batches[batchId].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
+        round[roundId].proposals.push(newProposal);
+        round[roundId].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
 
         emit ProposalAdded(_title, _amountRequested);
     }
 
-    //Allow user to update the proposal title.
-    function setProposalTitle(
-        uint256 _proposalId,
-        string memory _newTitle
-    ) external {
-        Proposal storage proposalToUpdate = proposals[_proposalId];
-
-        //Only proposer can update title.
-        if (msg.sender != proposalToUpdate.proposer) {
-            revert(
-                "Error: you must be the proposer of the proposal to update."
-            );
-        }
-
-        proposalToUpdate.title = _newTitle;
-    }
-
-    //Allow user to update the proposal description.
-    function setProposalDescription(
-        uint256 _proposalId,
-        string memory _newDescription
-    ) external {
-        Proposal storage proposalToUpdate = proposals[_proposalId];
-
-        //Only proposer can update description.
-        if (msg.sender != proposalToUpdate.proposer) {
-            revert(
-                "Error: you must be the proposer of the proposal to update."
-            );
-        }
-
-        proposalToUpdate.description = _newDescription;
-    }
-
-    //Allow user to update the proposal amount requested.
-    function setProposalAmountRequested(
-        uint256 _proposalId,
-        uint256 _newAmountRequested
-    ) external {
-        Proposal storage proposalToUpdate = proposals[_proposalId];
-
-        //Only proposer can update requested amount.
-        if (msg.sender != proposalToUpdate.proposer) {
-            revert(
-                "Error: you must be the proposer of the proposal to update."
-            );
-        }
-
-        proposalToUpdate.amountRequested = _newAmountRequested;
-    }
-
     //Allow user to update the proposal receiver address.
-    function setProposalReceiverAddress(
-        uint256 _proposalId,
-        address _newAddress
-    ) external {
+    function setProposalReceiverAddress(uint256 _proposalId, address _newAddress) external {
         Proposal storage proposalToUpdate = proposals[_proposalId];
 
         //Only proposer can update receiver address.
         if (msg.sender != proposalToUpdate.proposer) {
-            revert(
-                "Error: you must be the proposer of the proposal to update."
-            );
+            revert("You must be the proposer of the proposal to update.");
         }
 
         proposalToUpdate.receiver = _newAddress;
@@ -202,7 +148,7 @@ contract ProjectProposal is Ownable {
         return proposals[_id];
     }
 
-    //Votes for a proposal within a batch.
+    //Votes for a proposal within a round.
     function addVotesToProposal(
         uint256 _proposalId,
         uint256 _numberOfVotes
@@ -214,181 +160,189 @@ contract ProjectProposal is Ownable {
             revert("Number of votes error.");
         }
 
+
         Proposal storage proposal = getProposalById(_proposalId);
         proposal.votesReceived += _numberOfVotes;
 
+        //update their voting power.
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
     }
 
-    //Remove a proposal from a batch.
-    function killProposal(uint256 _proposalId) external {
-        //Only the proposal owner or the contract owner can delete.
-        if (
-            msg.sender != proposals[_proposalId].proposer ||
-            msg.sender != owner()
-        ) {
-            revert("User must be owner of proposal or owner.");
-        }
-
-        //remove proposal from mapping.
-        delete proposals[_proposalId];
-
-        emit ProposalKilled(_proposalId, "Proposal killed successfully.");
-    }
-
-    //Get all the proposals by address.
-    // function getProposalsByAddress(address _address) public view returns (Proposal[]){
-    //     return proposals[_address];
-    // }
-
-    //Add a new batch (round).
-    function addBatch(
+    //Add a new round (round).
+    function addRound(
         uint256 _flrAmount,
-        uint256 _batchRuntime,
+        uint256 _roundRuntime,
         uint256 _snapshotDatetime,
         uint256 _votingRuntime
     ) external onlyOwner {
-        batchId++;
-        // uint256 snapshotBlock = block.number; // now handled by updateLatestBatch().
+        roundId++;
 
-        Batch storage newBatch = batches[batchId]; //Needed for mappings in structs to work.
-        newBatch.id = batchId;
-        newBatch.maxFlareAmount = _flrAmount;
-        newBatch.batchRuntime = _batchRuntime;
-        newBatch.snapshotDatetime = _snapshotDatetime;
-        newBatch.snapshotBlock = block.number;
-        newBatch.votingRuntime = _votingRuntime;
-        newBatch.proposals = [];
+        Round storage newRound = round[roundId]; //Needed for mappings in structs to work.
+        newRound.id = roundId;
+        newRound.maxFlareAmount = _flrAmount;
+        newRound.roundStarttime = block.timestamp;
+        newRound.roundRuntime = _roundRuntime;
+        newRound.snapshotDatetime = _snapshotDatetime;
+        newRound.snapshotBlock = block.number; //?
+        newRound.votingRuntime = _votingRuntime;
+        newRound.proposals = [];
 
-        batchIds.push(batchId); //Keep track of the batch ids.
+        roundIds.push(roundId); //Keep track of the round ids.
 
-        emit BatchAdded(batchId, _flrAmount, _batchRuntime);
+        emit RoundAdded(roundId, _flrAmount, _roundRuntime);
     }
 
-    //Allow owner to update the batch max flare amount.
-    function setBatchMaxFlare(uint256 _newBatchMaxFlare) external onlyOwner {
-        Batch storage batchToUpdate = getLatestBatch();
+    //Allow owner to update the round max flare amount.
+    function setRoundMaxFlare(uint256 _newRoundMaxFlare) external onlyOwner {
+        Round storage roundToUpdate = getLatestRound();
 
-        if (address(this).balance < _newBatchMaxFlare) {
+        if (address(this).balance < _newRoundMaxFlare) {
             revert("Insufficient balance.");
         }
 
-        batchToUpdate.maxFlareAmount = _newBatchMaxFlare;
+        roundToUpdate.maxFlareAmount = _newRoundMaxFlare;
     }
 
-    //Allow owner to update the batch runtime.
-    function setBatchRuntime(uint256 _newBatchRuntime) external onlyOwner {
-        Batch storage batchToUpdate = getLatestBatch();
+    //Allow owner to update the round runtime.
+    function setRoundRuntime(uint256 _newRoundRuntime) external onlyOwner {
+        Round storage roundToUpdate = getLatestRound();
 
-        batchToUpdate.batchRuntime = _newBatchRuntime;
+        roundToUpdate.roundRuntime = _newRoundRuntime;
     }
 
-    //Allow owner to update the batch snapshot date time.
-    function setBatchSnapshotDatetime(
+    //Allow owner to update the round snapshot date time.
+    function setRoundSnapshotDatetime(
         uint256 _newSnapshotDatetime
     ) external onlyOwner {
-        Batch storage batchToUpdate = getLatestBatch();
+        Round storage roundToUpdate = getLatestRound();
 
         if (block.timestamp < _newSnapshotDatetime) {
-            revert("Error: time must be in the future.");
+            revert("Time must be in the future.");
         }
 
-        batchToUpdate.snapshotDatetime = _newSnapshotDatetime;
+        roundToUpdate.snapshotDatetime = _newSnapshotDatetime;
     }
 
     //Set the snapshot block.
-    function setBatchSnapshotBlock() external onlyOwner {
-        Batch storage batch = getLatestBatch();
+    // function setRoundSnapshotBlock() external onlyOwner {
+    //     Round storage round = getLatestRound();
 
-        if (batch.snapshotDatetime > block.timestamp) {
-            batch.snapshotBlock = block.number;
-        }
-    }
+    //     if (round.snapshotDatetime > block.timestamp) {
+    //         round.snapshotBlock = block.number;
+    //     }
+    // }
 
-    //Allow owner to update the batch voting runtime.
-    function setBatchVotingRuntime(
+    //Allow owner to update the round voting runtime.
+    function setRoundVotingRuntime(
         uint256 _newVotingRuntime
     ) external onlyOwner {
-        Batch storage batchToUpdate = getLatestBatch();
+        Round storage roundToUpdate = getLatestRound();
 
-        batchToUpdate.votingRuntime = _newVotingRuntime;
+        roundToUpdate.votingRuntime = _newVotingRuntime;
     }
 
-    //Get a single batch by ID.
-    function getBatchById(uint256 _id) external view returns (Batch) {
-        return batches[_id];
+    //Get a single round by ID.
+    function getRoundById(uint256 _id) external view returns (Round) {
+        return round[_id];
     }
 
-    //Get the latest batch.
-    function getLatestBatch() public view returns (Batch) {
-        return batches[batchId];
+    //Get the latest round.
+    function getLatestRound() public view returns (Round) {
+        return round[roundId];
     }
 
-    //Get all batches.
-    function getAllBatches() external view returns (Batch[] memory) {
-        uint256 count = batchIds.length;
-        Batch[] memory allBatches = new Batch[](count);
+    //Get all round.
+    function getAllRounds() external view returns (Round[] memory) {
+        uint256 count = roundIds.length;
+        Round[] memory allRounds = new Round[](count);
         for (uint256 i = 0; i < count; i++) {
-            Batch storage batch = batches[batchIds[i]];
-            allBatches[i] = batch;
+            Round storage round = round[roundIds[i]];
+            allRounds[i] = round;
         }
-        return allBatches;
+        return allRounds;
     }
 
-    //Remove a batch.
-    function killBatch(uint256 _batchId) external onlyOwner {
-        //remove batch from mapping.
-        delete batches[_batchId];
+    //Remove a round.
+    function killRound(uint256 _roundId) external onlyOwner {
+        //remove round from mapping.
+        delete round[_roundId];
 
-        //remove batch id from array.
-        for (uint256 i = 0; i < batchIds.length; i++) {
-            if (batchIds[i] == _batchId) {
-                batchIds[i] = batchIds[batchIds.length - 1];
-                batchIds.pop();
+        //remove round id from array.
+        for (uint256 i = 0; i < roundIds.length; i++) {
+            if (roundIds[i] == _roundId) {
+                roundIds[i] = roundIds[roundIds.length - 1];
+                roundIds.pop();
                 break;
             }
         }
-        emit BatchKilled(_batchId, "Batch killed successfully.");
+        emit RoundKilled(_roundId, "Round killed successfully.");
     }
 
     //Get voting power for a user.
     function getVotingPower(address _address) external view returns (uint256) {
-        uint256 snapshotBlock = getLatestBatch().snapshotBlock;
+        uint256 snapshotBlock = getLatestRound().snapshotBlock;
 
         uint256 votingPower = floth.getPastVotes(_address, snapshotBlock);
 
         return votingPower;
     }
 
-    //When a batch is completed, call this to calculate proposal with most votes and send funds.
-    function batchComplete() external onlyOwner {
-        Proposal[] memory latestProposals = getLatestBatch().proposals;
+    //When a round is finished, allow winner to claim.
+    function roundFinished() external {
+        Round memory latestRound = getLatestRound();
+        Proposal[] memory latestProposals = latestRound.proposals;
 
         if (latestProposals.length == 0) {
-            revert("No proposals exist in the batch.");
+            revert("No proposals exist in the round.");
+        }
+
+        //Check if round is over.
+        if((latestRound.roundStarttime + latestRound.roundRuntime) < block.timestamp){
+            revert("Round has not finished yet.");
         }
 
         //Check which proposal has the most votes.
         Proposal memory mostVotedProposal = latestProposals[0];
         for (uint256 i = 1; i < latestProposals.length; i++) {
-            if (
-                latestProposals[i].votesReceived >
-                mostVotedProposal.votesReceived
-            ) {
+            if (latestProposals[i].votesReceived > mostVotedProposal.votesReceived) {
                 mostVotedProposal = latestProposals[i];
             }
         }
 
-        address recipient = mostVotedProposal.receiver;
-        uint256 amountRequested = mostVotedProposal.amountRequested;
+        //Add winning proposal to mappings.
+        winningProposals[mostVotedProposal.receiver] = mostVotedProposal;
+        winningProposalsById[latestRound.id] = mostVotedProposal;
+        hasWinningProposal[mostVotedProposal.receiver] = true;
+    }
 
+    //When a round is finished, allow winner to claim. 
+    function claimFunds() external {
+        //Check if the wallet has won a round.
+        if(!hasWinningProposal[msg.sender]){
+            revert("Claimer has not won a round.");
+        }
+
+        Round storage winningProposal = winningProposals[msg.sender];
+        
+        //Check if the funds have already been claimed.
+        if(winningProposal.fundsClaimedIfWinner){
+            revert("Funds has already been claimed for winning proposal.");
+        }
+
+        address recipient = winningProposal.receiver;
+        if(recipient != msg.sender){
+            revert("Claimer must be the proposal recipient.");
+        }
+
+        uint256 amountRequested = winningProposal.amountRequested;
         if (address(this).balance < amountRequested) {
             revert("Insufficient balance.");
         }
 
-        //Send amount requested to user.
+        //Send amount requested to winner.
         (bool success, ) = recipient.call{value: amountRequested}("");
 
         require(success);
+        winningProposal.fundsClaimedIfWinner = true; //Set as claimed so winner cannot reclaim for the proposal.
     }
 }
