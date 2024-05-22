@@ -108,10 +108,13 @@ contract ProjectProposal is Ownable {
     event VotesAdded(uint256 proposalId, address wallet, uint256 numberofVotes);
 
     //Add a new proposal using the users input - doesn't require to be owner.
-    function addProposal(
-        string memory _title,
-        uint256 _amountRequested,
-    ) external {
+    function addProposal(string memory _title,uint256 _amountRequested) external {
+        Round memory latestRound = getLatestRound();
+
+        if(latestRound.maxFlareAmount < _amountRequested){
+            revert("Amount requested is more than the max amount for the round.");
+        }
+
         proposalId++;
 
         Proposal memory newProposal = Proposal(
@@ -149,10 +152,7 @@ contract ProjectProposal is Ownable {
     }
 
     //Votes for a proposal within a round.
-    function addVotesToProposal(
-        uint256 _proposalId,
-        uint256 _numberOfVotes
-    ) external {
+    function addVotesToProposal(uint256 _proposalId, uint256 _numberOfVotes) external {
         //Check if the user has FLOTH and their voting power if greater than or equal to their votes.
         if (floth.balanceOf(msg.sender) <= 0) {
             revert("User doesn't have FLOTH.");
