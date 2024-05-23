@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./IFloth.sol";
 
-contract ProjectProposal is Ownable {
+contract ProjectProposal is AccessControl {
     /**
      * What does the front end need/TODO
      *
@@ -16,7 +16,7 @@ contract ProjectProposal is Ownable {
      * - Can ONLY submit proposals during "submission window" during a round. Should be locked otherwise. Front end needs to read this lock. ✅
      * - View function to get proposals and their votes and paginated, index 0 gives first x, index 1 give second x amount etc.
      * - Add winners array and remove the "accepted" bool. ✅
-     * - Add AccessControl for role permissoning to the contract. Roles: ADMIN, SNAPSHOTTER, ROUND_MANAGER
+     * - Add AccessControl for role permissoning to the contract. Roles: ADMIN, SNAPSHOTTER, ROUND_MANAGER ✅
      */
 
     /**
@@ -37,10 +37,16 @@ contract ProjectProposal is Ownable {
     * setter for current round - maxFlareAmount; roundRunTime;  snapshotDatetime; snapshotBlock; votingRuntime; -- onlyowner.  ✅
     */
 
+    //Admin role by default is DEFAULT_ADMIN_ROLE.
+    bytes32 public constant SNAPSHOTTER_ROLE = keccak256("SNAPSHOTTER_ROLE");
+    bytes32 public constant ROUND_MANAGER_ROLE = keccak256("ROUND_MANAGER_ROLE");
+
     IFloth internal floth;
 
     constructor(address _flothAddress) {
         floth = IFloth(_flothAddress);
+        
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     struct Proposal {
@@ -105,6 +111,31 @@ contract ProjectProposal is Ownable {
 
     //Notify of votes added to a proposal.
     event VotesAdded(uint256 proposalId, address wallet, uint256 numberofVotes);
+
+    //Modifiers to check for admin, shapshotter, or round manager roles.
+    modifier onlyAdmin() {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
+        _;
+    }
+
+    modifier roundManagerOrAdmin() {
+        require((hasRole(ROUND_MANAGER_ROLE, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender)), "Caller is not a round manager or admin");
+        _;
+    }
+     
+     modifier snapshotterManagerOrAdmin() {
+        require((hasRole(SNAPSHOTTER_ROLE, msg.sender) || hasRole(ROUND_MANAGER_ROLE, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender)), "Caller is not a snapshotter, round manager or admin,");
+        _;
+    }
+
+
+    function grantSnapshotterRole(address account) external onlyAdmin {
+        grantRole(SNAPSHOTTER_ROLE, account);
+    }
+
+    function grantRoundManagerRole(address account) external onlyAdmin {
+        grantRole(ROUND_MANAGER_ROLE, account);
+    }
 
     //Add a new proposal using the users input - doesn't require to be owner.
     function addProposal(string memory _title,uint256 _amountRequested) external {
@@ -194,7 +225,7 @@ contract ProjectProposal is Ownable {
         uint256 _roundRuntime,
         uint256 _snapshotDatetime,
         uint256 _votingRuntime
-    ) external onlyOwner {
+    ) external roundManagerOrAdmin {
         roundId++;
 
         Round storage newRound = round[roundId]; //Needed for mappings in structs to work.
@@ -212,8 +243,8 @@ contract ProjectProposal is Ownable {
         emit RoundAdded(roundId, _flrAmount, _roundRuntime);
     }
 
-    //Allow owner to update the round max flare amount.
-    function setRoundMaxFlare(uint256 _newRoundMaxFlare) external onlyOwner {
+    //Allow admin or Round Manager to update the round max flare amount.
+    function setRoundMaxFlare(uint256 _newRoundMaxFlare) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
 
         if (address(this).balance < _newRoundMaxFlare) {
@@ -223,17 +254,15 @@ contract ProjectProposal is Ownable {
         roundToUpdate.maxFlareAmount = _newRoundMaxFlare;
     }
 
-    //Allow owner to update the round runtime.
-    function setRoundRuntime(uint256 _newRoundRuntime) external onlyOwner {
+    //Allow Admin or Round Manager to update the round runtime.
+    function setRoundRuntime(uint256 _newRoundRuntime) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
 
         roundToUpdate.roundRuntime = _newRoundRuntime;
     }
 
-    //Allow owner to update the round snapshot date time.
-    function setRoundSnapshotDatetime(
-        uint256 _newSnapshotDatetime
-    ) external onlyOwner {
+    //Allow Admin or Round Manager to update the round snapshot date time.
+    function setRoundSnapshotDatetime(uint256 _newSnapshotDatetime) external snapshotterManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
 
         if (block.timestamp < _newSnapshotDatetime) {
@@ -243,7 +272,7 @@ contract ProjectProposal is Ownable {
         roundToUpdate.snapshotDatetime = _newSnapshotDatetime;
     }
 
-    function setRoundSnapshotBlock() external onlyOwner {
+    function setRoundSnapshotBlock() external snapshotterManagerOrAdmin {
         Round storage round = getLatestRound();
 
         if (round.snapshotDatetime > block.timestamp) {
@@ -254,16 +283,14 @@ contract ProjectProposal is Ownable {
     }
 
     //Take a snapshot for the current round.
-    function takeSnapshot() external onlyOwner {
+    function takeSnapshot() external snapshotterManagerOrAdmin {
         Round storage round = getLatestRound();
 
         round.snapshotBlock = block.number;
     }
 
     //Allow owner to update the round voting runtime.
-    function setRoundVotingRuntime(
-        uint256 _newVotingRuntime
-    ) external onlyOwner {
+    function setRoundVotingRuntime(uint256 _newVotingRuntime) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
 
         roundToUpdate.votingRuntime = _newVotingRuntime;
@@ -304,7 +331,7 @@ contract ProjectProposal is Ownable {
     }
 
     //Remove a round.
-    function killRound(uint256 _roundId) external onlyOwner {
+    function killRound(uint256 _roundId) external roundManagerOrAdmin{
         //remove round from mapping.
         delete round[_roundId];
 
@@ -342,7 +369,7 @@ contract ProjectProposal is Ownable {
     }
 
     //When a round is finished, allow winner to claim.
-    function roundFinished() external {
+    function roundFinished() external roundManagerOrAdmin{
         Round memory latestRound = getLatestRound();
         Proposal[] memory latestProposals = latestRound.proposals;
 
