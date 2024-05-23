@@ -13,7 +13,7 @@ contract ProjectProposal is Ownable {
      * - No description on chain. ✅
      * - Remove setter for amount requested. -✅ Kyle said to now keep.
      * - Event emitted when proposal is created (creator proposal address, proposal id (make it more like a uid using keccak or something, use 16 bytes).✅
-     * - Can ONLY submit proposals during "submission window" during a round. Should be locked otherwise. Front end needs to read this lock.
+     * - Can ONLY submit proposals during "submission window" during a round. Should be locked otherwise. Front end needs to read this lock. ✅
      * - View function to get proposals and their votes and paginated, index 0 gives first x, index 1 give second x amount etc.
      * - Add winners array and remove the "accepted" bool. ✅
      * - Add AccessControl for role permissoning to the contract. Roles: ADMIN, SNAPSHOTTER, ROUND_MANAGER
@@ -112,6 +112,11 @@ contract ProjectProposal is Ownable {
 
         if(latestRound.maxFlareAmount < _amountRequested){
             revert("Amount requested is more than the max amount for the round.");
+        }
+        
+        //If within a voting period, revert.
+        if(getVotingPeriod()){
+            revert("Cannot submit proposal during voting period.");
         }
 
         proposalId++;
@@ -264,6 +269,19 @@ contract ProjectProposal is Ownable {
         roundToUpdate.votingRuntime = _newVotingRuntime;
     }
 
+    //Get the total votes for a specifc round.
+    function getTotalVotesForRound(uint256 _roundId) external view returns (uint256) {
+        Proposal[] memory requestedProposals = getRoundById(_roundId).proposals;
+        uint256 totalVotes = 0;
+
+        //Iterate through proposals and count all votes.
+         for (uint256 i = 0; i < requestedProposals.length; i++) {
+            totalVotes += requestedProposals[i].votesReceived;
+        }
+
+        return totalVotes;
+    }
+
     //Get a single round by ID.
     function getRoundById(uint256 _id) external view returns (Round) {
         return round[_id];
@@ -301,13 +319,26 @@ contract ProjectProposal is Ownable {
         emit RoundKilled(_roundId, "Round killed successfully.");
     }
 
-    //Get voting power for a user.
-    function getVotingPower(address _address) public view returns (uint256) {
-        uint256 snapshotBlock = getLatestRound().snapshotBlock;
+    //Get the remaining voting power for a user for a round.
+    function getRemainingVotingPower(address _address) external view returns (uint256) {
+        return getLatestRound().currentVotingPower[_address];
+    }
 
-        uint256 votingPower = floth.getPastVotes(_address, snapshotBlock);
+    //Check if we are in a voting period. This contract and the UI will call.
+    function getVotingPeriod() public view returns (bool) {
+        bool inVotingPeriod = false;
 
-        return votingPower;
+        Round memory latestRound = getLatestRound();
+        
+        //🟠 We need a way to calculate voting start and end dates. 🟠
+        uint256 votingStartDate;
+        uint256 votingEndDate;
+
+        if(block.timestamp >= votingStartDate && block.timestamp <= votingEndDate){
+            inVotingPeriod = true;
+        }
+        
+        return inVotingPeriod;
     }
 
     //When a round is finished, allow winner to claim.
