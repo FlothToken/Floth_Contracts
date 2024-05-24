@@ -106,13 +106,16 @@ contract ProjectProposal is AccessControl {
     event ProposalKilled(uint256 proposalId);
 
     //Notify of a new round being added.
-    event RoundAdded(string name, uint256 amountRequested);
+    event RoundAdded(uint256 roundId, uint256 flrAmount, uint256 roundRuntime);
 
     //Notify of a round being killed.
     event RoundKilled(uint256 roundId);
 
     //Notify of votes added to a proposal.
     event VotesAdded(uint256 proposalId, address wallet, uint256 numberofVotes);
+
+    //Notify when snapshots are taken.
+    event SnapshotTaken(uint256 roundId, uint256 snapshotBlock);
 
     //Modifiers to check for admin, shapshotter, or round manager roles.
     modifier onlyAdmin() {
@@ -312,6 +315,8 @@ contract ProjectProposal is AccessControl {
         // Set voting period start and end times
         round.votingStartDate = block.timestamp;
         round.votingEndDate = block.timestamp + round.votingRuntime;
+
+        emit SnapshotTaken(round.id, round.snapshotBlock);
     }
 
     //Allow owner to update the round voting runtime.
@@ -371,10 +376,10 @@ contract ProjectProposal is AccessControl {
         emit RoundKilled(_roundId, "Round killed successfully.");
     }
 
-    //Get the remaining voting power for a user for a round.
-    function voteRetrieval(uint256 _roundId, uint256 _pageNumber) external view returns (uint256[]) {
-        return getLatestRound().currentVotingPower[_address];
-    }
+    //Retrieve proposal ID's and the number of votes for each, using pagination.
+    // function voteRetrieval(uint256 _roundId, uint256 _pageNumber) external view returns (uint256[]) {
+    //     return getLatestRound().currentVotingPower[_address];
+    // }
 
     //Get the remaining voting power for a user for a round.
     function getRemainingVotingPower(address _address) external view returns (uint256) {
