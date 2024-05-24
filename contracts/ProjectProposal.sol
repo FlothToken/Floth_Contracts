@@ -9,7 +9,7 @@ contract ProjectProposal is AccessControl {
      * What does the front end need/TODO
      *
      * - Create proposal function (name/amount requested/proposer and receiver set to msg.sender initially). ✅
-     * - Change "round" to "round". ✅
+     * - Change "batch" to "round". ✅
      * - No description on chain. ✅
      * - Remove setter for amount requested. -✅ Kyle said to now keep.
      * - Event emitted when proposal is created (creator proposal address, proposal id (make it more like a uid using keccak or something, use 16 bytes).✅
@@ -67,6 +67,8 @@ contract ProjectProposal is AccessControl {
         uint256 snapshotDatetime;
         uint256 snapshotBlock;
         uint256 votingRuntime;
+        uint256 votingStartDate;
+        uint256 votingEndDate;
         Proposal[] proposals;
         mapping(address => uint256) proposalsPerWallet; //Tracks the number of proposals submitted by a wallet.
         mapping(address => bool) hasVoted; //Tracks if a wallet has voted in a round.
@@ -128,11 +130,17 @@ contract ProjectProposal is AccessControl {
         _;
     }
 
+    //Allow admin to grant admin role to another account.
+    function grantAdminRole(address account) external onlyAdmin {
+        grantRole(DEFAULT_ADMIN_ROLE, account);
+    }
 
+    //Allow admin to grant snapshotter role.
     function grantSnapshotterRole(address account) external onlyAdmin {
         grantRole(SNAPSHOTTER_ROLE, account);
     }
 
+    //Allow admin to grant round manager role.
     function grantRoundManagerRole(address account) external onlyAdmin {
         grantRole(ROUND_MANAGER_ROLE, account);
     }
@@ -141,13 +149,18 @@ contract ProjectProposal is AccessControl {
     function addProposal(string memory _title,uint256 _amountRequested) external {
         Round memory latestRound = getLatestRound();
 
-        if(latestRound.maxFlareAmount < _amountRequested){
-            revert("Amount requested is more than the max amount for the round.");
+        //If submission window is closed, revert.
+        if(!isSubmissionWindowOpen()){
+            revert("Submission window is closed.");
         }
         
         //If within a voting period, revert.
-        if(getVotingPeriod()){
+        if(isVotingPeriodOpen()){
             revert("Cannot submit proposal during voting period.");
+        }
+
+        if(latestRound.maxFlareAmount < _amountRequested){
+            revert("Amount requested is more than the max amount for the round.");
         }
 
         proposalId++;
@@ -161,10 +174,9 @@ contract ProjectProposal is AccessControl {
             false
         );
 
-        // proposals[msg.sender].push(newProposal); //Removed and moved to Round struct.
         proposals[proposalId] = newProposal;
-        round[roundId].proposals.push(newProposal);
-        round[roundId].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
+        rounds[roundId].proposals.push(newProposal);
+        rounds[roundId].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
 
         emit ProposalAdded(msg.sender, proposalId, _title, _amountRequested);
     }
@@ -228,15 +240,17 @@ contract ProjectProposal is AccessControl {
     ) external roundManagerOrAdmin {
         roundId++;
 
-        Round storage newRound = round[roundId]; //Needed for mappings in structs to work.
+        Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
         newRound.id = roundId;
         newRound.maxFlareAmount = _flrAmount;
         newRound.roundStarttime = block.timestamp;
         newRound.roundRuntime = _roundRuntime;
         newRound.snapshotDatetime = _snapshotDatetime;
+        newRound.votingStartDate = 0;
+        newRound.votingEndDate = 0;
         newRound.snapshotBlock = block.number; //?
         newRound.votingRuntime = _votingRuntime;
-        newRound.proposals = [];
+        //newRound.proposals = []; Gets initialized by default.
 
         roundIds.push(roundId); //Keep track of the round ids.
 
@@ -286,7 +300,18 @@ contract ProjectProposal is AccessControl {
     function takeSnapshot() external snapshotterManagerOrAdmin {
         Round storage round = getLatestRound();
 
+        if(block.timestamp <= round.snapshotDatetime){
+            revert("Snapshot time not reached yet.");
+        }
+        if(block.timestamp > (round.roundStarttime + round.roundRuntime)){
+            revert("Round has already ended.");
+        }
+
         round.snapshotBlock = block.number;
+
+        // Set voting period start and end times
+        round.votingStartDate = block.timestamp;
+        round.votingEndDate = block.timestamp + round.votingRuntime;
     }
 
     //Allow owner to update the round voting runtime.
@@ -311,12 +336,12 @@ contract ProjectProposal is AccessControl {
 
     //Get a single round by ID.
     function getRoundById(uint256 _id) external view returns (Round) {
-        return round[_id];
+        return rounds[_id];
     }
 
     //Get the latest round.
     function getLatestRound() public view returns (Round) {
-        return round[roundId];
+        return rounds[roundId];
     }
 
     //Get all round.
@@ -324,7 +349,7 @@ contract ProjectProposal is AccessControl {
         uint256 count = roundIds.length;
         Round[] memory allRounds = new Round[](count);
         for (uint256 i = 0; i < count; i++) {
-            Round storage round = round[roundIds[i]];
+            Round storage round = rounds[roundIds[i]];
             allRounds[i] = round;
         }
         return allRounds;
@@ -333,7 +358,7 @@ contract ProjectProposal is AccessControl {
     //Remove a round.
     function killRound(uint256 _roundId) external roundManagerOrAdmin{
         //remove round from mapping.
-        delete round[_roundId];
+        delete rounds[_roundId];
 
         //remove round id from array.
         for (uint256 i = 0; i < roundIds.length; i++) {
@@ -347,25 +372,37 @@ contract ProjectProposal is AccessControl {
     }
 
     //Get the remaining voting power for a user for a round.
+    function voteRetrieval(uint256 _roundId, uint256 _pageNumber) external view returns (uint256[]) {
+        return getLatestRound().currentVotingPower[_address];
+    }
+
+    //Get the remaining voting power for a user for a round.
     function getRemainingVotingPower(address _address) external view returns (uint256) {
         return getLatestRound().currentVotingPower[_address];
     }
 
     //Check if we are in a voting period. This contract and the UI will call.
-    function getVotingPeriod() public view returns (bool) {
+    function isVotingPeriodOpen() public view returns (bool) {
         bool inVotingPeriod = false;
 
         Round memory latestRound = getLatestRound();
-        
-        //🟠 We need a way to calculate voting start and end dates. 🟠
-        uint256 votingStartDate;
-        uint256 votingEndDate;
 
-        if(block.timestamp >= votingStartDate && block.timestamp <= votingEndDate){
+        if(block.timestamp >= latestRound.votingStartDate && block.timestamp <= latestRound.votingEndDate){
             inVotingPeriod = true;
         }
         
         return inVotingPeriod;
+    }
+
+    function isSubmissionWindowOpen() public view returns (bool) {
+        Round memory latestRound = getLatestRound();
+        bool isWindowOpen = false;
+
+        if(block.timestamp < latestRound.snapshotDatetime && block.timestamp > latestRound.roundStarttime){
+            isWindowOpen = true;
+        }
+
+        return isWindowOpen;
     }
 
     //When a round is finished, allow winner to claim.
