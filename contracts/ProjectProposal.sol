@@ -75,6 +75,12 @@ contract ProjectProposal is AccessControl {
         mapping(address => uint256) currentVotingPower; //Tracks the current voting power per wallet.
     }
 
+    //Used to return proposal id's and their vote count for a specific round.
+    struct VoteRetrieval{
+        uint256 proposalId;
+        uint256 voteCount;
+    }
+
     //Tracks ID number for each proposal.
     uint256 proposalId = 0;
 
@@ -99,14 +105,23 @@ contract ProjectProposal is AccessControl {
     //Keeps track of all round IDs.
     uint256[] roundIds;
 
+    //The number of proposals we want to return per page.
+    uint256 constant PAGE_SIZE = 50;
+
     //Notify of a new proposal being added.
     event ProposalAdded(address creator, uint16 proposalId, string title, uint256 amountRequested);
+
+    //Notify community when propsal receiver address is updated.
+    event ProposalUpdated(uint256 proposalId, address newAddress);
 
     //Notify of a proposal being killed.
     event ProposalKilled(uint256 proposalId);
 
     //Notify of a new round being added.
     event RoundAdded(uint256 roundId, uint256 flrAmount, uint256 roundRuntime);
+
+    //Notify about round completed and the winning proposal ID.
+    event RoundCompleted(uint256 roundId, uint256 proposalId);
 
     //Notify of a round being killed.
     event RoundKilled(uint256 roundId);
@@ -116,6 +131,15 @@ contract ProjectProposal is AccessControl {
 
     //Notify when snapshots are taken.
     event SnapshotTaken(uint256 roundId, uint256 snapshotBlock);
+
+    //Notify when the winner has claimed the funds.
+    event FundsClaimed(uint256 proposalId, address winningAddress, uint256 amountRequested);
+
+    //Notify when roles are granted.
+    event RoleGranted(bytes32 role, address grantedTo, address grantedBy);
+
+    //Notify when roles are revoked.
+    event RoleRevoked(bytes32 role, address revokedFrom, address revoker);
 
     //Modifiers to check for admin, shapshotter, or round manager roles.
     modifier onlyAdmin() {
@@ -136,17 +160,39 @@ contract ProjectProposal is AccessControl {
     //Allow admin to grant admin role to another account.
     function grantAdminRole(address account) external onlyAdmin {
         grantRole(DEFAULT_ADMIN_ROLE, account);
+        emit RoleGranted(DEFAULT_ADMIN_ROLE, account, msg.sender);
     }
 
     //Allow admin to grant snapshotter role.
     function grantSnapshotterRole(address account) external onlyAdmin {
         grantRole(SNAPSHOTTER_ROLE, account);
+        emit RoleGranted(SNAPSHOTTER_ROLE, account, msg.sender);
     }
 
     //Allow admin to grant round manager role.
     function grantRoundManagerRole(address account) external onlyAdmin {
         grantRole(ROUND_MANAGER_ROLE, account);
+        emit RoleGranted(ROUND_MANAGER_ROLE, account, msg.sender);
     }
+
+    //Revoke admin role from a user.
+    function revokeAdminRole(address account) external onlyAdmin {
+        revokeRole(DEFAULT_ADMIN_ROLE, account);
+        emit RoleRevoked(DEFAULT_ADMIN_ROLE, account, msg.sender);
+    }
+
+    //Revoke snapshotter role from a user.
+    function revokeSnapshotterRole(address account) external onlyAdmin {
+        revokeRole(SNAPSHOTTER_ROLE, account);
+        emit RoleRevoked(SNAPSHOTTER_ROLE, account, msg.sender);
+    }
+
+    //Revoke round manager role from a user.
+    function revokeRoundManagerRole(address account) external onlyAdmin {
+        revokeRole(ROUND_MANAGER_ROLE, account);
+        emit RoleRevoked(ROUND_MANAGER_ROLE, account, msg.sender);
+    }
+
 
     //Add a new proposal using the users input - doesn't require to be owner.
     function addProposal(string memory _title,uint256 _amountRequested) external {
@@ -194,6 +240,7 @@ contract ProjectProposal is AccessControl {
         }
 
         proposalToUpdate.receiver = _newAddress;
+        emit ProposalUpdated(_proposalId, _newAddress);
     }
 
     //Get a single proposal by ID.
@@ -377,9 +424,31 @@ contract ProjectProposal is AccessControl {
     }
 
     //Retrieve proposal ID's and the number of votes for each, using pagination.
-    // function voteRetrieval(uint256 _roundId, uint256 _pageNumber) external view returns (uint256[]) {
-    //     return getLatestRound().currentVotingPower[_address];
-    // }
+    function voteRetrieval(uint256 _roundId, uint256 _pageNumber) external view returns (VoteRetrieval[] memory) {
+        Proposal[] memory requestedProposals = getRoundById(_roundId).proposals;
+
+        //Start/end indexes of proposals to return.
+        uint256 startIndex = (_pageNumber - 1) * PAGE_SIZE;
+        uint256 endIndex = startIndex + PAGE_SIZE;
+
+        //Check end index is not bigger than proposal length.
+        if (endIndex > requestedProposals.length) {
+            endIndex = requestedProposals.length;
+        }
+
+        uint256 resultSize = endIndex - startIndex; //Should equal PAGE_SIZE, but may not if final page.
+
+        VoteRetrieval[] memory voteRetrievals = new VoteRetrieval[](resultSize);
+
+         for (uint256 i = 0; i < resultSize; i++) {
+           voteRetrievals[i] = VoteRetrieval({
+                proposalId: requestedProposals[startIndex + i].id,
+                voteCount: requestedProposals[startIndex + i].votesReceived
+            });
+        }
+
+        return voteRetrievals;
+    }
 
     //Get the remaining voting power for a user for a round.
     function getRemainingVotingPower(address _address) external view returns (uint256) {
@@ -426,7 +495,7 @@ contract ProjectProposal is AccessControl {
 
         //Check which proposal has the most votes.
         Proposal memory mostVotedProposal = latestProposals[0];
-        for (uint256 i = 1; i < latestProposals.length; i++) {
+        for (uint256 i = 0; i < latestProposals.length; i++) {
             if (latestProposals[i].votesReceived > mostVotedProposal.votesReceived) {
                 mostVotedProposal = latestProposals[i];
             }
@@ -436,6 +505,8 @@ contract ProjectProposal is AccessControl {
         winningProposals[mostVotedProposal.receiver] = mostVotedProposal;
         winningProposalsById[latestRound.id] = mostVotedProposal;
         hasWinningProposal[mostVotedProposal.receiver] = true;
+
+        emit RoundCompleted(latestRound.id, mostVotedProposal.id);
     }
 
     //When a round is finished, allow winner to claim. 
@@ -467,5 +538,7 @@ contract ProjectProposal is AccessControl {
 
         require(success);
         winningProposal.fundsClaimedIfWinner = true; //Set as claimed so winner cannot reclaim for the proposal.
+
+        emit FundsClaimed(winningProposal.id, msg.sender, amountRequested);
     }
 }
