@@ -105,9 +105,6 @@ contract ProjectProposal is AccessControl {
     //Keeps track of all round IDs.
     uint256[] roundIds;
 
-    //The number of proposals we want to return per page.
-    uint256 constant PAGE_SIZE = 50;
-
     //Notify of a new proposal being added.
     event ProposalAdded(address creator, uint16 proposalId, string title, uint256 amountRequested);
 
@@ -424,19 +421,19 @@ contract ProjectProposal is AccessControl {
     }
 
     //Retrieve proposal ID's and the number of votes for each, using pagination.
-    function voteRetrieval(uint256 _roundId, uint256 _pageNumber) external view returns (VoteRetrieval[] memory) {
+    function voteRetrieval(uint256 _roundId, uint256 _pageNumber, uint256 _pageSize) external view returns (VoteRetrieval[] memory) {
         Proposal[] memory requestedProposals = getRoundById(_roundId).proposals;
 
         //Start/end indexes of proposals to return.
-        uint256 startIndex = (_pageNumber - 1) * PAGE_SIZE;
-        uint256 endIndex = startIndex + PAGE_SIZE;
+        uint256 startIndex = (_pageNumber - 1) * _pageSize;
+        uint256 endIndex = startIndex + _pageSize;
 
         //Check end index is not bigger than proposal length.
         if (endIndex > requestedProposals.length) {
             endIndex = requestedProposals.length;
         }
 
-        uint256 resultSize = endIndex - startIndex; //Should equal PAGE_SIZE, but may not if final page.
+        uint256 resultSize = endIndex - startIndex; //Should equal _pageSize, but may not if final page.
 
         VoteRetrieval[] memory voteRetrievals = new VoteRetrieval[](resultSize);
 
