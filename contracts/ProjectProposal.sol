@@ -215,17 +215,18 @@ contract ProjectProposal is AccessControl {
 
         proposalId++;
 
-        Proposal memory newProposal = Proposal(
-            proposalId,
-            latestRound.id,
-            _title,
-            _amountRequested,
-            msg.sender,
-            msg.sender, //receiver set to msg.sender by default.
-            false
-        );
+        Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
 
-        proposals[proposalId] = newProposal;
+
+        Proposal storage newProposal = proposals[proposalId];
+        newProposal.id = proposalId;
+        newProposal.roundId = latestRound.id;
+        newProposal.title = _title;
+        newProposal.amountRequested = _amountRequested;
+        newProposal.receiver = msg.sender; //receiver set to msg.sender by default.
+        newProposal.proposer = msg.sender;
+        newProposal.fundsClaimedIfWinner = false;
+
         rounds[roundId].proposals.push(newProposal);
         rounds[roundId].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
 
