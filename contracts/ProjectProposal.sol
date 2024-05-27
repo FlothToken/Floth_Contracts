@@ -231,6 +231,11 @@ contract ProjectProposal is AccessControl {
     function setProposalReceiverAddress(uint256 _proposalId, address _newAddress) external {
         Proposal storage proposalToUpdate = proposals[_proposalId];
 
+        //Prevent proposer updating receiver address during voting window.
+        if(isVotingPeriodOpen()){
+            revert("Cannot update receiver address during voting window.");
+        }
+
         //Only proposer can update receiver address.
         if (msg.sender != proposalToUpdate.proposer) {
             revert("You must be the proposer of the proposal to update.");
