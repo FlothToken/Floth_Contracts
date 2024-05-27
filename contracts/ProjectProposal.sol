@@ -327,6 +327,19 @@ contract ProjectProposal is AccessControl {
         newRound.votingRuntime = _votingRuntime;
         //newRound.proposals = []; Gets initialized by default.
 
+        //Add 'Abstain' proposal for the new round.
+        proposalId++;
+        Proposal storage abstainProposal = proposals[proposalId];
+        abstainProposal.id = proposalId;
+        abstainProposal.roundId = roundId;
+        abstainProposal.title = "Abstain";
+        abstainProposal.amountRequested = 0;
+        abstainProposal.receiver = msg.sender; 
+        abstainProposal.proposer = msg.sender;
+        abstainProposal.fundsClaimedIfWinner = false;
+
+        newRound.proposals.push(newProposal); //Add abstain proposal to round struct.
+
         roundIds.push(roundId); //Keep track of the round ids.
 
         emit RoundAdded(roundId, _flrAmount, _roundRuntime);
