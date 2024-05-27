@@ -51,6 +51,7 @@ contract ProjectProposal is AccessControl {
 
     struct Proposal {
         uint256 id;
+        uint256 roundId; //Needs to be tracked for claiming funds.
         string title;
         uint256 amountRequested;
         uint256 votesReceived;
@@ -213,6 +214,7 @@ contract ProjectProposal is AccessControl {
 
         Proposal memory newProposal = Proposal(
             proposalId,
+            latestRound.id,
             _title,
             _amountRequested,
             msg.sender,
@@ -518,8 +520,15 @@ contract ProjectProposal is AccessControl {
             revert("Claimer has not won a round.");
         }
 
-        Round storage winningProposal = winningProposals[msg.sender];
+        Proposal storage winningProposal = winningProposals[msg.sender];
         
+        //Check if 30 days have passed since round finished. 86400 seconds in a day.
+        Round memory claimRound = getRoundById(winningProposal.roundId);
+        uint256 daysPassed = (block.timestamp - claimRound.roundStarttime + claimRound.roundRuntime)/86400;
+        if(daysPassed > 30){
+            revert("Funds can only be claimed within 30 days of the round ending.");
+        }
+
         //Check if the funds have already been claimed.
         if(winningProposal.fundsClaimedIfWinner){
             revert("Funds has already been claimed for winning proposal.");
