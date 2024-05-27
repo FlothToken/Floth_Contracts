@@ -127,6 +127,9 @@ contract ProjectProposal is AccessControl {
     //Notify of votes added to a proposal.
     event VotesAdded(uint256 proposalId, address wallet, uint256 numberofVotes);
 
+    //Notify of votes removed from a proposal.
+    event VotesRemoved(uint256 proposalId, address wallet, uint256 numberofVotes);
+
     //Notify when snapshots are taken.
     event SnapshotTaken(uint256 roundId, uint256 snapshotBlock);
 
@@ -281,8 +284,28 @@ contract ProjectProposal is AccessControl {
         currentVotingPower -= _numberOfVotes; //Reduce voting power in a round.
         currentRound.hasVoted[msg.sender] = true; //Set that the user has voted in a round.
 
-        //update their voting power.
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
+    }
+
+    //Votes for a proposal within a round.
+    function removeVotesFromProposal(uint256 _proposalId, address _account) external {
+        Round storage currentRound = getLatestRound();
+       
+        //Check if the user hasn't voted yet.
+         if(!currentRound.hasVoted[msg.sender]){
+            revert("User has not voted yet in this round.");
+         }
+       
+        uint256 currentVotingPower = currentRound.currentVotingPower[msg.sender];
+        uint256 votesGiven =  getVotingPower(_account) - currentVotingPower; //Calculate votes given to proposal.
+
+        Proposal storage proposal = getProposalById(_proposalId);
+        proposal.votesReceived -= votesGiven; //Remove votes given to proposal.
+
+        currentVotingPower += votesGiven; //Give voting power back to user.
+        currentRound.hasVoted[msg.sender] = false; //Remove users has voted status.
+
+        emit VotesRemoved(_proposalId, msg.sender, votesGiven);
     }
 
     //Add a new round (round).
@@ -457,6 +480,15 @@ contract ProjectProposal is AccessControl {
     //Get the remaining voting power for a user for a round.
     function getRemainingVotingPower(address _address) external view returns (uint256) {
         return getLatestRound().currentVotingPower[_address];
+    }
+
+    //Get voting power for a user.
+    function getVotingPower(address _address) external view returns (uint256) {
+        uint256 snapshotBlock = getLatestRound().snapshotBlock;
+
+        uint256 votingPower = floth.getPastVotes(_address, snapshotBlock);
+
+        return votingPower;
     }
 
     //Check if we are in a voting period. This contract and the UI will call.
