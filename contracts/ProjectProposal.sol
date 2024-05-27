@@ -215,9 +215,6 @@ contract ProjectProposal is AccessControl {
 
         proposalId++;
 
-        Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
-
-
         Proposal storage newProposal = proposals[proposalId];
         newProposal.id = proposalId;
         newProposal.roundId = latestRound.id;
@@ -227,8 +224,8 @@ contract ProjectProposal is AccessControl {
         newProposal.proposer = msg.sender;
         newProposal.fundsClaimedIfWinner = false;
 
-        rounds[roundId].proposals.push(newProposal);
-        rounds[roundId].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
+        rounds[latestRound.id].proposals.push(newProposal);
+        rounds[latestRound.id].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
 
         emit ProposalAdded(msg.sender, proposalId, _title, _amountRequested);
     }
