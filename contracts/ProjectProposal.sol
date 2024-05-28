@@ -334,7 +334,7 @@ contract ProjectProposal is AccessControl {
         abstainProposal.roundId = roundId;
         abstainProposal.title = "Abstain";
         abstainProposal.amountRequested = 0;
-        abstainProposal.receiver = msg.sender; 
+        abstainProposal.receiver = 0x0000000000000000000000000000000000000000; 
         abstainProposal.proposer = msg.sender;
         abstainProposal.fundsClaimedIfWinner = false;
 
