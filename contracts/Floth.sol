@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 contract Floth is ERC20Votes, Ownable {
-    using SafeMath for uint256;
 
     //Bot tax
     uint256 public buyTax = 25;
@@ -64,18 +63,18 @@ contract Floth is ERC20Votes, Ownable {
 
         //Case for if it's a buy transaction.
         if(dexAddresses[_sender]){
-            taxAmount = _amount.mul(buyTax).div(100); //Amount * buy tax as a decimal.
+            taxAmount = _amount * (buyTax / 100); //Amount * buy tax as a decimal.
             if(taxAmount > 0){
                 super._transfer(_sender, grantFundWallet, taxAmount);
             }
         }
         //Case for if it's a sell transaction.
         if(dexAddresses[_recipient]){
-            taxAmount = _amount.mul(sellTax).div(100); //Amount * sell tax as a decimal.
+            taxAmount = _amount * (sellTax / 100); //Amount * sell tax as a decimal.
 
             if(taxAmount > 0){
-                uint256 grantFundAmount = taxAmount.mul(833).div(1000); //83.3% (2.5% of the 3%)
-                uint256 lpPairingAmount = taxAmount.sub(grantFundAmount); //16.7% (0.5% of the 3%)
+                uint256 grantFundAmount = _taxAmount * (833 / 1000); //83.3% (2.5% from the 3%)
+                int256 lpPairingAmount = _taxAmount - grantFundAmount; //16.7% (0.5% from the 3%)
 
                 super._transfer(_sender, grantFundWallet, grantFundAmount);
 
@@ -83,7 +82,8 @@ contract Floth is ERC20Votes, Ownable {
             }
         }
 
-        uint256 totalPayable = _amount.sub(taxAmount); //Final tax amount is deducted.
+        uint256 totalPayable = _amount - taxAmount; //Final tax amount is deducted.
+        
         super._transfer(_sender, _recipient, totalPayable);
     }
 }
