@@ -2,14 +2,14 @@
 pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Floth is ERC20Votes {
+contract Floth is ERC20Votes, Ownable {
 
     //Bot tax
     uint256 public buyTax = 25;
     uint256 public sellTax = 35;
 
-    address private admin;
     uint256 public deploymentTime;
 
     // Store DEX addresses to calculate if buy/sell/transfer.
@@ -21,27 +21,19 @@ contract Floth is ERC20Votes {
     constructor(address[] memory _dexAddresses) ERC20("Floth", "FLOTH") {
         _mint(msg.sender, 1000000 * 10 ** 18);
         deploymentTime = block.timestamp;
-        admin = msg.sender;
 
         for (uint256 i = 0; i < _dexAddresses.length; i++) {
             dexAddresses[_dexAddresses[i]] = true;
         }
     }
 
-    modifier onlyAdmin(){
-        if(msg.sender != admin){
-            revert("You must be admin.");
-        }
-        _;
-    }
-
-    //Set sell bot tax.
-    function setSellBotTax(uint256 _newSellTax) external onlyAdmin {
+    //Set sell bot tax. We need to review how this will be done...
+    function setSellBotTax(uint256 _newSellTax) external onlyOwner {
         sellTax = _newSellTax;
     }
 
     //Set buy bot tax.
-    function setBuyBotTax(uint256 _newBuyTax) external onlyAdmin {
+    function setBuyBotTax(uint256 _newBuyTax) external onlyOwner {
         buyTax = _newBuyTax;
     }
 
@@ -70,7 +62,7 @@ contract Floth is ERC20Votes {
             }
         }
         //Case for if it's a sell transaction.
-        else if(dexAddresses[_recipient]){
+        if(dexAddresses[_recipient]){
             taxAmount = _amount * (sellTax / 100); //Amount * sell tax as a decimal.
 
             if(taxAmount > 0){
@@ -79,12 +71,8 @@ contract Floth is ERC20Votes {
 
                 super._transfer(_from, grantFundWallet, grantFundAmount);
                 
-                //Also send to the LP Pairing until 10% LP allocation reserve is depleted.
+                //Also send to the LP Pairing until 10% LP allocation reserve is depleted. REVIEW.
             }
-        }
-        //Case for if it's a wallet to wallet transfer.
-        else{
-        
         }
 
         uint256 totalPayable = _amount - taxAmount; //Final tax amount is deducted.
