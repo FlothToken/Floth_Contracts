@@ -37,7 +37,7 @@ contract ProjectProposal is AccessControl {
     * setter for current round - maxFlareAmount; roundRunTime;  snapshotDatetime; snapshotBlock; votingRuntime; -- onlyowner.  ✅
     */
 
-    //Admin role by default is DEFAULT_ADMIN_ROLE.
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant SNAPSHOTTER_ROLE = keccak256("SNAPSHOTTER_ROLE");
     bytes32 public constant ROUND_MANAGER_ROLE = keccak256("ROUND_MANAGER_ROLE");
 
@@ -46,18 +46,21 @@ contract ProjectProposal is AccessControl {
     constructor(address _flothAddress) {
         floth = IFloth(_flothAddress);
         
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
+        _setRoleAdmin(SNAPSHOTTER_ROLE, ADMIN_ROLE);
+        _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
+        _grantRole(ADMIN_ROLE, msg.sender);
     }
 
     struct Proposal {
         uint256 id;
-        uint256 roundId; //Needs to be tracked for claiming funds.
+        uint256 roundId; //Tracked for claiming funds.
         string title;
         uint256 amountRequested;
         uint256 votesReceived;
         address proposer; //The wallet that submitted the proposal.
         address receiver; //The wallet that will receive the funds.
-        bool fundsClaimedIfWinner; //Tracked here incase funds are not claimed before new round begins.
+        bool fundsClaimed; //Tracked here incase funds are not claimed before new round begins.
     }
 
     struct Round {
@@ -142,54 +145,69 @@ contract ProjectProposal is AccessControl {
     //Notify when roles are revoked.
     event RoleRevoked(bytes32 role, address revokedFrom, address revoker);
 
-    //Modifiers to check for admin, shapshotter, or round manager roles.
-    modifier onlyAdmin() {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
-        _;
-    }
+    error InvalidPermissions();
+    error SubmissionWindowClosed();
+    error VotingPeriodOpen();
+    error AmountRequestedTooHigh();
+    error InvalidVotingPower();
+    error InvalidFlothAmount();
+    error InsufficientBalance();
+    error FundsAlreadyClaimed();
+    error FundsClaimingPeriod();
+    error InvalidClaimer();
+    error ClaimerNotRecipient();
+    error NoProposalsInRound();
+    error RoundIsOpen();
+    error RoundIsClosed();
+    error InvalidSnapshotTime();
+    error UserVoteNotFound();
 
     modifier roundManagerOrAdmin() {
-        require((hasRole(ROUND_MANAGER_ROLE, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender)), "Caller is not a round manager or admin");
+        if(!hasRole(ROUND_MANAGER_ROLE, msg.sender) || !hasRole(ADMIN_ROLE, msg.sender)){
+            revert InvalidPermissions();
+        }
         _;
     }
      
      modifier snapshotterManagerOrAdmin() {
-        require((hasRole(SNAPSHOTTER_ROLE, msg.sender) || hasRole(ROUND_MANAGER_ROLE, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender)), "Caller is not a snapshotter, round manager or admin,");
+        if(!hasRole(SNAPSHOTTER_ROLE, msg.sender) || !hasRole(ROUND_MANAGER_ROLE, msg.sender) || !hasRole(ADMIN_ROLE, msg.sender)){
+            revert InvalidPermissions();
+        }
         _;
     }
 
     //Allow admin to grant admin role to another account.
-    function grantAdminRole(address account) external onlyAdmin {
-        grantRole(DEFAULT_ADMIN_ROLE, account);
-        emit RoleGranted(DEFAULT_ADMIN_ROLE, account, msg.sender);
+    function grantAdminRole(address account) external onlyRole(ADMIN_ROLE) {
+        grantRole(ADMIN_ROLE, account);
+        emit RoleGranted(ADMIN_ROLE, account, msg.sender);
     }
 
     //Allow admin to grant snapshotter role.
-    function grantSnapshotterRole(address account) external onlyAdmin {
+    function grantSnapshotterRole(address account) external onlyRole(ADMIN_ROLE) {
         grantRole(SNAPSHOTTER_ROLE, account);
         emit RoleGranted(SNAPSHOTTER_ROLE, account, msg.sender);
     }
 
     //Allow admin to grant round manager role.
-    function grantRoundManagerRole(address account) external onlyAdmin {
+    function grantRoundManagerRole(address account) external onlyRole(ADMIN_ROLE) {
         grantRole(ROUND_MANAGER_ROLE, account);
         emit RoleGranted(ROUND_MANAGER_ROLE, account, msg.sender);
     }
 
     //Revoke admin role from a user.
-    function revokeAdminRole(address account) external onlyAdmin {
-        revokeRole(DEFAULT_ADMIN_ROLE, account);
-        emit RoleRevoked(DEFAULT_ADMIN_ROLE, account, msg.sender);
+    function revokeAdminRole(address account) external onlyRole(ADMIN_ROLE) {
+        revokeRole(ADMIN_ROLE, account);
+        emit RoleRevoked(ADMIN_ROLE, account, msg.sender);
     }
 
     //Revoke snapshotter role from a user.
-    function revokeSnapshotterRole(address account) external onlyAdmin {
+    function revokeSnapshotterRole(address account) external onlyRole(ADMIN_ROLE) {
         revokeRole(SNAPSHOTTER_ROLE, account);
         emit RoleRevoked(SNAPSHOTTER_ROLE, account, msg.sender);
     }
 
     //Revoke round manager role from a user.
-    function revokeRoundManagerRole(address account) external onlyAdmin {
+    function revokeRoundManagerRole(address account) external onlyRole(ADMIN_ROLE) {
         revokeRole(ROUND_MANAGER_ROLE, account);
         emit RoleRevoked(ROUND_MANAGER_ROLE, account, msg.sender);
     }
@@ -201,16 +219,16 @@ contract ProjectProposal is AccessControl {
 
         //If submission window is closed, revert.
         if(!isSubmissionWindowOpen()){
-            revert("Submission window is closed.");
+            revert SubmissionWindowClosed();
         }
         
         //If within a voting period, revert.
         if(isVotingPeriodOpen()){
-            revert("Cannot submit proposal during voting period.");
+            revert VotingPeriodOpen();
         }
 
         if(latestRound.maxFlareAmount < _amountRequested){
-            revert("Amount requested is more than the max amount for the round.");
+            revert AmountRequestedTooHigh();
         }
 
         proposalId++;
@@ -222,7 +240,7 @@ contract ProjectProposal is AccessControl {
         newProposal.amountRequested = _amountRequested;
         newProposal.receiver = msg.sender; //receiver set to msg.sender by default.
         newProposal.proposer = msg.sender;
-        newProposal.fundsClaimedIfWinner = false;
+        newProposal.fundsClaimed = false;
 
         rounds[latestRound.id].proposals.push(newProposal);
         rounds[latestRound.id].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
@@ -236,12 +254,12 @@ contract ProjectProposal is AccessControl {
 
         //Prevent proposer updating receiver address during voting window.
         if(isVotingPeriodOpen()){
-            revert("Cannot update receiver address during voting window.");
+            revert VotingPeriodOpen();
         }
 
         //Only proposer can update receiver address.
         if (msg.sender != proposalToUpdate.proposer) {
-            revert("You must be the proposer of the proposal to update.");
+            revert InvalidPermissions();
         }
 
         proposalToUpdate.receiver = _newAddress;
@@ -257,15 +275,15 @@ contract ProjectProposal is AccessControl {
     function addVotesToProposal(uint256 _proposalId, uint256 _numberOfVotes) external {
         //Check if the user has FLOTH.
         if (floth.balanceOf(msg.sender) == 0) {
-            revert("User doesn't have FLOTH.");
+            revert InvalidFlothAmount();
         } 
 
         Round storage currentRound = getLatestRound();
         uint256 currentVotingPower = currentRound.currentVotingPower[msg.sender];
 
-        //Check if the users doesn't have a voting power set and they haven already voted in the round.
+        //Check if the users doesn't have a voting power set and they haven't already voted in the round.
          if(currentVotingPower == 0 && currentRound.hasVoted[msg.sender]){
-            revert("No voting power left in this round.");
+            revert InvalidVotingPower();
          }
          else if(currentVotingPower == 0 && !currentRound.hasVoted[msg.sender]){
             currentVotingPower = floth.getPastVotes(msg.sender, currentRound.snapshotBlock);
@@ -273,7 +291,7 @@ contract ProjectProposal is AccessControl {
 
         //If the user doesn't have enough voting power, stop them from voting.
         if(currentVotingPower < _numberOfVotes){
-           revert("Not enough voting power to vote that amount of votes.");
+           revert InvalidVotingPower();
         }
 
         Proposal storage proposal = getProposalById(_proposalId);
@@ -284,18 +302,18 @@ contract ProjectProposal is AccessControl {
 
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
     }
-
+//CASE FOR VOTING ON MUltiPLE PROJECts
     //Votes for a proposal within a round.
-    function removeVotesFromProposal(uint256 _proposalId, address _account) external {
+    function removeVotesFromProposal(uint256 _proposalId) external {
         Round storage currentRound = getLatestRound();
        
         //Check if the user hasn't voted yet.
          if(!currentRound.hasVoted[msg.sender]){
-            revert("User has not voted yet in this round.");
+            revert UserVoteNotFound();
          }
        
         uint256 currentVotingPower = currentRound.currentVotingPower[msg.sender];
-        uint256 votesGiven =  getVotingPower(_account) - currentVotingPower; //Calculate votes given to proposal.
+        uint256 votesGiven =  getVotingPower(msg.sender) - currentVotingPower; //Calculate votes given to proposal.
 
         Proposal storage proposal = getProposalById(_proposalId);
         proposal.votesReceived -= votesGiven; //Remove votes given to proposal.
@@ -327,7 +345,7 @@ contract ProjectProposal is AccessControl {
         newRound.votingRuntime = _votingRuntime;
         //newRound.proposals = []; Gets initialized by default.
 
-        //Add 'Abstain' proposal for the new round.
+        //Add 'Abstain' proposal for the new round. Should they give all their voting power to it?🟠
         proposalId++;
         Proposal storage abstainProposal = proposals[proposalId];
         abstainProposal.id = proposalId;
@@ -336,9 +354,9 @@ contract ProjectProposal is AccessControl {
         abstainProposal.amountRequested = 0;
         abstainProposal.receiver = 0x0000000000000000000000000000000000000000; 
         abstainProposal.proposer = msg.sender;
-        abstainProposal.fundsClaimedIfWinner = false;
+        abstainProposal.fundsClaimed = false;
 
-        newRound.proposals.push(newProposal); //Add abstain proposal to round struct.
+        newRound.proposals.push(abstainProposal); //Add abstain proposal to round struct.
 
         roundIds.push(roundId); //Keep track of the round ids.
 
@@ -350,7 +368,7 @@ contract ProjectProposal is AccessControl {
         Round storage roundToUpdate = getLatestRound();
 
         if (address(this).balance < _newRoundMaxFlare) {
-            revert("Insufficient balance.");
+            revert InsufficientBalance();
         }
 
         roundToUpdate.maxFlareAmount = _newRoundMaxFlare;
@@ -368,20 +386,10 @@ contract ProjectProposal is AccessControl {
         Round storage roundToUpdate = getLatestRound();
 
         if (block.timestamp < _newSnapshotDatetime) {
-            revert("Time must be in the future.");
+            revert InvalidSnapshotTime();
         }
 
         roundToUpdate.snapshotDatetime = _newSnapshotDatetime;
-    }
-
-    function setRoundSnapshotBlock() external snapshotterManagerOrAdmin {
-        Round storage round = getLatestRound();
-
-        if (round.snapshotDatetime > block.timestamp) {
-            round.snapshotBlock = block.number;
-        }
-      
-        round.snapshotBlock = block.number;
     }
 
     //Take a snapshot for the current round.
@@ -389,10 +397,10 @@ contract ProjectProposal is AccessControl {
         Round storage round = getLatestRound();
 
         if(block.timestamp <= round.snapshotDatetime){
-            revert("Snapshot time not reached yet.");
+            revert InvalidSnapshotTime();
         }
         if(block.timestamp > (round.roundStarttime + round.roundRuntime)){
-            revert("Round has already ended.");
+            revert RoundIsClosed();
         }
 
         round.snapshotBlock = block.number;
@@ -532,12 +540,12 @@ contract ProjectProposal is AccessControl {
         Proposal[] memory latestProposals = latestRound.proposals;
 
         if (latestProposals.length == 0) {
-            revert("No proposals exist in the round.");
+            revert NoProposalsInRound();
         }
 
         //Check if round is over.
         if((latestRound.roundStarttime + latestRound.roundRuntime) < block.timestamp){
-            revert("Round has not finished yet.");
+            revert RoundIsOpen();
         }
 
         //Check which proposal has the most votes.
@@ -560,7 +568,7 @@ contract ProjectProposal is AccessControl {
     function claimFunds() external {
         //Check if the wallet has won a round.
         if(!hasWinningProposal[msg.sender]){
-            revert("Claimer has not won a round.");
+            revert InvalidClaimer();
         }
 
         Proposal storage winningProposal = winningProposals[msg.sender];
@@ -569,29 +577,29 @@ contract ProjectProposal is AccessControl {
         Round memory claimRound = getRoundById(winningProposal.roundId);
         uint256 daysPassed = (block.timestamp - claimRound.roundStarttime + claimRound.roundRuntime)/86400;
         if(daysPassed > 30){
-            revert("Funds can only be claimed within 30 days of the round ending.");
+            revert FundsClaimingPeriod();
         }
 
         //Check if the funds have already been claimed.
-        if(winningProposal.fundsClaimedIfWinner){
-            revert("Funds has already been claimed for winning proposal.");
+        if(winningProposal.fundsClaimed){
+            revert FundsAlreadyClaimed();
         }
 
         address recipient = winningProposal.receiver;
         if(recipient != msg.sender){
-            revert("Claimer must be the proposal recipient.");
+            revert ClaimerNotRecipient();
         }
 
         uint256 amountRequested = winningProposal.amountRequested;
         if (address(this).balance < amountRequested) {
-            revert("Insufficient balance.");
+            revert InsufficientBalance();
         }
 
+        winningProposal.fundsClaimed = true; //Set as claimed so winner cannot reclaim for the proposal.
+       
         //Send amount requested to winner.
         (bool success, ) = recipient.call{value: amountRequested}("");
-
         require(success);
-        winningProposal.fundsClaimedIfWinner = true; //Set as claimed so winner cannot reclaim for the proposal.
 
         emit FundsClaimed(winningProposal.id, msg.sender, amountRequested);
     }
