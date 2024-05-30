@@ -179,7 +179,7 @@ contract ProjectProposal is AccessControl {
         string memory _title,
         uint256 _amountRequested
     ) external {
-        Round memory latestRound = getLatestRound();
+        Round storage latestRound = getLatestRound();
 
         //If submission window is closed, revert.
         if (!isSubmissionWindowOpen()) {
