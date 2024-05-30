@@ -532,17 +532,9 @@ contract ProjectProposal is AccessControl {
     }
 
     function isSubmissionWindowOpen() public view returns (bool) {
-        Round memory latestRound = getLatestRound();
-        bool isWindowOpen = false;
-
-        if (
-            block.timestamp < latestRound.snapshotDatetime &&
-            block.timestamp > latestRound.roundStarttime
-        ) {
-            isWindowOpen = true;
-        }
-
-        return isWindowOpen;
+        Round memory latestRound = rounds[roundId];
+        return (block.timestamp < latestRound.snapshotDatetime &&
+            block.timestamp > latestRound.roundStarttime);
     }
 
     //When a round is finished, allow winner to claim.
