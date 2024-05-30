@@ -174,50 +174,6 @@ contract ProjectProposal is AccessControl {
         _;
     }
 
-    //Allow admin to grant admin role to another account.
-    function grantAdminRole(address account) external onlyRole(ADMIN_ROLE) {
-        grantRole(ADMIN_ROLE, account);
-        emit RoleGranted(ADMIN_ROLE, account, msg.sender);
-    }
-
-    //Allow admin to grant snapshotter role.
-    function grantSnapshotterRole(
-        address account
-    ) external onlyRole(ADMIN_ROLE) {
-        grantRole(SNAPSHOTTER_ROLE, account);
-        emit RoleGranted(SNAPSHOTTER_ROLE, account, msg.sender);
-    }
-
-    //Allow admin to grant round manager role.
-    function grantRoundManagerRole(
-        address account
-    ) external onlyRole(ADMIN_ROLE) {
-        grantRole(ROUND_MANAGER_ROLE, account);
-        emit RoleGranted(ROUND_MANAGER_ROLE, account, msg.sender);
-    }
-
-    //Revoke admin role from a user.
-    function revokeAdminRole(address account) external onlyRole(ADMIN_ROLE) {
-        revokeRole(ADMIN_ROLE, account);
-        emit RoleRevoked(ADMIN_ROLE, account, msg.sender);
-    }
-
-    //Revoke snapshotter role from a user.
-    function revokeSnapshotterRole(
-        address account
-    ) external onlyRole(ADMIN_ROLE) {
-        revokeRole(SNAPSHOTTER_ROLE, account);
-        emit RoleRevoked(SNAPSHOTTER_ROLE, account, msg.sender);
-    }
-
-    //Revoke round manager role from a user.
-    function revokeRoundManagerRole(
-        address account
-    ) external onlyRole(ADMIN_ROLE) {
-        revokeRole(ROUND_MANAGER_ROLE, account);
-        emit RoleRevoked(ROUND_MANAGER_ROLE, account, msg.sender);
-    }
-
     //Add a new proposal using the users input - doesn't require to be owner.
     function addProposal(
         string memory _title,
