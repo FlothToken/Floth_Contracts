@@ -42,37 +42,18 @@ contract ProjectProposal is AccessControl {
     struct Round {
         uint256 id;
         uint256 maxFlareAmount;
-        uint256 roundStartTime;
+        uint256 roundStarttime;
         uint256 roundRuntime;
         uint256 snapshotDatetime;
         uint256 snapshotBlock;
         uint256 votingRuntime;
         uint256 votingStartDate;
         uint256 votingEndDate;
-        uint256 proposalCount;
+        Proposal[] proposals;
+        mapping(address => uint256) proposalsPerWallet; //Tracks the number of proposals submitted by a wallet.
+        mapping(address => bool) hasVoted; //Tracks if a wallet has voted in a round.
+        mapping(address => uint256) currentVotingPower; //Tracks the current voting power per wallet.
     }
-
-    //Maps IDs to a proposal.
-    mapping(uint256 => Proposal) proposals;
-
-    //Maps IDs to a round.
-    mapping(uint256 => Round) rounds;
-
-    //Maps round ID to proposals.
-    mapping(uint256 => mapping(uint256 => uint256)) public roundProposals;
-
-    //Maps address to a bool for proposal winners.
-    mapping(address => bool) hasWinningProposal;
-
-    //Maps winning address to winning proposals.
-    mapping(address => Proposal) winningProposals;
-
-    //Maps winning roundID to winning proposals.
-    mapping(uint256 => Proposal) winningProposalsById;
-
-    mapping(address => uint256) proposalsPerWallet; //Tracks the number of proposals submitted by a wallet.
-    mapping(address => bool) hasVoted; //Tracks if a wallet has voted in a round.
-    mapping(address => uint256) currentVotingPower; //Tracks the current voting power per wallet.
 
     //Used to return proposal id's and their vote count for a specific round.
     struct VoteRetrieval {
@@ -85,6 +66,21 @@ contract ProjectProposal is AccessControl {
 
     //Tracks ID number for each round.
     uint256 public roundId = 0;
+
+    //Maps IDs to a proposal.
+    mapping(uint256 => Proposal) proposals;
+
+    //Maps address to a bool for proposal winners.
+    mapping(address => bool) hasWinningProposal;
+
+    //Maps winning address to winning proposals.
+    mapping(address => Proposal) winningProposals;
+
+    //Maps winning roundID to winning proposals.
+    mapping(uint256 => Proposal) winningProposalsById;
+
+    //Maps IDs to a round.
+    mapping(uint256 => Round) rounds;
 
     //Keeps track of all round IDs.
     uint256[] roundIds;
@@ -131,6 +127,12 @@ contract ProjectProposal is AccessControl {
         address winningAddress,
         uint256 amountRequested
     );
+
+    //Notify when roles are granted.
+    event RoleGranted(bytes32 role, address grantedTo, address grantedBy);
+
+    //Notify when roles are revoked.
+    event RoleRevoked(bytes32 role, address revokedFrom, address revoker);
 
     error InvalidPermissions();
     error SubmissionWindowClosed();
@@ -195,19 +197,17 @@ contract ProjectProposal is AccessControl {
 
         proposalId++;
 
-        proposals[proposalId] = Proposal({
-            id: proposalId,
-            roundId: latestRound.id,
-            title: _title,
-            amountRequested: _amountRequested,
-            votesReceived: 0,
-            proposer: msg.sender,
-            receiver: msg.sender,
-            fundsClaimed: false
-        });
+        Proposal storage newProposal = proposals[proposalId];
+        newProposal.id = proposalId;
+        newProposal.roundId = latestRound.id;
+        newProposal.title = _title;
+        newProposal.amountRequested = _amountRequested;
+        newProposal.receiver = msg.sender; //receiver set to msg.sender by default.
+        newProposal.proposer = msg.sender;
+        newProposal.fundsClaimed = false;
 
-        roundProposals[latestRound.id][latestRound.proposalCount] = proposalId;
-        latestRound.proposalCount++;
+        rounds[latestRound.id].proposals.push(newProposal);
+        rounds[latestRound.id].proposalsPerWallet[msg.sender] += 1; //Increase proposal count for a wallet by 1.
 
         emit ProposalAdded(msg.sender, proposalId, _title, _amountRequested);
     }
@@ -240,7 +240,7 @@ contract ProjectProposal is AccessControl {
     //Get a single proposal by ID.
     function getProposalById(
         uint256 _id
-    ) public view returns (Proposal memory) {
+    ) external view returns (Proposal memory) {
         if (_id > proposalId) {
             revert ProposalIdOutOfRange();
         }
@@ -258,32 +258,30 @@ contract ProjectProposal is AccessControl {
         }
 
         Round storage currentRound = getLatestRound();
-        uint256 votingPowerForRound = currentRound.currentVotingPower[
+        uint256 currentVotingPower = currentRound.currentVotingPower[
             msg.sender
         ];
-        bool hasVotedForRound = currentRound.hasVoted[msg.sender];
+        bool hasVoted = currentRound.hasVoted[msg.sender];
 
         //Check if the users doesn't have a voting power set and they haven't already voted in the round.
-        if (votingPowerForRound == 0 && hasVotedForRound) {
+        if (currentVotingPower == 0 && hasVoted) {
             revert InvalidVotingPower();
-        } else if (votingPowerForRound == 0 && !hasVotedForRound) {
-            votingPowerForRound = floth.getPastVotes(
+        } else if (currentVotingPower == 0 && !hasVoted) {
+            currentVotingPower = floth.getPastVotes(
                 msg.sender,
                 currentRound.snapshotBlock
             );
         }
 
         //If the user doesn't have enough voting power, stop them from voting.
-        if (votingPowerForRound < _numberOfVotes) {
+        if (currentVotingPower < _numberOfVotes) {
             revert InvalidVotingPower();
         }
 
         Proposal storage proposal = getProposalById(_proposalId);
         proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
 
-        currentRound.currentVotingPower[msg.sender] =
-            currentVotingPower -
-            _numberOfVotes; //Reduce voting power in a round.
+        currentVotingPower -= _numberOfVotes; //Reduce voting power in a round.
         currentRound.hasVoted[msg.sender] = true; //Set that the user has voted in a round.
 
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
@@ -299,17 +297,15 @@ contract ProjectProposal is AccessControl {
             revert UserVoteNotFound();
         }
 
-        uint256 votingPowerForRound = currentRound.currentVotingPower[
+        uint256 currentVotingPower = currentRound.currentVotingPower[
             msg.sender
         ];
-        uint256 votesGiven = getVotingPower(msg.sender) - votingPowerForRound; //Calculate votes given.
+        uint256 votesGiven = getVotingPower(msg.sender) - currentVotingPower; //Calculate votes given.
 
         Proposal storage proposal = getProposalById(_proposalId);
         proposal.votesReceived -= votesGiven; //Remove votes given to proposal.
 
-        currentRound.currentVotingPower[msg.sender] =
-            currentVotingPower +
-            votesGiven; //Give voting power back to user.
+        currentVotingPower += votesGiven; //Give voting power back to user.
         currentRound.hasVoted[msg.sender] = false; //Remove users has voted status.
 
         emit VotesRemoved(_proposalId, msg.sender, votesGiven);
@@ -323,40 +319,33 @@ contract ProjectProposal is AccessControl {
         uint256 _votingRuntime
     ) external roundManagerOrAdmin {
         roundId++;
-        roundIds.push(roundId); //Keep track of the round ids.
 
-        rounds[roundId] = Round({
-            id: roundId,
-            maxFlareAmount: _flrAmount,
-            roundStarttime: block.timestamp,
-            roundRuntime: _roundRuntime,
-            snapshotDatetime: _snapshotDatetime,
-            snapshotBlock: block.number,
-            votingRuntime: _votingRuntime,
-            votingStartDate: 0,
-            votingEndDate: 0,
-            proposalCount: 0
-        });
+        Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
+        newRound.id = roundId;
+        newRound.maxFlareAmount = _flrAmount;
+        newRound.roundStarttime = block.timestamp;
+        newRound.roundRuntime = _roundRuntime;
+        newRound.snapshotDatetime = _snapshotDatetime;
+        newRound.votingStartDate = 0;
+        newRound.votingEndDate = 0;
+        newRound.snapshotBlock = block.number; //?
+        newRound.votingRuntime = _votingRuntime;
         //newRound.proposals = []; Gets initialized by default.
 
-        proposalId++;
-
-        Round storage latestRound = getLatestRound();
-
         //Add 'Abstain' proposal for the new round. Should they give all their voting power to it?🟠
-        proposals[proposalId] = Proposal({
-            id: proposalId,
-            roundId: latestRound.id,
-            title: "Abstain",
-            amountRequested: 0,
-            votesReceived: 0,
-            proposer: msg.sender,
-            receiver: address(0), // TODO We need to add check that if we are claiming the funds on a winning abstain we don't withdraw to zero address!
-            fundsClaimed: false
-        });
+        proposalId++;
+        Proposal storage abstainProposal = proposals[proposalId];
+        abstainProposal.id = proposalId;
+        abstainProposal.roundId = roundId;
+        abstainProposal.title = "Abstain";
+        abstainProposal.amountRequested = 0;
+        abstainProposal.receiver = 0x0000000000000000000000000000000000000000;
+        abstainProposal.proposer = msg.sender;
+        abstainProposal.fundsClaimed = false;
 
-        roundProposals[latestRound.id][latestRound.proposalCount] = proposalId;
-        latestRound.proposalCount++;
+        newRound.proposals.push(abstainProposal); //Add abstain proposal to round struct.
+
+        roundIds.push(roundId); //Keep track of the round ids.
 
         emit RoundAdded(roundId, _flrAmount, _roundRuntime);
     }
@@ -430,11 +419,15 @@ contract ProjectProposal is AccessControl {
     function getTotalVotesForRound(
         uint256 _roundId
     ) external view returns (uint256) {
-        Round storage round = rounds[_roundId];
+        Proposal[] storage requestedProposals = getRoundById(_roundId)
+            .proposals;
         uint256 totalVotes = 0;
-        for (uint256 i = 0; i < round.proposalCount; i++) {
-            totalVotes += proposals[roundProposals[_roundId][i]].votesReceived;
+
+        //Iterate through proposals and count all votes.
+        for (uint256 i = 0; i < requestedProposals.length; i++) {
+            totalVotes += requestedProposals[i].votesReceived;
         }
+
         return totalVotes;
     }
 
@@ -453,7 +446,8 @@ contract ProjectProposal is AccessControl {
         uint256 count = roundIds.length;
         Round[] memory allRounds = new Round[](count);
         for (uint256 i = 0; i < count; i++) {
-            allRounds[i] = rounds[roundIds[i]];
+            Round storage round = rounds[roundIds[i]];
+            allRounds[i] = round;
         }
         return allRounds;
     }
@@ -463,7 +457,7 @@ contract ProjectProposal is AccessControl {
         //remove round from mapping.
         delete rounds[_roundId];
 
-        //remove round from roundIds array.
+        //remove round id from array.
         for (uint256 i = 0; i < roundIds.length; i++) {
             if (roundIds[i] == _roundId) {
                 roundIds[i] = roundIds[roundIds.length - 1];
@@ -471,7 +465,7 @@ contract ProjectProposal is AccessControl {
                 break;
             }
         }
-        emit RoundKilled(_roundId);
+        emit RoundKilled(_roundId, "Round killed successfully.");
     }
 
     //Retrieve proposal ID's and the number of votes for each, using pagination.
@@ -483,8 +477,6 @@ contract ProjectProposal is AccessControl {
         Proposal[] memory requestedProposals = getRoundById(_roundId).proposals;
 
         //Start/end indexes of proposals to return.
-        //TODO What happens if the page number passed in is 0?
-        //TODO Can probably use new roudn.proposalCount instead of requestedProposals.length
         uint256 startIndex = (_pageNumber - 1) * _pageSize;
         uint256 endIndex = startIndex + _pageSize;
 
@@ -515,17 +507,28 @@ contract ProjectProposal is AccessControl {
     }
 
     //Get voting power for a user.
-    function getVotingPower(address _address) public view returns (uint256) {
-        uint256 snapshotBlock = rounds[roundId].snapshotBlock;
-        return floth.getPastVotes(_address, snapshotBlock);
+    function getVotingPower(address _address) external view returns (uint256) {
+        uint256 snapshotBlock = getLatestRound().snapshotBlock;
+
+        uint256 votingPower = floth.getPastVotes(_address, snapshotBlock);
+
+        return votingPower;
     }
 
     //Check if we are in a voting period. This contract and the UI will call.
     function isVotingPeriodOpen() public view returns (bool) {
-        Round storage round = rounds[roundId];
-        return
-            block.timestamp >= round.votingStartDate &&
-            block.timestamp <= round.votingEndDate;
+        bool inVotingPeriod = false;
+
+        Round memory latestRound = getLatestRound();
+
+        if (
+            block.timestamp >= latestRound.votingStartDate &&
+            block.timestamp <= latestRound.votingEndDate
+        ) {
+            inVotingPeriod = true;
+        }
+
+        return inVotingPeriod;
     }
 
     function isSubmissionWindowOpen() public view returns (bool) {
@@ -544,31 +547,33 @@ contract ProjectProposal is AccessControl {
 
     //When a round is finished, allow winner to claim.
     function roundFinished() external roundManagerOrAdmin {
-        Round storage latestRound = rounds[roundId];
+        Round memory latestRound = getLatestRound();
+        Proposal[] memory latestProposals = latestRound.proposals;
 
-        if (latestRound.proposalCount == 0) {
+        if (latestProposals.length == 0) {
             revert NoProposalsInRound();
         }
 
+        //Check if round is over.
         if (
-            block.timestamp <
-            (latestRound.roundStarttime + latestRound.roundRuntime)
+            (latestRound.roundStarttime + latestRound.roundRuntime) <
+            block.timestamp
         ) {
             revert RoundIsOpen();
         }
 
-        Proposal storage mostVotedProposal = proposals[
-            roundProposals[latestRound.id][0]
-        ];
-        for (uint256 i = 1; i < latestRound.proposalCount; i++) {
-            Proposal storage proposal = proposals[
-                roundProposals[latestRound.id][i]
-            ];
-            if (proposal.votesReceived > mostVotedProposal.votesReceived) {
-                mostVotedProposal = proposal;
+        //Check which proposal has the most votes.
+        Proposal memory mostVotedProposal = latestProposals[0];
+        for (uint256 i = 0; i < latestProposals.length; i++) {
+            if (
+                latestProposals[i].votesReceived >
+                mostVotedProposal.votesReceived
+            ) {
+                mostVotedProposal = latestProposals[i];
             }
         }
 
+        //Add winning proposal to mappings.
         winningProposals[mostVotedProposal.receiver] = mostVotedProposal;
         winningProposalsById[latestRound.id] = mostVotedProposal;
         hasWinningProposal[mostVotedProposal.receiver] = true;
