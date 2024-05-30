@@ -88,7 +88,7 @@ contract ProjectProposal is AccessControl {
     //Notify of a new proposal being added.
     event ProposalAdded(
         address creator,
-        uint16 proposalId,
+        uint256 proposalId,
         string title,
         uint256 amountRequested
     );
