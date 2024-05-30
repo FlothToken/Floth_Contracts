@@ -507,7 +507,7 @@ contract ProjectProposal is AccessControl {
     }
 
     //Get voting power for a user.
-    function getVotingPower(address _address) external view returns (uint256) {
+    function getVotingPower(address _address) public view returns (uint256) {
         uint256 snapshotBlock = getLatestRound().snapshotBlock;
 
         uint256 votingPower = floth.getPastVotes(_address, snapshotBlock);
