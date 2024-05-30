@@ -240,7 +240,7 @@ contract ProjectProposal is AccessControl {
     //Get a single proposal by ID.
     function getProposalById(
         uint256 _id
-    ) external view returns (Proposal memory) {
+    ) public view returns (Proposal memory) {
         if (_id > proposalId) {
             revert ProposalIdOutOfRange();
         }
