@@ -22,6 +22,8 @@ contract Floth is ERC20Votes, Ownable {
     event TaxUpdated(string taxType, uint256 newTax);
     event DexAddressUpdated(address dexAddress, bool isAdded);
 
+    error InvalidTaxAmount();
+
     constructor(address[] memory _dexAddresses) ERC20("Floth", "FLOTH") {
         _mint(msg.sender, 1000000 * 10 ** 18);
         deploymentTime = block.timestamp;
@@ -31,14 +33,22 @@ contract Floth is ERC20Votes, Ownable {
         }
     }
 
-    //Set sell bot tax. We need to review how this will be done...
+    //Set sell bot tax.
     function setSellBotTax(uint256 _newSellTax) external onlyOwner {
+        //Sell tax cannot be more than 5%.
+        if(_newSellTax > 5){
+            revert InvalidTaxAmount();
+        }
         sellTax = _newSellTax;
         emit TaxUpdated("Sell", _newSellTax);
     }
 
     //Set buy bot tax.
     function setBuyBotTax(uint256 _newBuyTax) external onlyOwner {
+        //Buy tax cannot be more than 5%.
+        if(_newBuyTax > 5){
+            revert InvalidTaxAmount();
+        }
         buyTax = _newBuyTax;
         emit TaxUpdated("Buy", _newBuyTax);
     }
