@@ -6,46 +6,19 @@ import "./IFloth.sol";
 
 contract ProjectProposal is AccessControl {
     /**
-     * What does the front end need/TODO
-     *
-     * - Create proposal function (name/amount requested/proposer and receiver set to msg.sender initially). ✅
-     * - Change "batch" to "round". ✅
-     * - No description on chain. ✅
-     * - Remove setter for amount requested. -✅ Kyle said to now keep.
-     * - Event emitted when proposal is created (creator proposal address, proposal id (make it more like a uid using keccak or something, use 16 bytes).✅
-     * - Can ONLY submit proposals during "submission window" during a round. Should be locked otherwise. Front end needs to read this lock. ✅
-     * - View function to get proposals and their votes and paginated, index 0 gives first x, index 1 give second x amount etc.✅
-     * - Add winners array and remove the "accepted" bool. ✅
-     * - Add AccessControl for role permissoning to the contract. Roles: ADMIN, SNAPSHOTTER, ROUND_MANAGER ✅
-     */
-
-    /**
-    *
-    * - Add an address to constructor argument that creates an IERC20Votes contract (Create interface which reduces the number of functions we need to pass) instead of making this it's own ERCVotes. ✅
-    *
-    * Do we need a history of round? This will determine if we need roundid tracings. - yes, may as well have this ✅
-    *
-    * When are we taking snapshots? doing it 2 weeks after round opens could be tricky - We do need a snapshot function that can be called when round is ready for voting on. ✅
-    *
-    *use reverts instead of require, revert errors. ✅
-    *
-    *change to external contracts where necessary ✅
-
-    * add receiver address to proposal ✅
-    * Add complete round function which sends funds to receiver address. - highest votes ✅
-    * kill proposal function. ✅
-    * setter for current round - maxFlareAmount; roundRunTime;  snapshotDatetime; snapshotBlock; votingRuntime; -- onlyowner.  ✅
-    */
+     * TODO
+     * */
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant SNAPSHOTTER_ROLE = keccak256("SNAPSHOTTER_ROLE");
-    bytes32 public constant ROUND_MANAGER_ROLE = keccak256("ROUND_MANAGER_ROLE");
+    bytes32 public constant ROUND_MANAGER_ROLE =
+        keccak256("ROUND_MANAGER_ROLE");
 
     IFloth internal floth;
 
     constructor(address _flothAddress) {
         floth = IFloth(_flothAddress);
-        
+
         _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
         _setRoleAdmin(SNAPSHOTTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
@@ -80,7 +53,7 @@ contract ProjectProposal is AccessControl {
     }
 
     //Used to return proposal id's and their vote count for a specific round.
-    struct VoteRetrieval{
+    struct VoteRetrieval {
         uint256 proposalId;
         uint256 voteCount;
     }
@@ -110,7 +83,12 @@ contract ProjectProposal is AccessControl {
     uint256[] roundIds;
 
     //Notify of a new proposal being added.
-    event ProposalAdded(address creator, uint16 proposalId, string title, uint256 amountRequested);
+    event ProposalAdded(
+        address creator,
+        uint16 proposalId,
+        string title,
+        uint256 amountRequested
+    );
 
     //Notify community when propsal receiver address is updated.
     event ProposalUpdated(uint256 proposalId, address newAddress);
@@ -131,13 +109,21 @@ contract ProjectProposal is AccessControl {
     event VotesAdded(uint256 proposalId, address wallet, uint256 numberofVotes);
 
     //Notify of votes removed from a proposal.
-    event VotesRemoved(uint256 proposalId, address wallet, uint256 numberofVotes);
+    event VotesRemoved(
+        uint256 proposalId,
+        address wallet,
+        uint256 numberofVotes
+    );
 
     //Notify when snapshots are taken.
     event SnapshotTaken(uint256 roundId, uint256 snapshotBlock);
 
     //Notify when the winner has claimed the funds.
-    event FundsClaimed(uint256 proposalId, address winningAddress, uint256 amountRequested);
+    event FundsClaimed(
+        uint256 proposalId,
+        address winningAddress,
+        uint256 amountRequested
+    );
 
     //Notify when roles are granted.
     event RoleGranted(bytes32 role, address grantedTo, address grantedBy);
@@ -163,14 +149,21 @@ contract ProjectProposal is AccessControl {
     error UserVoteNotFound();
 
     modifier roundManagerOrAdmin() {
-        if(!hasRole(ROUND_MANAGER_ROLE, msg.sender) || !hasRole(ADMIN_ROLE, msg.sender)){
+        if (
+            !hasRole(ROUND_MANAGER_ROLE, msg.sender) && // Check if user does not have ROUND_MANAGER_ROLE
+            !hasRole(ADMIN_ROLE, msg.sender) // Check if user does not have ADMIN_ROLE
+        ) {
             revert InvalidPermissions();
         }
         _;
     }
-     
-     modifier snapshotterManagerOrAdmin() {
-        if(!hasRole(SNAPSHOTTER_ROLE, msg.sender) || !hasRole(ROUND_MANAGER_ROLE, msg.sender) || !hasRole(ADMIN_ROLE, msg.sender)){
+
+    modifier managerOrAdmin() {
+        if (
+            !hasRole(SNAPSHOTTER_ROLE, msg.sender) && // Check if user does not have SNAPSHOTTER_ROLE
+            !hasRole(ROUND_MANAGER_ROLE, msg.sender) && // Check if user does not have ROUND_MANAGER_ROLE
+            !hasRole(ADMIN_ROLE, msg.sender) // Check if user does not have ADMIN_ROLE
+        ) {
             revert InvalidPermissions();
         }
         _;
@@ -183,13 +176,17 @@ contract ProjectProposal is AccessControl {
     }
 
     //Allow admin to grant snapshotter role.
-    function grantSnapshotterRole(address account) external onlyRole(ADMIN_ROLE) {
+    function grantSnapshotterRole(
+        address account
+    ) external onlyRole(ADMIN_ROLE) {
         grantRole(SNAPSHOTTER_ROLE, account);
         emit RoleGranted(SNAPSHOTTER_ROLE, account, msg.sender);
     }
 
     //Allow admin to grant round manager role.
-    function grantRoundManagerRole(address account) external onlyRole(ADMIN_ROLE) {
+    function grantRoundManagerRole(
+        address account
+    ) external onlyRole(ADMIN_ROLE) {
         grantRole(ROUND_MANAGER_ROLE, account);
         emit RoleGranted(ROUND_MANAGER_ROLE, account, msg.sender);
     }
@@ -201,33 +198,39 @@ contract ProjectProposal is AccessControl {
     }
 
     //Revoke snapshotter role from a user.
-    function revokeSnapshotterRole(address account) external onlyRole(ADMIN_ROLE) {
+    function revokeSnapshotterRole(
+        address account
+    ) external onlyRole(ADMIN_ROLE) {
         revokeRole(SNAPSHOTTER_ROLE, account);
         emit RoleRevoked(SNAPSHOTTER_ROLE, account, msg.sender);
     }
 
     //Revoke round manager role from a user.
-    function revokeRoundManagerRole(address account) external onlyRole(ADMIN_ROLE) {
+    function revokeRoundManagerRole(
+        address account
+    ) external onlyRole(ADMIN_ROLE) {
         revokeRole(ROUND_MANAGER_ROLE, account);
         emit RoleRevoked(ROUND_MANAGER_ROLE, account, msg.sender);
     }
 
-
     //Add a new proposal using the users input - doesn't require to be owner.
-    function addProposal(string memory _title,uint256 _amountRequested) external {
+    function addProposal(
+        string memory _title,
+        uint256 _amountRequested
+    ) external {
         Round memory latestRound = getLatestRound();
 
         //If submission window is closed, revert.
-        if(!isSubmissionWindowOpen()){
+        if (!isSubmissionWindowOpen()) {
             revert SubmissionWindowClosed();
         }
-        
+
         //If within a voting period, revert.
-        if(isVotingPeriodOpen()){
+        if (isVotingPeriodOpen()) {
             revert VotingPeriodOpen();
         }
 
-        if(latestRound.maxFlareAmount < _amountRequested){
+        if (latestRound.maxFlareAmount < _amountRequested) {
             revert AmountRequestedTooHigh();
         }
 
@@ -249,11 +252,14 @@ contract ProjectProposal is AccessControl {
     }
 
     //Allow user to update the proposal receiver address.
-    function setProposalReceiverAddress(uint256 _proposalId, address _newAddress) external {
+    function setProposalReceiverAddress(
+        uint256 _proposalId,
+        address _newAddress
+    ) external {
         Proposal storage proposalToUpdate = proposals[_proposalId];
 
         //Prevent proposer updating receiver address during voting window.
-        if(isVotingPeriodOpen()){
+        if (isVotingPeriodOpen()) {
             revert VotingPeriodOpen();
         }
 
@@ -267,32 +273,41 @@ contract ProjectProposal is AccessControl {
     }
 
     //Get a single proposal by ID.
-    function getProposalById(uint256 _id) external view returns (Proposal memory) {
+    function getProposalById(
+        uint256 _id
+    ) external view returns (Proposal memory) {
         return proposals[_id];
     }
 
     //Votes for a proposal within a round.
-    function addVotesToProposal(uint256 _proposalId, uint256 _numberOfVotes) external {
+    function addVotesToProposal(
+        uint256 _proposalId,
+        uint256 _numberOfVotes
+    ) external {
         //Check if the user has FLOTH.
         if (floth.balanceOf(msg.sender) == 0) {
             revert InvalidFlothAmount();
-        } 
+        }
 
         Round storage currentRound = getLatestRound();
-        uint256 currentVotingPower = currentRound.currentVotingPower[msg.sender];
+        uint256 currentVotingPower = currentRound.currentVotingPower[
+            msg.sender
+        ];
         bool hasVoted = currentRound.hasVoted[msg.sender];
 
         //Check if the users doesn't have a voting power set and they haven't already voted in the round.
-         if(currentVotingPower == 0 && hasVoted){
+        if (currentVotingPower == 0 && hasVoted) {
             revert InvalidVotingPower();
-         }
-         else if(currentVotingPower == 0 && !hasVoted){
-            currentVotingPower = floth.getPastVotes(msg.sender, currentRound.snapshotBlock);
+        } else if (currentVotingPower == 0 && !hasVoted) {
+            currentVotingPower = floth.getPastVotes(
+                msg.sender,
+                currentRound.snapshotBlock
+            );
         }
 
         //If the user doesn't have enough voting power, stop them from voting.
-        if(currentVotingPower < _numberOfVotes){
-           revert InvalidVotingPower();
+        if (currentVotingPower < _numberOfVotes) {
+            revert InvalidVotingPower();
         }
 
         Proposal storage proposal = getProposalById(_proposalId);
@@ -303,18 +318,21 @@ contract ProjectProposal is AccessControl {
 
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
     }
-//CASE FOR VOTING ON MUltiPLE PROJECts
+
+    //CASE FOR VOTING ON MUltiPLE PROJECts
     //Votes for a proposal within a round.
     function removeVotesFromProposal(uint256 _proposalId) external {
         Round storage currentRound = getLatestRound();
-       
+
         //Check if the user hasn't voted yet.
-         if(!currentRound.hasVoted[msg.sender]){
+        if (!currentRound.hasVoted[msg.sender]) {
             revert UserVoteNotFound();
-         }
-       
-        uint256 currentVotingPower = currentRound.currentVotingPower[msg.sender];
-        uint256 votesGiven =  getVotingPower(msg.sender) - currentVotingPower; //Calculate votes given.
+        }
+
+        uint256 currentVotingPower = currentRound.currentVotingPower[
+            msg.sender
+        ];
+        uint256 votesGiven = getVotingPower(msg.sender) - currentVotingPower; //Calculate votes given.
 
         Proposal storage proposal = getProposalById(_proposalId);
         proposal.votesReceived -= votesGiven; //Remove votes given to proposal.
@@ -353,7 +371,7 @@ contract ProjectProposal is AccessControl {
         abstainProposal.roundId = roundId;
         abstainProposal.title = "Abstain";
         abstainProposal.amountRequested = 0;
-        abstainProposal.receiver = 0x0000000000000000000000000000000000000000; 
+        abstainProposal.receiver = 0x0000000000000000000000000000000000000000;
         abstainProposal.proposer = msg.sender;
         abstainProposal.fundsClaimed = false;
 
@@ -365,10 +383,12 @@ contract ProjectProposal is AccessControl {
     }
 
     //Allow admin or Round Manager to update the round max flare amount.
-    function setRoundMaxFlare(uint256 _newRoundMaxFlare) external roundManagerOrAdmin {
+    function setRoundMaxFlare(
+        uint256 _newRoundMaxFlare
+    ) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
 
-         if (roundToUpdate.maxFlareAmount != _newRoundMaxFlare) {
+        if (roundToUpdate.maxFlareAmount != _newRoundMaxFlare) {
             if (address(this).balance < _newRoundMaxFlare) {
                 revert InsufficientBalance();
             }
@@ -377,14 +397,18 @@ contract ProjectProposal is AccessControl {
     }
 
     //Allow Admin or Round Manager to update the round runtime.
-    function setRoundRuntime(uint256 _newRoundRuntime) external roundManagerOrAdmin {
+    function setRoundRuntime(
+        uint256 _newRoundRuntime
+    ) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
 
         roundToUpdate.roundRuntime = _newRoundRuntime;
     }
 
     //Allow Admin or Round Manager to update the round snapshot date time.
-    function setRoundSnapshotDatetime(uint256 _newSnapshotDatetime) external snapshotterManagerOrAdmin {
+    function setRoundSnapshotDatetime(
+        uint256 _newSnapshotDatetime
+    ) external managerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
 
         if (block.timestamp < _newSnapshotDatetime) {
@@ -395,13 +419,13 @@ contract ProjectProposal is AccessControl {
     }
 
     //Take a snapshot for the current round.
-    function takeSnapshot() external snapshotterManagerOrAdmin {
+    function takeSnapshot() external managerOrAdmin {
         Round storage round = getLatestRound();
 
-        if(block.timestamp <= round.snapshotDatetime){
+        if (block.timestamp <= round.snapshotDatetime) {
             revert InvalidSnapshotTime();
         }
-        if(block.timestamp > (round.roundStarttime + round.roundRuntime)){
+        if (block.timestamp > (round.roundStarttime + round.roundRuntime)) {
             revert RoundIsClosed();
         }
 
@@ -415,19 +439,24 @@ contract ProjectProposal is AccessControl {
     }
 
     //Allow owner to update the round voting runtime.
-    function setRoundVotingRuntime(uint256 _newVotingRuntime) external roundManagerOrAdmin {
+    function setRoundVotingRuntime(
+        uint256 _newVotingRuntime
+    ) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
 
         roundToUpdate.votingRuntime = _newVotingRuntime;
     }
 
     //Get the total votes for a specifc round.
-    function getTotalVotesForRound(uint256 _roundId) external view returns (uint256) {
-        Proposal[] storage requestedProposals = getRoundById(_roundId).proposals;
+    function getTotalVotesForRound(
+        uint256 _roundId
+    ) external view returns (uint256) {
+        Proposal[] storage requestedProposals = getRoundById(_roundId)
+            .proposals;
         uint256 totalVotes = 0;
 
         //Iterate through proposals and count all votes.
-         for (uint256 i = 0; i < requestedProposals.length; i++) {
+        for (uint256 i = 0; i < requestedProposals.length; i++) {
             totalVotes += requestedProposals[i].votesReceived;
         }
 
@@ -456,7 +485,7 @@ contract ProjectProposal is AccessControl {
     }
 
     //Remove a round.
-    function killRound(uint256 _roundId) external roundManagerOrAdmin{
+    function killRound(uint256 _roundId) external roundManagerOrAdmin {
         //remove round from mapping.
         delete rounds[_roundId];
 
@@ -472,7 +501,11 @@ contract ProjectProposal is AccessControl {
     }
 
     //Retrieve proposal ID's and the number of votes for each, using pagination.
-    function voteRetrieval(uint256 _roundId, uint256 _pageNumber, uint256 _pageSize) external view returns (VoteRetrieval[] memory) {
+    function voteRetrieval(
+        uint256 _roundId,
+        uint256 _pageNumber,
+        uint256 _pageSize
+    ) external view returns (VoteRetrieval[] memory) {
         Proposal[] memory requestedProposals = getRoundById(_roundId).proposals;
 
         //Start/end indexes of proposals to return.
@@ -488,8 +521,8 @@ contract ProjectProposal is AccessControl {
 
         VoteRetrieval[] memory voteRetrievals = new VoteRetrieval[](resultSize);
 
-         for (uint256 i = 0; i < resultSize; i++) {
-           voteRetrievals[i] = VoteRetrieval({
+        for (uint256 i = 0; i < resultSize; i++) {
+            voteRetrievals[i] = VoteRetrieval({
                 proposalId: requestedProposals[startIndex + i].id,
                 voteCount: requestedProposals[startIndex + i].votesReceived
             });
@@ -499,7 +532,9 @@ contract ProjectProposal is AccessControl {
     }
 
     //Get the remaining voting power for a user for a round.
-    function getRemainingVotingPower(address _address) external view returns (uint256) {
+    function getRemainingVotingPower(
+        address _address
+    ) external view returns (uint256) {
         return getLatestRound().currentVotingPower[_address];
     }
 
@@ -518,10 +553,13 @@ contract ProjectProposal is AccessControl {
 
         Round memory latestRound = getLatestRound();
 
-        if(block.timestamp >= latestRound.votingStartDate && block.timestamp <= latestRound.votingEndDate){
+        if (
+            block.timestamp >= latestRound.votingStartDate &&
+            block.timestamp <= latestRound.votingEndDate
+        ) {
             inVotingPeriod = true;
         }
-        
+
         return inVotingPeriod;
     }
 
@@ -529,7 +567,10 @@ contract ProjectProposal is AccessControl {
         Round memory latestRound = getLatestRound();
         bool isWindowOpen = false;
 
-        if(block.timestamp < latestRound.snapshotDatetime && block.timestamp > latestRound.roundStarttime){
+        if (
+            block.timestamp < latestRound.snapshotDatetime &&
+            block.timestamp > latestRound.roundStarttime
+        ) {
             isWindowOpen = true;
         }
 
@@ -537,7 +578,7 @@ contract ProjectProposal is AccessControl {
     }
 
     //When a round is finished, allow winner to claim.
-    function roundFinished() external roundManagerOrAdmin{
+    function roundFinished() external roundManagerOrAdmin {
         Round memory latestRound = getLatestRound();
         Proposal[] memory latestProposals = latestRound.proposals;
 
@@ -546,14 +587,20 @@ contract ProjectProposal is AccessControl {
         }
 
         //Check if round is over.
-        if((latestRound.roundStarttime + latestRound.roundRuntime) < block.timestamp){
+        if (
+            (latestRound.roundStarttime + latestRound.roundRuntime) <
+            block.timestamp
+        ) {
             revert RoundIsOpen();
         }
 
         //Check which proposal has the most votes.
         Proposal memory mostVotedProposal = latestProposals[0];
         for (uint256 i = 0; i < latestProposals.length; i++) {
-            if (latestProposals[i].votesReceived > mostVotedProposal.votesReceived) {
+            if (
+                latestProposals[i].votesReceived >
+                mostVotedProposal.votesReceived
+            ) {
                 mostVotedProposal = latestProposals[i];
             }
         }
@@ -566,29 +613,31 @@ contract ProjectProposal is AccessControl {
         emit RoundCompleted(latestRound.id, mostVotedProposal.id);
     }
 
-    //When a round is finished, allow winner to claim. 
+    //When a round is finished, allow winner to claim.
     function claimFunds() external {
         //Check if the wallet has won a round.
-        if(!hasWinningProposal[msg.sender]){
+        if (!hasWinningProposal[msg.sender]) {
             revert InvalidClaimer();
         }
 
         Proposal storage winningProposal = winningProposals[msg.sender];
-        
+
         //Check if 30 days have passed since round finished. 86400 seconds in a day.
         Round memory claimRound = getRoundById(winningProposal.roundId);
-        uint256 daysPassed = (block.timestamp - claimRound.roundStarttime + claimRound.roundRuntime)/86400;
-        if(daysPassed > 30){
+        uint256 daysPassed = (block.timestamp -
+            claimRound.roundStarttime +
+            claimRound.roundRuntime) / 86400;
+        if (daysPassed > 30) {
             revert FundsClaimingPeriod();
         }
 
         //Check if the funds have already been claimed.
-        if(winningProposal.fundsClaimed){
+        if (winningProposal.fundsClaimed) {
             revert FundsAlreadyClaimed();
         }
 
         address recipient = winningProposal.receiver;
-        if(recipient != msg.sender){
+        if (recipient != msg.sender) {
             revert ClaimerNotRecipient();
         }
 
@@ -598,7 +647,7 @@ contract ProjectProposal is AccessControl {
         }
 
         winningProposal.fundsClaimed = true; //Set as claimed so winner cannot reclaim for the proposal.
-       
+
         //Send amount requested to winner.
         (bool success, ) = recipient.call{value: amountRequested}("");
         require(success);
