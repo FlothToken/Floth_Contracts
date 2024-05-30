@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
 
 contract Floth is ERC20Votes, Ownable {
 
@@ -83,7 +83,7 @@ contract Floth is ERC20Votes, Ownable {
         }
 
         uint256 totalPayable = _amount - taxAmount; //Final tax amount is deducted.
-        
+
         super._transfer(_sender, _recipient, totalPayable);
     }
 }

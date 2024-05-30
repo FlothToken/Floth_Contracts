@@ -3,8 +3,10 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract pFLOTH is ERC20, Ownable {
+
+contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
     uint256 public constant MAX_SUPPLY = 30 * 10 ** 9 * 10 ** 18; // 30 billion pFLOTH
     uint256 public constant EXCHANGE_RATE = 10000; // 1 FLR = 10,000 pFLOTH
     uint256 public constant WALLET_LIMIT = 2.5 * 10 ** 9 * 10 ** 18; // 2.5 billion pFLOTH per wallet
@@ -45,7 +47,8 @@ contract pFLOTH is ERC20, Ownable {
     }
 
     // Withdraw function for the owner to withdraw FLR collected during presale
-    function withdraw() external onlyOwner {
+    //nonReentrant prevent function reentrancy vulnerabilities.
+    function withdraw() external onlyOwner nonReentrant{
         (bool success,) = owner.call{value: address(this).balance}("");
 
         require(success);
