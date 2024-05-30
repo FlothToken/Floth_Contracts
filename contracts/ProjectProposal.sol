@@ -86,10 +86,10 @@ contract ProjectProposal is AccessControl {
     }
 
     //Tracks ID number for each proposal.
-    uint256 proposalId = 0;
+    uint256 public proposalId = 0;
 
     //Tracks ID number for each round.
-    uint256 roundId = 0;
+    uint256 public roundId = 0;
 
     //Maps IDs to a proposal.
     mapping(uint256 => Proposal) proposals;
@@ -267,7 +267,7 @@ contract ProjectProposal is AccessControl {
     }
 
     //Get a single proposal by ID.
-    function getProposalById(uint256 _id) external view returns (Proposal) {
+    function getProposalById(uint256 _id) external view returns (Proposal memory) {
         return proposals[_id];
     }
 
@@ -280,12 +280,13 @@ contract ProjectProposal is AccessControl {
 
         Round storage currentRound = getLatestRound();
         uint256 currentVotingPower = currentRound.currentVotingPower[msg.sender];
+        bool hasVoted = currentRound.hasVoted[msg.sender];
 
         //Check if the users doesn't have a voting power set and they haven't already voted in the round.
-         if(currentVotingPower == 0 && currentRound.hasVoted[msg.sender]){
+         if(currentVotingPower == 0 && hasVoted){
             revert InvalidVotingPower();
          }
-         else if(currentVotingPower == 0 && !currentRound.hasVoted[msg.sender]){
+         else if(currentVotingPower == 0 && !hasVoted){
             currentVotingPower = floth.getPastVotes(msg.sender, currentRound.snapshotBlock);
         }
 
@@ -313,7 +314,7 @@ contract ProjectProposal is AccessControl {
          }
        
         uint256 currentVotingPower = currentRound.currentVotingPower[msg.sender];
-        uint256 votesGiven =  getVotingPower(msg.sender) - currentVotingPower; //Calculate votes given to proposal.
+        uint256 votesGiven =  getVotingPower(msg.sender) - currentVotingPower; //Calculate votes given.
 
         Proposal storage proposal = getProposalById(_proposalId);
         proposal.votesReceived -= votesGiven; //Remove votes given to proposal.
@@ -367,11 +368,12 @@ contract ProjectProposal is AccessControl {
     function setRoundMaxFlare(uint256 _newRoundMaxFlare) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
 
-        if (address(this).balance < _newRoundMaxFlare) {
-            revert InsufficientBalance();
+         if (roundToUpdate.maxFlareAmount != _newRoundMaxFlare) {
+            if (address(this).balance < _newRoundMaxFlare) {
+                revert InsufficientBalance();
+            }
+            roundToUpdate.maxFlareAmount = _newRoundMaxFlare;
         }
-
-        roundToUpdate.maxFlareAmount = _newRoundMaxFlare;
     }
 
     //Allow Admin or Round Manager to update the round runtime.
@@ -421,7 +423,7 @@ contract ProjectProposal is AccessControl {
 
     //Get the total votes for a specifc round.
     function getTotalVotesForRound(uint256 _roundId) external view returns (uint256) {
-        Proposal[] memory requestedProposals = getRoundById(_roundId).proposals;
+        Proposal[] storage requestedProposals = getRoundById(_roundId).proposals;
         uint256 totalVotes = 0;
 
         //Iterate through proposals and count all votes.
@@ -433,12 +435,12 @@ contract ProjectProposal is AccessControl {
     }
 
     //Get a single round by ID.
-    function getRoundById(uint256 _id) external view returns (Round) {
+    function getRoundById(uint256 _id) public view returns (Round memory) {
         return rounds[_id];
     }
 
     //Get the latest round.
-    function getLatestRound() public view returns (Round) {
+    function getLatestRound() public view returns (Round memory) {
         return rounds[roundId];
     }
 
