@@ -17,6 +17,9 @@ contract ProjectProposal is AccessControl {
     IFloth internal floth;
 
     constructor(address _flothAddress) {
+        if (_flothAddress == address(0)) {
+            revert ZeroAddress();
+        }
         floth = IFloth(_flothAddress);
 
         _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
@@ -147,6 +150,7 @@ contract ProjectProposal is AccessControl {
     error RoundIsClosed();
     error InvalidSnapshotTime();
     error UserVoteNotFound();
+    error ZeroAddress();
 
     modifier roundManagerOrAdmin() {
         if (
@@ -266,6 +270,10 @@ contract ProjectProposal is AccessControl {
         //Only proposer can update receiver address.
         if (msg.sender != proposalToUpdate.proposer) {
             revert InvalidPermissions();
+        }
+
+        if (_newAddress == address(0)) {
+            revert ZeroAddress();
         }
 
         proposalToUpdate.receiver = _newAddress;
