@@ -151,6 +151,7 @@ contract ProjectProposal is AccessControl {
     error InvalidSnapshotTime();
     error UserVoteNotFound();
     error ZeroAddress();
+    error ProposalIdOutOfRange();
 
     modifier roundManagerOrAdmin() {
         if (
@@ -284,6 +285,9 @@ contract ProjectProposal is AccessControl {
     function getProposalById(
         uint256 _id
     ) external view returns (Proposal memory) {
+        if (_id > proposalId) {
+            revert ProposalIdOutOfRange();
+        }
         return proposals[_id];
     }
 
