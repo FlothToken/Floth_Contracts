@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-
 contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
     uint256 public constant MAX_SUPPLY = 30 * 10 ** 9 * 10 ** 18; // 30 billion pFLOTH
     uint256 public constant EXCHANGE_RATE = 10000; // 1 FLR = 10,000 pFLOTH
@@ -26,17 +25,19 @@ contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
     error WalletLimitExceeded();
 
     function presale() external payable {
-        if(presaleEndTime > block.timestamp){
+        if (presaleEndTime > block.timestamp) {
             revert PresaleEnded();
         }
 
         uint256 amountFLR = msg.value; // msg.value is the amount of FLR sent as native token
         uint256 amountpFLOTH = amountFLR * EXCHANGE_RATE;
 
-        if(totalSupply() + amountpFLOTH >= MAX_SUPPLY){ //>= or just > ???🟠🟠🟠
+        if (totalSupply() + amountpFLOTH >= MAX_SUPPLY) {
+            //>= or just > ???🟠🟠🟠
             revert ExceedsSupply();
         }
-        if(balanceOf(msg.sender) + amountpFLOTH >= WALLET_LIMIT){ //>= or just > ???🟠🟠🟠
+        if (balanceOf(msg.sender) + amountpFLOTH >= WALLET_LIMIT) {
+            //>= or just > ???🟠🟠🟠
             revert WalletLimitExceeded();
         }
 
@@ -48,8 +49,8 @@ contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
 
     // Withdraw function for the owner to withdraw FLR collected during presale
     //nonReentrant prevent function reentrancy vulnerabilities.
-    function withdraw() external onlyOwner nonReentrant{
-        (bool success,) = owner.call{value: address(this).balance}("");
+    function withdraw() external onlyOwner nonReentrant {
+        (bool success, ) = owner().call{value: address(this).balance}("");
 
         require(success);
 
