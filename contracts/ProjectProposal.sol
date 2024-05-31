@@ -39,6 +39,7 @@ contract ProjectProposal is AccessControl {
 
     struct Round {
         uint256 id;
+        uint256 abstainProposalId;
         uint256 maxFlareAmount;
         uint256 roundStarttime;
         uint256 roundRuntime;
@@ -128,6 +129,7 @@ contract ProjectProposal is AccessControl {
     error UserVoteNotFound();
     error ZeroAddress();
     error ProposalIdOutOfRange();
+    error InvalidAbstainVote();
 
     modifier roundManagerOrAdmin() {
         if (
@@ -222,6 +224,8 @@ contract ProjectProposal is AccessControl {
         if (floth.balanceOf(msg.sender) == 0) {
             revert InvalidFlothAmount();
         }
+
+        Proposal storage proposal = getProposalById(_proposalId);
         Round storage currentRound = getLatestRound();
         uint256 currentVotingPower = currentRound.currentVotingPower[
             msg.sender
@@ -240,10 +244,25 @@ contract ProjectProposal is AccessControl {
         if (currentVotingPower < _numberOfVotes) {
             revert InvalidVotingPower();
         }
-        Proposal storage proposal = getProposalById(_proposalId);
-        proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
-        currentVotingPower -= _numberOfVotes; //Reduce voting power in a round.
-        currentRound.hasVoted[msg.sender] = true; //Set that the user has voted in a round.
+       
+       //If voting for the Abstain proposal.
+        if(_proposalId == currentRound.abstainProposalId){
+            //Abstain vote can only be given to one proposal.
+            if(hasVoted){
+                revert InvalidAbstainVote();
+            }else{
+                proposal.votesReceived += currentVotingPower; //Total voting power is voted.
+                currentVotingPower = 0; //All voting power is removed.
+                currentRound.hasVoted[msg.sender] = true; //Set that the user has voted in a round.
+            }
+        }
+        //Otherwise vote is for non-abstain proposal.
+        else{
+            proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
+            currentVotingPower -= _numberOfVotes; //Reduce voting power in a round.
+            currentRound.hasVoted[msg.sender] = true; //Set that the user has voted in a round.
+        }
+
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
     }
 
@@ -285,7 +304,8 @@ contract ProjectProposal is AccessControl {
         newRound.snapshotBlock = block.number; //?
         newRound.votingRuntime = _votingRuntime;
         //newRound.proposals = []; Gets initialized by default.
-        //Add 'Abstain' proposal for the new round. Should they give all their voting power to it?🟠
+
+        //Add 'Abstain' proposal for the new round.
         proposalId++;
         Proposal storage abstainProposal = proposals[proposalId];
         abstainProposal.id = proposalId;
@@ -295,7 +315,10 @@ contract ProjectProposal is AccessControl {
         abstainProposal.receiver = 0x0000000000000000000000000000000000000000;
         abstainProposal.proposer = msg.sender;
         abstainProposal.fundsClaimed = false;
+        
         newRound.proposals.push(abstainProposal); //Add abstain proposal to round struct.
+        newRound.abstainProposalId = proposalId; //Used to track the abstain proposal of the round.
+
         roundIds.push(roundId); //Keep track of the round ids.
         emit RoundAdded(roundId, _flrAmount, _roundRuntime);
     }
