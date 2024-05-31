@@ -5,6 +5,9 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Floth is ERC20Votes, Ownable {
+    //Roles
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
     //Bot tax
     uint256 public buyTax = 25;
     uint256 public sellTax = 35;
@@ -23,8 +26,10 @@ contract Floth is ERC20Votes, Ownable {
     error InvalidTaxAmount();
 
     constructor(
-        address[] memory _dexAddresses
-    ) ERC20("Floth", "FLOTH") ERC20Permit("Floth") {
+        address[] memory _dexAddresses,
+        string memory name,
+        string memory symbol
+    ) ERC20(name, symbol) ERC20Permit(name) {
         _mint(msg.sender, 1000000 * 10 ** 18);
         deploymentTime = block.timestamp;
 

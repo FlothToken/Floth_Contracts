@@ -25,5 +25,8 @@
     "@nomicfoundation/hardhat-verify": "^2.0.6",
     "dotenv": "^16.4.5",
     "hardhat": "^2.22.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.3"
   }
 }
