@@ -1,6 +1,7 @@
 require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-verify");
+require("@nomicfoundation/hardhat-ignition");
 
 module.exports = {
   solidity: {

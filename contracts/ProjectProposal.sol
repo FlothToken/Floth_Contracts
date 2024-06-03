@@ -427,7 +427,7 @@ contract ProjectProposal is AccessControl {
     //Get the latest round.
     //TODO: Do we need to give any round data to the UI? This is internal due to the mappings now
     function getLatestRound() internal view returns (Round storage) {
-        return rounds[roundId];
+        return rounds[roundId]; 
     }
 
     //Get all round.
