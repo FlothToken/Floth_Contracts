@@ -204,6 +204,32 @@ contract ProjectProposal is AccessControl {
         emit ProposalUpdated(_proposalId, _newAddress);
     }
 
+    //Get proposals by user for a specific round.
+    function getProposalsByAddress(uint256 _roundId, address _account) internal view returns (Proposal[] memory) {
+        Proposal[] memory getProposals = getRoundById(_roundId).proposals;
+
+        uint256 count = 0;
+        //Count the number of proposals by the given account
+        for (uint256 i = 0; i < getProposals.length; i++) {
+            if (getProposals[i].proposer == _account) {
+            count++;
+            }
+        }
+
+        Proposal[] memory accountProposals = new Proposal[](count);
+        uint256 index = 0;
+        //Collect the proposals by the given account
+        for (uint256 i = 0; i < getProposals.length; i++) {
+            if (getProposals[i].proposer == _account) {
+                accountProposals[index] = getProposals[i];
+                index++;
+            }
+        }
+
+        return accountProposals;
+    }
+    
+
     //Get a single proposal by ID.
     //TODO: Do we need to give any proposal data to the UI?
     function getProposalById(
@@ -255,7 +281,7 @@ contract ProjectProposal is AccessControl {
                 currentVotingPower = 0; //All voting power is removed.
                 currentRound.hasVoted[msg.sender] = true; //Set that the user has voted in a round.
             }
-        }
+        } 
         //Otherwise vote is for non-abstain proposal.
         else{
             proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
@@ -266,7 +292,6 @@ contract ProjectProposal is AccessControl {
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
     }
 
-    //CASE FOR VOTING ON MUltiPLE PROJECts
     //Votes for a proposal within a round.
     function removeVotesFromProposal(uint256 _proposalId) external {
         Round storage currentRound = getLatestRound();
