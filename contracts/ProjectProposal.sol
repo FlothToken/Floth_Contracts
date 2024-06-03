@@ -114,7 +114,7 @@ contract ProjectProposal is AccessControl {
     error InvalidPermissions();
     error SubmissionWindowClosed();
     error VotingPeriodOpen();
-    error AmountRequestedTooHigh();
+    error InvalidAmountRequested();
     error InvalidVotingPower();
     error InvalidFlothAmount();
     error InsufficientBalance();
@@ -167,8 +167,13 @@ contract ProjectProposal is AccessControl {
             revert VotingPeriodOpen();
         }
         if (latestRound.maxFlareAmount < _amountRequested) {
-            revert AmountRequestedTooHigh();
+            revert InvalidAmountRequested();
         }
+
+        if(_amountRequested == 0){
+            revert InvalidAmountRequested();
+        }
+
         proposalId++;
         Proposal storage newProposal = proposals[proposalId];
         newProposal.id = proposalId;
@@ -317,6 +322,7 @@ contract ProjectProposal is AccessControl {
         uint256 _snapshotDatetime,
         uint256 _votingRuntime
     ) external roundManagerOrAdmin {
+
         roundId++;
         Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
         newRound.id = roundId;
