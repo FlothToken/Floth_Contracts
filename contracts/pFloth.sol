@@ -33,12 +33,10 @@ contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
         uint256 amountFLR = msg.value; // msg.value is the amount of FLR sent as native token
         uint256 amountpFLOTH = amountFLR * EXCHANGE_RATE;
 
-        if (totalSupply() + amountpFLOTH >= MAX_SUPPLY) {
-            //>= or just > ???🟠🟠🟠
+        if (totalSupply() + amountpFLOTH > MAX_SUPPLY) {
             revert ExceedsSupply();
         }
-        if (balanceOf(msg.sender) + amountpFLOTH >= WALLET_LIMIT) {
-            //>= or just > ???🟠🟠🟠
+        if (balanceOf(msg.sender) + amountpFLOTH > WALLET_LIMIT) {
             revert WalletLimitExceeded();
         }
 
