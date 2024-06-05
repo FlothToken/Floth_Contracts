@@ -152,12 +152,6 @@ contract ProjectProposal is AccessControl {
         _;
     }
 
-    //Allow admin to grant admin role to another account.
-    function grantAdminRole(address account) external onlyRole(ADMIN_ROLE) {
-        grantRole(ADMIN_ROLE, account);
-        emit RoleGranted(ADMIN_ROLE, account, msg.sender);
-    }
-
     //Add a new proposal using the users input - doesn't require to be owner.
     function addProposal(
         string memory _title,
