@@ -21,7 +21,6 @@
   },
   "homepage": "https://github.com/FlothToken/Floth_Contracts#readme",
   "devDependencies": {
-    "@nomicfoundation/hardhat-ignition": "^0.15.4",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.8",
     "dotenv": "^16.4.5",
