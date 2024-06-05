@@ -26,7 +26,7 @@ contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
     error WalletLimitExceeded();
 
     function presale() external payable {
-        if (presaleEndTime > block.timestamp) {
+        if (block.timestamp > presaleEndTime) {
             revert PresaleEnded();
         }
 
