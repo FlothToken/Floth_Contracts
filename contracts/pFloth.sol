@@ -24,6 +24,7 @@ contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
     error PresaleEnded();
     error ExceedsSupply();
     error WalletLimitExceeded();
+    error TransferFailed();
 
     function presale() external payable {
         if (block.timestamp > presaleEndTime) {
@@ -49,10 +50,10 @@ contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
     // Withdraw function for the owner to withdraw FLR collected during presale
     //nonReentrant prevent function reentrancy vulnerabilities.
     function withdraw() external onlyOwner nonReentrant {
-        (bool success, ) = owner().call{value: address(this).balance}("");
+        uint256 _amount = address(this).balance;
+        (bool success, ) = owner().call{value: _amount}("");
+        if (!success) revert TransferFailed();
 
-        require(success);
-
-        emit Withdraw(msg.sender, address(this).balance);
+        emit Withdraw(msg.sender, _amount);
     }
 }
