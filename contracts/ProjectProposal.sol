@@ -170,7 +170,7 @@ contract ProjectProposal is AccessControl {
             revert InvalidAmountRequested();
         }
 
-        if(_amountRequested == 0){
+        if (_amountRequested == 0) {
             revert InvalidAmountRequested();
         }
 
@@ -210,14 +210,17 @@ contract ProjectProposal is AccessControl {
     }
 
     //Get proposals by user for a specific round.
-    function getProposalsByAddress(uint256 _roundId, address _account) internal view returns (Proposal[] memory) {
+    function getProposalsByAddress(
+        uint256 _roundId,
+        address _account
+    ) internal view returns (Proposal[] memory) {
         Proposal[] memory getProposals = getRoundById(_roundId).proposals;
 
         uint256 count = 0;
         //Count the number of proposals by the given account
         for (uint256 i = 0; i < getProposals.length; i++) {
             if (getProposals[i].proposer == _account) {
-            count++;
+                count++;
             }
         }
 
@@ -233,7 +236,6 @@ contract ProjectProposal is AccessControl {
 
         return accountProposals;
     }
-    
 
     //Get a single proposal by ID.
     //TODO: Do we need to give any proposal data to the UI?
@@ -275,20 +277,20 @@ contract ProjectProposal is AccessControl {
         if (currentVotingPower < _numberOfVotes) {
             revert InvalidVotingPower();
         }
-       
-       //If voting for the Abstain proposal.
-        if(_proposalId == currentRound.abstainProposalId){
+
+        //If voting for the Abstain proposal.
+        if (_proposalId == currentRound.abstainProposalId) {
             //Abstain vote can only be given to one proposal.
-            if(hasVoted){
+            if (hasVoted) {
                 revert InvalidAbstainVote();
-            }else{
+            } else {
                 proposal.votesReceived += currentVotingPower; //Total voting power is voted.
                 currentVotingPower = 0; //All voting power is removed.
                 currentRound.hasVoted[msg.sender] = true; //Set that the user has voted in a round.
             }
-        } 
+        }
         //Otherwise vote is for non-abstain proposal.
-        else{
+        else {
             proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
             currentVotingPower -= _numberOfVotes; //Reduce voting power in a round.
             currentRound.hasVoted[msg.sender] = true; //Set that the user has voted in a round.
@@ -322,7 +324,6 @@ contract ProjectProposal is AccessControl {
         uint256 _snapshotDatetime,
         uint256 _votingRuntime
     ) external roundManagerOrAdmin {
-
         roundId++;
         Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
         newRound.id = roundId;
@@ -346,7 +347,7 @@ contract ProjectProposal is AccessControl {
         abstainProposal.receiver = 0x0000000000000000000000000000000000000000;
         abstainProposal.proposer = msg.sender;
         abstainProposal.fundsClaimed = false;
-        
+
         newRound.proposals.push(abstainProposal); //Add abstain proposal to round struct.
         newRound.abstainProposalId = proposalId; //Used to track the abstain proposal of the round.
 
@@ -433,7 +434,7 @@ contract ProjectProposal is AccessControl {
     //Get the latest round.
     //TODO: Do we need to give any round data to the UI? This is internal due to the mappings now
     function getLatestRound() internal view returns (Round storage) {
-        return rounds[roundId]; 
+        return rounds[roundId];
     }
 
     //Get all round.
@@ -584,5 +585,10 @@ contract ProjectProposal is AccessControl {
         (bool success, ) = recipient.call{value: amountRequested}("");
         require(success);
         emit FundsClaimed(winningProposal.id, msg.sender, amountRequested);
+    }
+
+    // Function to return the address of the floth contract
+    function getFlothAddress() external view returns (address) {
+        return address(floth);
     }
 }
