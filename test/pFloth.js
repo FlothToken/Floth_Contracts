@@ -79,6 +79,21 @@ describe("pFLOTH Contract", function () {
         .to.emit(pFLOTH, "Presale")
         .withArgs(addr1.address, amountFLR, amountpFLOTH);
     });
+
+    it("Should handle multiple presale transactions from different accounts correctly", async function () {
+      const amountFLR1 = ethers.parseUnits("1", 18);
+      const amountFLR2 = ethers.parseUnits("2", 18);
+
+      const amountpFLOTH1 = amountFLR1 * EXCHANGE_RATE;
+      const amountpFLOTH2 = amountFLR2 * EXCHANGE_RATE;
+
+      await pFLOTH.connect(addr1).presale({ value: amountFLR1 });
+      await pFLOTH.connect(addr2).presale({ value: amountFLR2 });
+
+      expect(await pFLOTH.balanceOf(addr1.address)).to.equal(amountpFLOTH1);
+      expect(await pFLOTH.balanceOf(addr2.address)).to.equal(amountpFLOTH2);
+      expect(await pFLOTH.totalSupply()).to.equal(amountpFLOTH1 + amountpFLOTH2);
+    });
   });
 
   describe("Withdraw", function () {
