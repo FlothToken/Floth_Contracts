@@ -9,8 +9,6 @@ describe("pFLOTH Contract", function () {
   let addr2;
   const PRESALE_DURATION = 3600; // 1 hour
   const EXCHANGE_RATE = 10000n;
-  const MAX_SUPPLY = ethers.parseUnits("30000000000", 18); // 30 billion pFLOTH
-  const WALLET_LIMIT = ethers.parseUnits("2500000000", 18); // 2.5 billion pFLOTH
 
   beforeEach(async function () {
     [owner, addr1, addr2, _] = await ethers.getSigners();
