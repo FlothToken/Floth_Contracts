@@ -18,7 +18,8 @@ describe("pFLOTH Contract", function () {
     pFLOTH = await pFLOTHFactory.deploy(PRESALE_DURATION);
     await pFLOTH.waitForDeployment();
   });
-
+  //3000000052126489860000001 25
+  //9999987846277268851588 22
   describe("Deployment", function () {
     it("Should set the correct presale end time", async function () {
       const blockTimestamp = (await ethers.provider.getBlock()).timestamp;
@@ -38,8 +39,17 @@ describe("pFLOTH Contract", function () {
       const newTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
       console.log("New Timestamp:", newTimestamp);
 
+      try {
+        // Your test case code that triggers the transaction
+        await pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) });
+      } catch (error) {
+        console.log("Error message: ", error.message);
+        console.log("Error data: ", error.data); // This line can be used if the error object has additional data
+        expect(error.message).to.include("PresaleEnded");
+      }
+
       // Attempt to participate in the presale after the presale period has ended
-      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.be.revertedWith("PresaleEnded");
+      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.be.revertedWithCustomError(pFLOTH, "PresaleEnded");
     });
 
     it("Should mint the correct amount of pFLOTH tokens", async function () {
