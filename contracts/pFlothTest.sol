@@ -6,15 +6,17 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 //mandem
-contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
-    uint256 public constant MAX_SUPPLY = 30 * 10 ** 9 * 10 ** 18; // 30 billion pFLOTH
+contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
+    uint256 public MAX_SUPPLY = 30 * 10 ** 9 * 10 ** 18; // 30 billion pFLOTH
     uint256 public constant EXCHANGE_RATE = 10000; // 1 FLR = 10,000 pFLOTH
-    uint256 public constant WALLET_LIMIT = 2.5 * 10 ** 9 * 10 ** 18; // 2.5 billion pFLOTH per wallet
+    uint256 public WALLET_LIMIT = 2.5 * 10 ** 9 * 10 ** 18; // 2.5 billion pFLOTH per wallet
 
     uint256 public presaleEndTime;
     mapping(address => uint256) public pFLOTHBalance;
 
-    constructor(uint256 _presaleDuration) ERC20("Presale Floth", "pFLOTH") {
+    constructor(
+        uint256 _presaleDuration
+    ) ERC20("Presale FlothTest", "pFLOTHTest") {
         presaleEndTime = block.timestamp + _presaleDuration;
     }
 
@@ -48,8 +50,12 @@ contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
     }
 
     // Helper function for testing purposes
-    function setTotalSupply(uint256 _supply) external {
+    function setTotalSupply(uint256 _supply) external onlyOwner {
         MAX_SUPPLY = _supply;
+    }
+
+    function setWalletLimit(uint256 _limit) external onlyOwner {
+        WALLET_LIMIT = _limit;
     }
 
     // Withdraw function for the owner to withdraw FLR collected during presale

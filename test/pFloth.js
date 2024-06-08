@@ -3,6 +3,7 @@ const { ethers } = require("hardhat");
 
 describe("pFLOTH Contract", function () {
   let pFLOTH;
+  let pFLOTHTest;
   let owner;
   let addr1;
   let addr2;
@@ -17,36 +18,24 @@ describe("pFLOTH Contract", function () {
     const pFLOTHFactory = await ethers.getContractFactory("pFLOTH");
     pFLOTH = await pFLOTHFactory.deploy(PRESALE_DURATION);
     await pFLOTH.waitForDeployment();
+
+    const pFLOTHTestFactory = await ethers.getContractFactory("pFLOTHTest");
+    pFLOTHTest = await pFLOTHTestFactory.deploy(PRESALE_DURATION);
+    await pFLOTHTest.waitForDeployment();
   });
-  //3000000052126489860000001 25
-  //9999987846277268851588 22
+
   describe("Deployment", function () {
     it("Should set the correct presale end time", async function () {
       const blockTimestamp = (await ethers.provider.getBlock()).timestamp;
-      expect(await pFLOTH.presaleEndTime()).to.equal(blockTimestamp + PRESALE_DURATION);
+      expect(await pFLOTH.presaleEndTime()).to.be.closeTo(blockTimestamp + PRESALE_DURATION, 1);
     });
   });
 
   describe("Presale", function () {
     it("Should revert if presale has ended", async function () {
-      const initialTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
-      console.log("Initial Timestamp:", initialTimestamp);
-
       // Increase time by the presale duration plus one second
       await ethers.provider.send("evm_increaseTime", [PRESALE_DURATION + 1]);
       await ethers.provider.send("evm_mine", []);
-
-      const newTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
-      console.log("New Timestamp:", newTimestamp);
-
-      try {
-        // Your test case code that triggers the transaction
-        await pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) });
-      } catch (error) {
-        console.log("Error message: ", error.message);
-        console.log("Error data: ", error.data); // This line can be used if the error object has additional data
-        expect(error.message).to.include("PresaleEnded");
-      }
 
       // Attempt to participate in the presale after the presale period has ended
       await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.be.revertedWithCustomError(pFLOTH, "PresaleEnded");
@@ -63,13 +52,23 @@ describe("pFLOTH Contract", function () {
     });
 
     it("Should revert if minting exceeds MAX_SUPPLY", async function () {
-      const amountFLR = MAX_SUPPLY / EXCHANGE_RATE + 1n;
-      await expect(pFLOTH.connect(addr1).presale({ value: amountFLR })).to.be.revertedWith("ExceedsSupply");
+      const newSupply = BigInt(1000) * BigInt(10 ** 18);
+      await pFLOTHTest.setTotalSupply(newSupply);
+
+      // Calculate the amount that will exceed the supply
+      const amountFLR = newSupply / EXCHANGE_RATE + BigInt(1);
+
+      await expect(pFLOTHTest.connect(addr1).presale({ value: amountFLR })).to.be.revertedWithCustomError(pFLOTHTest, "ExceedsSupply");
     });
 
     it("Should revert if minting exceeds WALLET_LIMIT", async function () {
-      const amountFLR = WALLET_LIMIT / EXCHANGE_RATE + 1n;
-      await expect(pFLOTH.connect(addr1).presale({ value: amountFLR })).to.be.revertedWith("WalletLimitExceeded");
+      const newWalletLimit = BigInt(1000) * BigInt(10 ** 18);
+      await pFLOTHTest.setWalletLimit(newWalletLimit);
+
+      // Calculate the amount that will exceed the wallet limit
+      const amountFLR = newWalletLimit / EXCHANGE_RATE + BigInt(1);
+
+      await expect(pFLOTHTest.connect(addr1).presale({ value: amountFLR })).to.be.revertedWithCustomError(pFLOTHTest, "WalletLimitExceeded");
     });
 
     it("Should emit Presale event", async function () {
