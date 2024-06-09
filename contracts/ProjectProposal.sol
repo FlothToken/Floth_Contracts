@@ -359,7 +359,6 @@ contract ProjectProposal is AccessControl {
         Round storage roundToUpdate = getLatestRound();
         if (roundToUpdate.maxFlareAmount != _newRoundMaxFlare) {
             if (address(this).balance < _newRoundMaxFlare) {
-                //TODO: Why are we checking the contract balance?
                 revert InsufficientBalance();
             }
             roundToUpdate.maxFlareAmount = _newRoundMaxFlare;
