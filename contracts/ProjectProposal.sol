@@ -120,6 +120,7 @@ contract ProjectProposal is AccessControl {
     error InvalidVotingPower();
     error InvalidFlothAmount();
     error InsufficientBalance();
+    error InsufficientFundsForRound();
     error FundsAlreadyClaimed();
     error FundsClaimingPeriod();
     error InvalidClaimer();
@@ -315,7 +316,11 @@ contract ProjectProposal is AccessControl {
         uint256 _roundRuntime,
         uint256 _snapshotDatetime,
         uint256 _votingRuntime
-    ) external roundManagerOrAdmin {
+    ) external payable roundManagerOrAdmin {
+        if (msg.value < _flrAmount) {
+            revert InsufficientFundsForRound();
+        }
+
         roundId++;
         Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
         newRound.id = roundId;
@@ -354,6 +359,7 @@ contract ProjectProposal is AccessControl {
         Round storage roundToUpdate = getLatestRound();
         if (roundToUpdate.maxFlareAmount != _newRoundMaxFlare) {
             if (address(this).balance < _newRoundMaxFlare) {
+                //TODO: Why are we checking the contract balance?
                 revert InsufficientBalance();
             }
             roundToUpdate.maxFlareAmount = _newRoundMaxFlare;
@@ -442,6 +448,7 @@ contract ProjectProposal is AccessControl {
 
     //Remove a round.
     function killRound(uint256 _roundId) external roundManagerOrAdmin {
+        uint256 maxFlareAmount = rounds[_roundId].maxFlareAmount;
         //remove round from mapping.
         delete rounds[_roundId];
         //remove round id from array.
@@ -452,6 +459,11 @@ contract ProjectProposal is AccessControl {
                 break;
             }
         }
+
+        //Send funds back to grant pool.
+        (bool success, ) = msg.sender.call{value: maxFlareAmount}("");
+        require(success);
+
         emit RoundKilled(_roundId);
     }
 
