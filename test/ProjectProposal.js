@@ -149,7 +149,8 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
       await projectProposal.killRound(1);
-      await expect(projectProposal.getRoundById(1)).to.be.revertedWith("RoundIdOutOfRange");
+      const round = await projectProposal.getRoundById(1);
+      expect(round.isActive).to.equal(false);
     });
 
     it("Should revert if non-manager tries to kill a round", async function () {
