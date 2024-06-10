@@ -49,6 +49,7 @@ contract ProjectProposal is AccessControl {
         uint256 votingStartDate;
         uint256 votingEndDate;
         uint256[] proposalIds;
+        bool isActive;
     }
 
     //Used to return proposal id's and their vote count for a specific round.
@@ -332,6 +333,7 @@ contract ProjectProposal is AccessControl {
         newRound.votingEndDate = 0;
         newRound.snapshotBlock = block.number; //?
         newRound.votingRuntime = _votingRuntime;
+        newRound.isActive = true;
         //newRound.proposals = []; Gets initialized by default.
 
         //Add 'Abstain' proposal for the new round.
@@ -422,6 +424,7 @@ contract ProjectProposal is AccessControl {
 
     //Get a single round by ID.
     //TODO: Do we need to give any round data to the UI? This is internal due to the mappings now
+    //TODO: There is an issue here becaus
     function getRoundById(uint256 _id) public view returns (Round memory) {
         require(_id <= roundId, "RoundIdOutOfRange");
         return rounds[_id];
@@ -448,8 +451,8 @@ contract ProjectProposal is AccessControl {
     //Remove a round.
     function killRound(uint256 _roundId) external roundManagerOrAdmin {
         uint256 maxFlareAmount = rounds[_roundId].maxFlareAmount;
-        //remove round from mapping.
-        delete rounds[_roundId];
+        //set round as inactive.
+        rounds[_roundId].isActive = false;
         //remove round id from array.
         for (uint256 i = 0; i < roundIds.length; i++) {
             if (roundIds[i] == _roundId) {
