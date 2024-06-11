@@ -83,6 +83,7 @@ contract ProjectProposal is AccessControl {
     //Notify of a new proposal being added.
     event ProposalAdded(
         address creator,
+        uint256 roundId,
         uint256 proposalId,
         string title,
         uint256 amountRequested
@@ -189,7 +190,13 @@ contract ProjectProposal is AccessControl {
         newProposal.fundsClaimed = false;
         rounds[latestRound.id].proposalIds.push(proposalId); //Add proposal ID to round struct.
         proposalsPerWallet[msg.sender][latestRound.id]++; //Increase proposal count for a wallet by 1.
-        emit ProposalAdded(msg.sender, proposalId, _title, _amountRequested);
+        emit ProposalAdded(
+            msg.sender,
+            latestRound.id,
+            proposalId,
+            _title,
+            _amountRequested
+        );
     }
 
     //Allow user to update the proposal receiver address.
