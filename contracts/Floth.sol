@@ -20,16 +20,18 @@ contract Floth is ERC20Votes, Ownable {
     address public grantFundWallet = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; //Update to actual wallet.
     address public lpPairAddress = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; //Update to actual address.
 
-    event TaxUpdated(string taxType, uint256 newTax);
-    event DexAddressUpdated(address dexAddress, bool isAdded);
+    event SellTaxUpdate(uint256 newTax);
+    event BuyTaxUpdate(uint256 newTax);
+    event DexAddressAdded(address dexAddress);
+    event DexAddressRemoved(address dexAddress);
 
     error InvalidTaxAmount();
 
     constructor(
         address[] memory _dexAddresses,
-        string memory name,
-        string memory symbol
-    ) ERC20(name, symbol) ERC20Permit(name) {
+        string memory _name,
+        string memory _symbol
+    ) ERC20(_name, _symbol) ERC20Permit(_name) {
         _mint(msg.sender, 1000000 * 10 ** 18);
         deploymentTime = block.timestamp;
 
@@ -45,7 +47,7 @@ contract Floth is ERC20Votes, Ownable {
             revert InvalidTaxAmount();
         }
         sellTax = _newSellTax;
-        emit TaxUpdated("Sell", _newSellTax);
+        emit SellTaxUpdate(_newSellTax);
     }
 
     //Set buy bot tax.
@@ -55,19 +57,19 @@ contract Floth is ERC20Votes, Ownable {
             revert InvalidTaxAmount();
         }
         buyTax = _newBuyTax;
-        emit TaxUpdated("Buy", _newBuyTax);
+        emit BuyTaxUpdate(_newBuyTax);
     }
 
     //Add DEX address to mapping.
     function addDexAddress(address _dexAddress) external onlyOwner {
         dexAddresses[_dexAddress] = true;
-        emit DexAddressUpdated(_dexAddress, true);
+        emit DexAddressAdded(_dexAddress);
     }
 
     //Remove DEX address to mapping.
     function removeDexAddress(address _dexAddress) external onlyOwner {
         dexAddresses[_dexAddress] = false;
-        emit DexAddressUpdated(_dexAddress, false);
+        emit DexAddressRemoved(_dexAddress);
     }
 
     //Transfer tokens with/without tax, based on time of buy/sell.
