@@ -97,11 +97,9 @@ contract Floth is ERC20Votes, Ownable {
             taxAmount = _amount * (sellTax / 100); //Amount * sell tax as a decimal.
 
             if (taxAmount > 0) {
-                //TODO Below won't compile because we can't deal with floating point numbers.
-                //We have to do this in a more clever way - will look into it later - Westy.
-                //uint256 grantFundAmount = taxAmount * (833 / 1000); //83.3% (2.5% from the 3%)
-                //int256 lpPairingAmount = taxAmount - grantFundAmount; //16.7% (0.5% from the 3%)
-                //super._transfer(_sender, grantFundWallet, grantFundAmount);
+                uint256 grantFundAmount = (taxAmount * 833) / 1000; //83.3% (2.5% from the 3%)
+                uint256 lpPairingAmount = taxAmount - grantFundAmount; //16.7% (0.5% from the 3%)
+                super._transfer(_sender, grantFundWallet, grantFundAmount);
                 //Also send to the LP Pairing until 10% LP allocation reserve is depleted. REVIEW.
             }
         }
