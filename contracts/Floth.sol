@@ -26,6 +26,7 @@ contract Floth is ERC20Votes, Ownable {
     event DexAddressRemoved(address dexAddress);
 
     error InvalidTaxAmount();
+    error ZeroAddress();
 
     constructor(
         address[] memory _dexAddresses,
@@ -70,6 +71,22 @@ contract Floth is ERC20Votes, Ownable {
     function removeDexAddress(address _dexAddress) external onlyOwner {
         dexAddresses[_dexAddress] = false;
         emit DexAddressRemoved(_dexAddress);
+    }
+
+    //Set grant fund wallet address.
+    function setGrantFundWallet(address _newWallet) external onlyOwner {
+        if (_newWallet == address(0)) {
+            revert ZeroAddress();
+        }
+        grantFundWallet = _newWallet;
+    }
+
+    //Set LP Pair address.
+    function setLpPairAddress(address _newAddress) external onlyOwner {
+        if (_newAddress == address(0)) {
+            revert ZeroAddress();
+        }
+        lpPairAddress = _newAddress;
     }
 
     //Transfer tokens with/without tax, based on time of buy/sell.
