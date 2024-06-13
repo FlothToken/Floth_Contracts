@@ -5,9 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Floth is ERC20Votes, Ownable {
-    //Roles
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-
     //Bot tax in basis points (100 basis points = 1%)
     uint256 public buyTax = 2500; // 25%
     uint256 public sellTax = 3500; // 35%
@@ -69,15 +66,17 @@ contract Floth is ERC20Votes, Ownable {
         if (_dexAddress == address(0)) {
             revert ZeroAddress();
         }
+
         dexAddresses[_dexAddress] = true;
         emit DexAddressAdded(_dexAddress);
     }
 
-    //Remove DEX address to mapping.
+    //Remove DEX address from mapping.
     function removeDexAddress(address _dexAddress) external onlyOwner {
         if (_dexAddress == address(0)) {
             revert ZeroAddress();
         }
+
         dexAddresses[_dexAddress] = false;
         emit DexAddressRemoved(_dexAddress);
     }
@@ -100,40 +99,39 @@ contract Floth is ERC20Votes, Ownable {
         emit LpPairAddressUpdated(_newAddress);
     }
 
-    //Transfer tokens with/without tax, based on time of buy/sell.
+    //Transfer tokens with/without tax, based on buy/sell.
     function _transfer(
         address _sender,
         address _recipient,
         uint256 _amount
     ) internal override {
-        if (_recipient == address(this)) {
+        if (_sender == _recipient || address(0) == _recipient) {
             revert SelfTransfer();
         }
 
-        uint256 taxAmount = 0; //Amount to be taxed for this transaction.
+        uint256 taxAmount = 0; // Amount to be taxed for this transaction.
+        uint256 grantFundAmount = 0;
+        uint256 lpPairingAmount = 0;
 
-        //Case for if it's a buy transaction.
         if (dexAddresses[_sender]) {
+            // Buy transaction
             taxAmount = (_amount * buyTax) / 10000; // Amount * buy tax in basis points.
             if (taxAmount > 0) {
                 super._transfer(_sender, grantFundWallet, taxAmount);
             }
-        }
-        //Case for if it's a sell transaction.
-        else if (dexAddresses[_recipient]) {
+        } else if (dexAddresses[_recipient]) {
+            // Sell transaction
             taxAmount = (_amount * sellTax) / 10000; // Amount * sell tax in basis points.
-
             if (taxAmount > 0) {
-                uint256 grantFundAmount = (taxAmount * 833) / 1000; //83.3% (2.5% from the 3%)
-                uint256 lpPairingAmount = taxAmount - grantFundAmount; //16.7% (0.5% from the 3%)
+                grantFundAmount = (taxAmount * 833) / 1000; // 83.3% of tax amount (2.5% from the 3%)
+                lpPairingAmount = taxAmount - grantFundAmount; // Remaining 16.7% of tax amount (0.5% from the 3%)
                 super._transfer(_sender, grantFundWallet, grantFundAmount);
                 super._transfer(_sender, lpPairAddress, lpPairingAmount);
                 //Also send to the LP Pairing until 10% LP allocation reserve is depleted. REVIEW.
             }
         }
 
-        uint256 totalPayable = _amount - taxAmount; //Final tax amount is deducted.
-
+        uint256 totalPayable = _amount - taxAmount; // Final tax amount is deducted.
         super._transfer(_sender, _recipient, totalPayable);
     }
 }
