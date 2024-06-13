@@ -8,9 +8,9 @@ contract Floth is ERC20Votes, Ownable {
     //Roles
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    //Bot tax
-    uint256 public buyTax = 25;
-    uint256 public sellTax = 35;
+    //Bot tax in basis points (100 basis points = 1%)
+    uint256 public buyTax = 2500; // 25%
+    uint256 public sellTax = 3500; // 35%
 
     uint256 public deploymentTime;
 
@@ -24,9 +24,12 @@ contract Floth is ERC20Votes, Ownable {
     event BuyTaxUpdate(uint256 newTax);
     event DexAddressAdded(address dexAddress);
     event DexAddressRemoved(address dexAddress);
+    event GrantFundWalletUpdated(address newWallet);
+    event LpPairAddressUpdated(address newAddress);
 
     error InvalidTaxAmount();
     error ZeroAddress();
+    error SelfTransfer();
 
     constructor(
         address[] memory _dexAddresses,
@@ -44,7 +47,7 @@ contract Floth is ERC20Votes, Ownable {
     //Set sell bot tax.
     function setSellBotTax(uint256 _newSellTax) external onlyOwner {
         //Sell tax cannot be more than 5%.
-        if (_newSellTax > 5) {
+        if (_newSellTax > 500) {
             revert InvalidTaxAmount();
         }
         sellTax = _newSellTax;
@@ -54,7 +57,7 @@ contract Floth is ERC20Votes, Ownable {
     //Set buy bot tax.
     function setBuyBotTax(uint256 _newBuyTax) external onlyOwner {
         //Buy tax cannot be more than 5%.
-        if (_newBuyTax > 5) {
+        if (_newBuyTax > 500) {
             revert InvalidTaxAmount();
         }
         buyTax = _newBuyTax;
@@ -63,12 +66,18 @@ contract Floth is ERC20Votes, Ownable {
 
     //Add DEX address to mapping.
     function addDexAddress(address _dexAddress) external onlyOwner {
+        if (_dexAddress == address(0)) {
+            revert ZeroAddress();
+        }
         dexAddresses[_dexAddress] = true;
         emit DexAddressAdded(_dexAddress);
     }
 
     //Remove DEX address to mapping.
     function removeDexAddress(address _dexAddress) external onlyOwner {
+        if (_dexAddress == address(0)) {
+            revert ZeroAddress();
+        }
         dexAddresses[_dexAddress] = false;
         emit DexAddressRemoved(_dexAddress);
     }
@@ -79,6 +88,7 @@ contract Floth is ERC20Votes, Ownable {
             revert ZeroAddress();
         }
         grantFundWallet = _newWallet;
+        emit GrantFundWalletUpdated(_newWallet);
     }
 
     //Set LP Pair address.
@@ -87,6 +97,7 @@ contract Floth is ERC20Votes, Ownable {
             revert ZeroAddress();
         }
         lpPairAddress = _newAddress;
+        emit LpPairAddressUpdated(_newAddress);
     }
 
     //Transfer tokens with/without tax, based on time of buy/sell.
@@ -95,28 +106,28 @@ contract Floth is ERC20Votes, Ownable {
         address _recipient,
         uint256 _amount
     ) internal override {
-        require(
-            _recipient != address(this),
-            "Contract sending tokens to itself is not allowed."
-        );
+        if (_recipient == address(this)) {
+            revert SelfTransfer();
+        }
 
         uint256 taxAmount = 0; //Amount to be taxed for this transaction.
 
         //Case for if it's a buy transaction.
         if (dexAddresses[_sender]) {
-            taxAmount = _amount * (buyTax / 100); //Amount * buy tax as a decimal.
+            taxAmount = (_amount * buyTax) / 10000; // Amount * buy tax in basis points.
             if (taxAmount > 0) {
                 super._transfer(_sender, grantFundWallet, taxAmount);
             }
         }
         //Case for if it's a sell transaction.
-        if (dexAddresses[_recipient]) {
-            taxAmount = _amount * (sellTax / 100); //Amount * sell tax as a decimal.
+        else if (dexAddresses[_recipient]) {
+            taxAmount = (_amount * sellTax) / 10000; // Amount * sell tax in basis points.
 
             if (taxAmount > 0) {
                 uint256 grantFundAmount = (taxAmount * 833) / 1000; //83.3% (2.5% from the 3%)
                 uint256 lpPairingAmount = taxAmount - grantFundAmount; //16.7% (0.5% from the 3%)
                 super._transfer(_sender, grantFundWallet, grantFundAmount);
+                super._transfer(_sender, lpPairAddress, lpPairingAmount);
                 //Also send to the LP Pairing until 10% LP allocation reserve is depleted. REVIEW.
             }
         }
