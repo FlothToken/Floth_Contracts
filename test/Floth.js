@@ -69,6 +69,8 @@ describe("Floth Contract", function () {
       const grantFundBalance = await floth.balanceOf(floth.grantFundWallet());
       const lpPairBalance = await floth.balanceOf(floth.lpPairAddress());
 
+      console.log(dexBalance, grantFundBalance, lpPairBalance);
+
       expect(dexBalance).to.equal(65); // 35% tax applied
       expect(grantFundBalance).to.equal(29); // 83.3% of 35%
       expect(lpPairBalance).to.equal(6); // 16.7% of 35%
@@ -108,7 +110,7 @@ describe("Floth Contract", function () {
     });
 
     it("Should revert when setting grant fund wallet to zero address", async function () {
-      await expect(floth.setGrantFundWallet(ethers.constants.AddressZero)).to.be.revertedWith("ZeroAddress");
+      await expect(floth.setGrantFundWallet(zeroAddress)).to.be.revertedWithCustomError(Floth, "ZeroAddress");
     });
 
     it("Should allow owner to set lp pair address", async function () {
@@ -117,7 +119,7 @@ describe("Floth Contract", function () {
     });
 
     it("Should revert when setting lp pair address to zero address", async function () {
-      await expect(floth.setLpPairAddress(ethers.constants.AddressZero)).to.be.revertedWith("ZeroAddress");
+      await expect(floth.setLpPairAddress(zeroAddress)).to.be.revertedWithCustomError(Floth, "ZeroAddress");
     });
   });
 });
