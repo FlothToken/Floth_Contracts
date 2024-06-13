@@ -11,6 +11,8 @@ contract Floth is ERC20Votes, Ownable {
 
     uint256 public deploymentTime;
 
+    bool public lpTaxIsActive = true;
+
     // Store DEX addresses to calculate if buy/sell/transfer.
     mapping(address => bool) public dexAddresses;
 
@@ -99,6 +101,14 @@ contract Floth is ERC20Votes, Ownable {
         emit LpPairAddressUpdated(_newAddress);
     }
 
+    /**
+     * Setter for LP Tax status.
+     * @param _status - New status for LP tax.
+     */
+    function setLpTaxStatus(bool _status) external onlyOwner {
+        lpTaxIsActive = _status;
+    }
+
     //Transfer tokens with/without tax, based on buy/sell.
     function _transfer(
         address _sender,
@@ -124,10 +134,12 @@ contract Floth is ERC20Votes, Ownable {
             taxAmount = (_amount * sellTax) / 10000; // Amount * sell tax in basis points.
             if (taxAmount > 0) {
                 grantFundAmount = (taxAmount * 8333) / 10000; // 83.3% of tax amount (2.5% from the 3%)
-                lpPairingAmount = taxAmount - grantFundAmount; // Remaining 16.7% of tax amount (0.5% from the 3%)
                 super._transfer(_sender, grantFundWallet, grantFundAmount);
-                super._transfer(_sender, lpPairAddress, lpPairingAmount);
-                // TODO Should be able to turn LP tax off
+
+                if (lpTaxIsActive) {
+                    lpPairingAmount = taxAmount - grantFundAmount; // Remaining 16.7% of tax amount (0.5% from the 3%)
+                    super._transfer(_sender, lpPairAddress, lpPairingAmount);
+                }
             }
         }
 
