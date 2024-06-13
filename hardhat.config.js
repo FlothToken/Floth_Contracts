@@ -8,7 +8,7 @@ module.exports = {
       {
         version: "0.8.24",
         settings: {
-          evmVersion: "london",
+          evmVersion: "cancun",
         },
       },
     ],
