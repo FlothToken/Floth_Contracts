@@ -115,6 +115,15 @@ contract ProjectProposal is AccessControl {
         uint256 amountRequested
     );
 
+    // Notify when the snapshot datetime is updated
+    event SnapshotDatetimeUpdated(uint256 roundId, uint256 newSnapshotDatetime);
+
+    // Notify when the round runtime is updated
+    event RoundRuntimeUpdated(uint256 roundId, uint256 newRoundRuntime);
+
+    // Notify when max Flare is updated
+    event RoundMaxFlareSet(uint256 newMaxFlare);
+
     error InvalidPermissions();
     error SubmissionWindowClosed();
     error VotingPeriodOpen();
@@ -135,6 +144,7 @@ contract ProjectProposal is AccessControl {
     error ZeroAddress();
     error ProposalIdOutOfRange();
     error InvalidAbstainVote();
+    error InvalidRoundRuntime();
 
     modifier roundManagerOrAdmin() {
         if (
@@ -371,26 +381,67 @@ contract ProjectProposal is AccessControl {
                 revert InsufficientBalance();
             }
             roundToUpdate.maxFlareAmount = _newRoundMaxFlare;
+            emit RoundMaxFlareSet(_newRoundMaxFlare);
         }
     }
 
-    //Allow Admin or Round Manager to update the round runtime.
-    function setRoundRuntime(
+    // Function to update the round runtime and adjust the voting runtime accordingly
+    function extendRoundRuntime(
         uint256 _newRoundRuntime
     ) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
+        // Ensure the new runtime is greater than the current round runtime
+        if (_newRoundRuntime <= roundToUpdate.roundRuntime) {
+            revert InvalidRoundRuntime();
+        }
+        // Update the round runtime
         roundToUpdate.roundRuntime = _newRoundRuntime;
+        // Adjust voting runtime if necessary
+        if (roundToUpdate.votingStartDate != 0) {
+            uint256 newVotingEndDate = roundToUpdate.votingStartDate +
+                roundToUpdate.votingRuntime;
+            if (
+                newVotingEndDate >
+                (roundToUpdate.roundStarttime + _newRoundRuntime)
+            ) {
+                roundToUpdate.votingRuntime =
+                    (roundToUpdate.roundStarttime + _newRoundRuntime) -
+                    roundToUpdate.votingStartDate;
+            }
+        }
+        //?? TODO: Check if this is necessary
+        // Emit an event for updating the round runtime
+        emit RoundRuntimeUpdated(roundId, _newRoundRuntime);
     }
 
-    //Allow Admin or Round Manager to update the round snapshot date time.
-    function setRoundSnapshotDatetime(
+    // Function to update the round snapshot datetime and adjust related windows
+    function extendRoundSnapshotDatetime(
         uint256 _newSnapshotDatetime
     ) external managerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
-        if (block.timestamp < _newSnapshotDatetime) {
+        // Ensure the new snapshot time is in the future and within the round runtime
+        if (
+            block.timestamp >= _newSnapshotDatetime ||
+            _newSnapshotDatetime >
+            (roundToUpdate.roundStarttime + roundToUpdate.roundRuntime)
+        ) {
             revert InvalidSnapshotTime();
         }
+
+        // Calculate the difference in time
+        uint256 timeDifference = _newSnapshotDatetime -
+            roundToUpdate.snapshotDatetime;
+
+        // Update the snapshot datetime
         roundToUpdate.snapshotDatetime = _newSnapshotDatetime;
+
+        // Adjust the round end time and voting window by the same amount of time
+        roundToUpdate.roundRuntime += timeDifference;
+        roundToUpdate.votingEndDate += timeDifference;
+
+        // Emit events for updating the snapshot datetime and round runtime
+        emit SnapshotDatetimeUpdated(roundId, _newSnapshotDatetime);
+        emit RoundRuntimeUpdated(roundId, roundToUpdate.roundRuntime);
     }
 
     //Take a snapshot for the current round.
