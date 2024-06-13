@@ -14,8 +14,8 @@ contract Floth is ERC20Votes, Ownable {
     // Store DEX addresses to calculate if buy/sell/transfer.
     mapping(address => bool) public dexAddresses;
 
-    address public grantFundWallet = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; //Update to actual wallet.
-    address public lpPairAddress = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; //Update to actual address.
+    address public grantFundWallet = 0x315c76C23e8815Fe0dFd8DD626782C49647924Ba; //Update to actual wallet.
+    address public lpPairAddress = 0x86d9c457969bd9Bb102D0876D959601aF681882D; //Update to actual address.
 
     event SellTaxUpdate(uint256 newTax);
     event BuyTaxUpdate(uint256 newTax);
@@ -123,11 +123,11 @@ contract Floth is ERC20Votes, Ownable {
             // Sell transaction
             taxAmount = (_amount * sellTax) / 10000; // Amount * sell tax in basis points.
             if (taxAmount > 0) {
-                grantFundAmount = (taxAmount * 833) / 1000; // 83.3% of tax amount (2.5% from the 3%)
+                grantFundAmount = (taxAmount * 8333) / 10000; // 83.3% of tax amount (2.5% from the 3%)
                 lpPairingAmount = taxAmount - grantFundAmount; // Remaining 16.7% of tax amount (0.5% from the 3%)
                 super._transfer(_sender, grantFundWallet, grantFundAmount);
                 super._transfer(_sender, lpPairAddress, lpPairingAmount);
-                //Also send to the LP Pairing until 10% LP allocation reserve is depleted. REVIEW.
+                // TODO Should be able to turn LP tax off
             }
         }
 

@@ -51,17 +51,45 @@ describe("Floth Contract", function () {
     });
 
     it("Should apply buy tax when buying from a dex address", async function () {
-      await floth.transfer(dexAddress.address, 100);
+      //Owner transfers 100 tokens to dex address
+      //200 * 0.35 = sale tax = 70
+      //70 * 0.8333 = grant fund balance = 58.33
+      //70 - 58.33 = lp pair balance = 11.67
+      //dex address balance = 200 - 70 = 130
+      await floth.transfer(dexAddress.address, 200);
+
+      //   console.log("Dex Balance: ", await floth.balanceOf(dexAddress.address));
+      //   console.log("Grant Fund Balance: ", await floth.balanceOf(floth.grantFundWallet()));
+      //   console.log("LP Pair Balance: ", await floth.balanceOf(floth.lpPairAddress()));
+
+      //Dex address transfers 100 tokens to addr1
+      //100 * 0.25 = tax = 25
+      //addr1 balance = 100 - 25 = 75
+      //grant fund balance = 58.33 + 25 = 83.33
       await floth.connect(dexAddress).transfer(addr1.address, 100);
 
       const addr1Balance = await floth.balanceOf(addr1.address);
       const grantFundBalance = await floth.balanceOf(floth.grantFundWallet());
 
+      //   console.log("Addr1 Balance: ", addr1Balance);
+      //   console.log("Dex Balance: ", await floth.balanceOf(dexAddress.address));
+      //   console.log("Grant Fund Balance: ", await floth.balanceOf(floth.grantFundWallet()));
+      //   console.log("LP Pair Balance: ", await floth.balanceOf(floth.lpPairAddress()));
+
       expect(addr1Balance).to.equal(75); // 25% tax applied
-      expect(grantFundBalance).to.equal(25);
+      expect(grantFundBalance).to.equal(83);
     });
 
     it("Should apply sell tax when selling to a dex address", async function () {
+      //Owner transfers 100 tokens to addr1
+      //Neither buy nor sell tax is applied as no dex address is involved
+
+      //Addr1 transfers 100 tokens to dex address
+      //This is a sell
+      //100 * 0.35 = tax = 35
+      //35 * 0.8333 = grant fund balance = 29.17
+      //35 - 29.17 = lp pair balance = 5.83
+      //dex address balance = 100 - 35 = 65
       await floth.transfer(addr1.address, 100);
       await floth.connect(addr1).transfer(dexAddress.address, 100);
 
@@ -69,7 +97,7 @@ describe("Floth Contract", function () {
       const grantFundBalance = await floth.balanceOf(floth.grantFundWallet());
       const lpPairBalance = await floth.balanceOf(floth.lpPairAddress());
 
-      console.log(dexBalance, grantFundBalance, lpPairBalance);
+      //   console.log(dexBalance, grantFundBalance, lpPairBalance);
 
       expect(dexBalance).to.equal(65); // 35% tax applied
       expect(grantFundBalance).to.equal(29); // 83.3% of 35%
