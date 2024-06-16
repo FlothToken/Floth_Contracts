@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Floth is ERC20Votes, Ownable {
-    //Bot tax in basis points (100 basis points = 1%)
+    // Bot tax in basis points (100 basis points = 1%)
     uint256 public buyTax = 2500; // 25%
     uint256 public sellTax = 3500; // 35%
 
@@ -16,8 +16,8 @@ contract Floth is ERC20Votes, Ownable {
     // Store DEX addresses to calculate if buy/sell/transfer.
     mapping(address => bool) public dexAddresses;
 
-    address public grantFundWallet = 0x315c76C23e8815Fe0dFd8DD626782C49647924Ba; //Update to actual wallet.
-    address public lpPairAddress = 0x86d9c457969bd9Bb102D0876D959601aF681882D; //Update to actual address.
+    address public grantFundWallet = 0x315c76C23e8815Fe0dFd8DD626782C49647924Ba; // Update to actual wallet.
+    address public lpPairAddress = 0x86d9c457969bd9Bb102D0876D959601aF681882D; // Update to actual address.
 
     event SellTaxUpdate(uint256 newTax);
     event BuyTaxUpdate(uint256 newTax);
@@ -43,9 +43,12 @@ contract Floth is ERC20Votes, Ownable {
         }
     }
 
-    //Set sell bot tax.
+    /**
+     * @notice Set sell bot tax.
+     * @param _newSellTax New sell tax in basis points.
+     */
     function setSellBotTax(uint256 _newSellTax) external onlyOwner {
-        //Sell tax cannot be more than 5%.
+        // Sell tax cannot be more than 5%.
         if (_newSellTax > 500) {
             revert InvalidTaxAmount();
         }
@@ -53,9 +56,12 @@ contract Floth is ERC20Votes, Ownable {
         emit SellTaxUpdate(_newSellTax);
     }
 
-    //Set buy bot tax.
+    /**
+     * @notice Set buy bot tax.
+     * @param _newBuyTax New buy tax in basis points.
+     */
     function setBuyBotTax(uint256 _newBuyTax) external onlyOwner {
-        //Buy tax cannot be more than 5%.
+        // Buy tax cannot be more than 5%.
         if (_newBuyTax > 500) {
             revert InvalidTaxAmount();
         }
@@ -63,7 +69,10 @@ contract Floth is ERC20Votes, Ownable {
         emit BuyTaxUpdate(_newBuyTax);
     }
 
-    //Add DEX address to mapping.
+    /**
+     * @notice Add DEX address to mapping.
+     * @param _dexAddress Address of the DEX.
+     */
     function addDexAddress(address _dexAddress) external onlyOwner {
         if (_dexAddress == address(0)) {
             revert ZeroAddress();
@@ -73,7 +82,10 @@ contract Floth is ERC20Votes, Ownable {
         emit DexAddressAdded(_dexAddress);
     }
 
-    //Remove DEX address from mapping.
+    /**
+     * @notice Remove DEX address from mapping.
+     * @param _dexAddress Address of the DEX.
+     */
     function removeDexAddress(address _dexAddress) external onlyOwner {
         if (_dexAddress == address(0)) {
             revert ZeroAddress();
@@ -83,7 +95,10 @@ contract Floth is ERC20Votes, Ownable {
         emit DexAddressRemoved(_dexAddress);
     }
 
-    //Set grant fund wallet address.
+    /**
+     * @notice Set grant fund wallet address.
+     * @param _newWallet New grant fund wallet address.
+     */
     function setGrantFundWallet(address _newWallet) external onlyOwner {
         if (_newWallet == address(0)) {
             revert ZeroAddress();
@@ -92,7 +107,10 @@ contract Floth is ERC20Votes, Ownable {
         emit GrantFundWalletUpdated(_newWallet);
     }
 
-    //Set LP Pair address.
+    /**
+     * @notice Set LP Pair address.
+     * @param _newAddress New LP pair address.
+     */
     function setLpPairAddress(address _newAddress) external onlyOwner {
         if (_newAddress == address(0)) {
             revert ZeroAddress();
@@ -102,14 +120,19 @@ contract Floth is ERC20Votes, Ownable {
     }
 
     /**
-     * Setter for LP Tax status.
-     * @param _status - New status for LP tax.
+     * @notice Setter for LP Tax status.
+     * @param _status New status for LP tax.
      */
     function setLpTaxStatus(bool _status) external onlyOwner {
         lpTaxIsActive = _status;
     }
 
-    //Transfer tokens with/without tax, based on buy/sell.
+    /**
+     * @notice Transfer tokens with/without tax, based on buy/sell.
+     * @param _sender Address of the sender.
+     * @param _recipient Address of the recipient.
+     * @param _amount Amount to be transferred.
+     */
     function _transfer(
         address _sender,
         address _recipient,
