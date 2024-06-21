@@ -676,13 +676,17 @@ contract ProjectProposal is AccessControl {
             block.timestamp > latestRound.roundStartDatetime;
     }
 
-    //When a round is finished, allow winner to claim.
+    /**
+     * Function to finish a round
+     */
     function roundFinished() external roundManagerOrAdmin {
         Round storage latestRound = getLatestRound();
 
+        //TODO: What happens to the funds in this case? We want to be able to get them out!
         if (latestRound.proposalIds.length == 0) {
             revert NoProposalsInRound();
         }
+
         //Check if round is over.
         if (
             (latestRound.roundStartDatetime + latestRound.roundRuntime) <
@@ -690,6 +694,7 @@ contract ProjectProposal is AccessControl {
         ) {
             revert RoundIsOpen();
         }
+
         //Check which proposal has the most votes.
         Proposal memory mostVotedProposal = proposals[
             latestRound.proposalIds[0]
@@ -700,6 +705,7 @@ contract ProjectProposal is AccessControl {
                 mostVotedProposal = proposal;
             }
         }
+
         //Add winning proposal to mappings.
         winningProposals[mostVotedProposal.receiver] = mostVotedProposal;
         winningProposalsByRoundId[latestRound.id] = mostVotedProposal;
