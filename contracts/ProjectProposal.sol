@@ -284,10 +284,16 @@ contract ProjectProposal is AccessControl {
         return accountProposals;
     }
 
+    /**
+     * Get a specific proposal by ID
+     * @param _id The ID of the proposal
+     */
     function getProposalById(
         uint256 _id
     ) public view returns (Proposal memory) {
-        require(_id <= proposalId, "ProposalIdOutOfRange");
+        if (_id > proposalId) {
+            revert ProposalIdOutOfRange();
+        }
         return proposals[_id];
     }
 
