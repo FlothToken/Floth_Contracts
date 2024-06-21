@@ -643,7 +643,11 @@ contract ProjectProposal is AccessControl {
         return votingPowerByRound[_address][roundId];
     }
 
-    //Get voting power for a user.
+    /**
+     * Get voting power for a wallet
+     * @param _address the address to get voting power
+     */
+    //TODO: What's the difference between the above and this?
     function getVotingPower(address _address) public view returns (uint256) {
         uint256 snapshotBlock = getLatestRound().snapshotBlock;
         return floth.getPastVotes(_address, snapshotBlock);
