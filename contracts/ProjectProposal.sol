@@ -30,8 +30,8 @@ contract ProjectProposal is AccessControl {
 
         _setRoleAdmin(SNAPSHOTTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // TODO Change address
-        _grantRole(ADMIN_ROLE, msg.sender); // TODO Change address
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // TODO Change address when we deploy
+        _grantRole(ADMIN_ROLE, msg.sender); // TODO Change address when we deploy
     }
 
     // Proposal struct to store proposal data
