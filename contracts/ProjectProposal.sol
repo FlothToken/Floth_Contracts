@@ -110,7 +110,10 @@ contract ProjectProposal is AccessControl {
         string title,
         uint256 amountRequested
     );
-    event ProposalUpdated(uint256 proposalId, address newAddress);
+    event ProposalReceiverAddressUpdated(
+        uint256 proposalId,
+        address newAddress
+    );
     event ProposalKilled(uint256 proposalId);
     event RoundAdded(uint256 roundId, uint256 flrAmount, uint256 roundRuntime);
     event RoundCompleted(uint256 roundId, uint256 proposalId);
@@ -226,25 +229,33 @@ contract ProjectProposal is AccessControl {
         );
     }
 
-    //Allow user to update the proposal receiver address.
+    /**
+     * Function to update the receiver address of a proposal
+     * @param _proposalId The ID of the proposal
+     * @param _newAddress The new address of the receiver
+     */
     function setProposalReceiverAddress(
         uint256 _proposalId,
         address _newAddress
     ) external {
         Proposal storage proposalToUpdate = proposals[_proposalId];
+
         //Prevent proposer updating receiver address during voting window.
         if (isVotingPeriodOpen()) {
             revert VotingPeriodOpen();
         }
+
         //Only proposer can update receiver address.
         if (msg.sender != proposalToUpdate.proposer) {
             revert InvalidPermissions();
         }
+
         if (_newAddress == address(0)) {
             revert ZeroAddress();
         }
+
         proposalToUpdate.receiver = _newAddress;
-        emit ProposalUpdated(_proposalId, _newAddress);
+        emit ProposalReceiverAddressUpdated(_proposalId, _newAddress);
     }
 
     //Get proposals by user for a specific round.
