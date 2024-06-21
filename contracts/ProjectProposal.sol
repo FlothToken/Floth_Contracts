@@ -389,26 +389,30 @@ contract ProjectProposal is AccessControl {
         emit VotesRemoved(_proposalId, msg.sender, votesGiven);
     }
 
-    //Add a new round (round).
+    /**
+     * Function to add a new round to the contract
+     * @param _maxFlareAmount The amount of FLR for the round
+     * @param _roundRuntime The runtime of the round
+     * @param _snapshotDatetime The snapshot datetime of the round
+     */
     function addRound(
-        uint256 _flrAmount,
+        uint256 _maxFlareAmount,
         uint256 _roundRuntime,
         uint256 _snapshotDatetime
-    ) external payable roundManagerOrAdmin {
-        if (msg.value < _flrAmount) {
+    ) external payable onlyRole(ADMIN_ROLE) {
+        if (msg.value < _maxFlareAmount) {
             revert InsufficientFundsForRound();
         }
 
         roundId++;
         Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
         newRound.id = roundId;
-        newRound.maxFlareAmount = _flrAmount;
+        newRound.maxFlareAmount = _maxFlareAmount;
         newRound.roundStarttime = block.timestamp;
         newRound.roundRuntime = _roundRuntime;
         newRound.snapshotDatetime = _snapshotDatetime;
-        newRound.snapshotBlock = block.number; //?
+        newRound.snapshotBlock = block.number; //TODO: We can't set this here, but if we don't what happens?
         newRound.isActive = true;
-        //newRound.proposals = []; Gets initialized by default.
 
         //Add 'Abstain' proposal for the new round.
         proposalId++;
@@ -417,7 +421,7 @@ contract ProjectProposal is AccessControl {
         abstainProposal.roundId = roundId;
         abstainProposal.title = "Abstain";
         abstainProposal.amountRequested = 0;
-        abstainProposal.receiver = address(0);
+        abstainProposal.receiver = msg.sender;
         abstainProposal.proposer = msg.sender;
         abstainProposal.fundsClaimed = false;
 
@@ -425,10 +429,12 @@ contract ProjectProposal is AccessControl {
         newRound.abstainProposalId = proposalId; //Used to track the abstain proposal of the round.
 
         roundIds.push(roundId); //Keep track of the round ids.
-        emit RoundAdded(roundId, _flrAmount, _roundRuntime);
+        emit RoundAdded(roundId, _maxFlareAmount, _roundRuntime);
     }
 
     //Allow admin or Round Manager to update the round max flare amount.
+    //TODO: Make it payable and if the new max is higher than current, we should send the difference.
+    //TODO: Shouldn't be able to set it lower than the current max.
     function setRoundMaxFlare(
         uint256 _newRoundMaxFlare
     ) external roundManagerOrAdmin {
