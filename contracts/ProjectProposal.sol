@@ -534,6 +534,7 @@ contract ProjectProposal is AccessControl {
 
         //TODO: Set the snapshot datetime (but we need to think of consequences of this)
         // round.snapshotDateTime = block.timestamp;
+        // need a way to check if the snapshot has been taken already
         round.snapshotBlock = block.number;
 
         emit SnapshotTaken(round.id, round.snapshotBlock);
@@ -647,7 +648,6 @@ contract ProjectProposal is AccessControl {
      * Get voting power for a wallet
      * @param _address the address to get voting power
      */
-    //TODO: What's the difference between the above and this?
     function getVotingPower(address _address) public view returns (uint256) {
         uint256 snapshotBlock = getLatestRound().snapshotBlock;
         return floth.getPastVotes(_address, snapshotBlock);
