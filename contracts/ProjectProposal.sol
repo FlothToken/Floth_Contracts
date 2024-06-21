@@ -432,20 +432,18 @@ contract ProjectProposal is AccessControl {
         emit RoundAdded(roundId, _maxFlareAmount, _roundRuntime);
     }
 
-    //Allow admin or Round Manager to update the round max flare amount.
-    //TODO: Make it payable and if the new max is higher than current, we should send the difference.
-    //TODO: Shouldn't be able to set it lower than the current max.
-    function setRoundMaxFlare(
-        uint256 _newRoundMaxFlare
-    ) external roundManagerOrAdmin {
+    /**
+     * Function to increase the max flare amount for a round
+     */
+    function increaseRoundMaxFlare() external payable roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
-        if (roundToUpdate.maxFlareAmount != _newRoundMaxFlare) {
-            if (address(this).balance < _newRoundMaxFlare) {
-                revert InsufficientBalance();
-            }
-            roundToUpdate.maxFlareAmount = _newRoundMaxFlare;
-            emit RoundMaxFlareSet(_newRoundMaxFlare);
+
+        if (msg.value == 0) {
+            revert InvalidAmountRequested();
         }
+
+        roundToUpdate.maxFlareAmount += msg.value;
+        emit RoundMaxFlareSet(roundToUpdate.maxFlareAmount);
     }
 
     // Function to update the round runtime and adjust the voting runtime accordingly
