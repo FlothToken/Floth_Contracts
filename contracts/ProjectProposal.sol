@@ -361,20 +361,30 @@ contract ProjectProposal is AccessControl {
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
     }
 
-    //Votes for a proposal within a round.
+    /**
+     * Function to remove votes from a proposal
+     * @param _proposalId The ID of the proposal
+     */
     function removeVotesFromProposal(uint256 _proposalId) external {
         Round storage currentRound = getLatestRound();
-        //Check if the user hasn't voted yet.
-        if (hasVotedByRound[msg.sender][currentRound.id]) {
+
+        //TODO: IF we are not using this bool flag, we may need another way?
+        //Check if the user hasn't voted.
+        if (!hasVotedByRound[msg.sender][currentRound.id]) {
             revert UserVoteNotFound();
         }
+
         uint256 currentVotingPower = votingPowerByRound[msg.sender][
             currentRound.id
         ];
+
+        //TODO: This is the total votes given, but we are just removing votes given to a particular proposal?
         uint256 votesGiven = getVotingPower(msg.sender) - currentVotingPower; //Calculate votes given.
         Proposal storage proposal = proposals[_proposalId];
         proposal.votesReceived -= votesGiven; //Remove votes given to proposal.
         votingPowerByRound[msg.sender][currentRound.id] += votesGiven; //Give voting power back to user.
+
+        //TODO: May not need this voting flag.
         hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
         emit VotesRemoved(_proposalId, msg.sender, votesGiven);
     }
