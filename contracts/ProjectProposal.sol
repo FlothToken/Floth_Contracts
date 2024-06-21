@@ -653,7 +653,11 @@ contract ProjectProposal is AccessControl {
         return floth.getPastVotes(_address, snapshotBlock);
     }
 
-    //Check if we are in a voting period. This contract and the UI will call.
+    /**
+     * Check if the voting period is open
+     */
+    //TODO: We may want this to not go off the expected but of the snapshot time
+    // we should record when taking a snapshot
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         return
@@ -662,7 +666,11 @@ contract ProjectProposal is AccessControl {
             latestRound.roundStartDatetime + latestRound.roundRuntime;
     }
 
-    // Check if we are in submission window.
+    /**
+     * Check if the submission window is open
+     */
+    //TODO: We may want this to not go off the expected but of the snapshot time
+    // we should record when taking a snapshot
     function isSubmissionWindowOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         return
