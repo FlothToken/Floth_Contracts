@@ -450,15 +450,28 @@ contract ProjectProposal is AccessControl {
         emit RoundMaxFlareSet(roundToUpdate.maxFlareAmount);
     }
 
-    // Function to update the round runtime and adjust the voting runtime accordingly
+    /**
+     * Function to extend the runtime of a round
+     * @param _newRoundRuntime The new runtime for the round
+     */
     function extendRoundRuntime(
         uint256 _newRoundRuntime
     ) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
+
         // Ensure the new runtime is greater than the current round runtime
         if (_newRoundRuntime <= roundToUpdate.roundRuntime) {
             revert InvalidRoundRuntime();
         }
+
+        // Check if round is closed
+        if (
+            block.timestamp >
+            (roundToUpdate.roundStarttime + roundToUpdate.roundRuntime)
+        ) {
+            revert RoundIsClosed();
+        }
+
         // Update the round runtime
         roundToUpdate.roundRuntime = _newRoundRuntime;
 
@@ -467,7 +480,7 @@ contract ProjectProposal is AccessControl {
     }
 
     // Function to update the round snapshot datetime and adjust related windows
-    function extendRoundSnapshotDatetime(
+    function changeRoundSnapshotDatetime(
         uint256 _newSnapshotDatetime
     ) external managerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
