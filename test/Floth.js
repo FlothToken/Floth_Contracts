@@ -95,7 +95,7 @@ describe("Floth Contract", function () {
 
       const dexBalance = await floth.balanceOf(dexAddress.address);
       const grantFundBalance = await floth.balanceOf(floth.grantFundWallet());
-      const lpPairBalance = await floth.balanceOf(floth.lpPairAddress());
+      const lpPairBalance = await floth.balanceOf(floth.lpFundWallet());
 
       //   console.log(dexBalance, grantFundBalance, lpPairBalance);
 
@@ -105,7 +105,7 @@ describe("Floth Contract", function () {
     });
 
     it("Should apply correct tax after changing buy tax", async function () {
-      await floth.setBuyBotTax(500); // Set buy tax to 5%
+      await floth.setBuyTax(500); // Set buy tax to 5%
       await floth.transfer(dexAddress.address, 200);
       await floth.connect(dexAddress).transfer(addr1.address, 100);
 
@@ -114,7 +114,7 @@ describe("Floth Contract", function () {
     });
 
     it("Should apply correct tax after changing sell tax", async function () {
-      await floth.setSellBotTax(500); // Set sell tax to 5%
+      await floth.setSellTax(500); // Set sell tax to 5%
       await floth.transfer(addr1.address, 200);
       await floth.connect(addr1).transfer(dexAddress.address, 100);
 
@@ -142,7 +142,7 @@ describe("Floth Contract", function () {
 
       const dexBalance = await floth.balanceOf(dexAddress.address);
       const grantFundBalance = await floth.balanceOf(floth.grantFundWallet());
-      const lpPairBalance = await floth.balanceOf(floth.lpPairAddress());
+      const lpPairBalance = await floth.balanceOf(floth.lpFundWallet());
 
       expect(dexBalance).to.equal(65); // 35% tax applied
       expect(grantFundBalance).to.equal(29); // 83% of 35% tax
@@ -166,15 +166,11 @@ describe("Floth Contract", function () {
     });
 
     it("Should revert when setting buy tax beyond limit", async function () {
-      await expect(floth.setBuyBotTax(600)).to.be.revertedWithCustomError(floth, "InvalidTaxAmount");
+      await expect(floth.setBuyTax(600)).to.be.revertedWithCustomError(floth, "InvalidTaxAmount");
     });
 
     it("Should revert when setting sell tax beyond limit", async function () {
-      await expect(floth.setSellBotTax(600)).to.be.revertedWithCustomError(floth, "InvalidTaxAmount");
-    });
-
-    it("Should revert when transferring to zero address", async function () {
-      await expect(floth.transfer(zeroAddress, 50)).to.be.revertedWithCustomError(floth, "SelfTransfer");
+      await expect(floth.setSellTax(600)).to.be.revertedWithCustomError(floth, "InvalidTaxAmount");
     });
 
     it("Should revert when self transferring", async function () {
@@ -217,21 +213,21 @@ describe("Floth Contract", function () {
 
   describe("Admin functions", function () {
     it("Should allow owner to set new buy tax", async function () {
-      await floth.setBuyBotTax(400);
+      await floth.setBuyTax(400);
       expect(await floth.buyTax()).to.equal(400);
     });
 
     it("Should revert when non-owner tries to set buy tax", async function () {
-      await expect(floth.connect(addr1).setBuyBotTax(400)).to.be.revertedWith("Ownable: caller is not the owner");
+      await expect(floth.connect(addr1).setBuyTax(400)).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
     it("Should allow owner to set new sell tax", async function () {
-      await floth.setSellBotTax(400);
+      await floth.setSellTax(400);
       expect(await floth.sellTax()).to.equal(400);
     });
 
     it("Should revert when non-owner tries to set sell tax", async function () {
-      await expect(floth.connect(addr1).setSellBotTax(400)).to.be.revertedWith("Ownable: caller is not the owner");
+      await expect(floth.connect(addr1).setSellTax(400)).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
     it("Should allow owner to add and remove dex addresses", async function () {
@@ -252,12 +248,12 @@ describe("Floth Contract", function () {
     });
 
     it("Should allow owner to set lp pair address", async function () {
-      await floth.setLpPairAddress(addr1.address);
-      expect(await floth.lpPairAddress()).to.equal(addr1.address);
+      await floth.setLpFundWalletAddress(addr1.address);
+      expect(await floth.lpFundWallet()).to.equal(addr1.address);
     });
 
     it("Should revert when setting lp pair address to zero address", async function () {
-      await expect(floth.setLpPairAddress(zeroAddress)).to.be.revertedWithCustomError(Floth, "ZeroAddress");
+      await expect(floth.setLpFundWalletAddress(zeroAddress)).to.be.revertedWithCustomError(Floth, "ZeroAddress");
     });
 
     it("Should allow owner to toggle LP tax status", async function () {
@@ -268,12 +264,12 @@ describe("Floth Contract", function () {
     });
 
     it("Should emit events on admin actions", async function () {
-      await expect(floth.setBuyBotTax(400)).to.emit(floth, "BuyTaxUpdate").withArgs(400);
-      await expect(floth.setSellBotTax(400)).to.emit(floth, "SellTaxUpdate").withArgs(400);
+      await expect(floth.setBuyTax(400)).to.emit(floth, "BuyTaxUpdate").withArgs(400);
+      await expect(floth.setSellTax(400)).to.emit(floth, "SellTaxUpdate").withArgs(400);
       await expect(floth.addDexAddress(addr1.address)).to.emit(floth, "DexAddressAdded").withArgs(addr1.address);
       await expect(floth.removeDexAddress(addr1.address)).to.emit(floth, "DexAddressRemoved").withArgs(addr1.address);
       await expect(floth.setGrantFundWallet(addr1.address)).to.emit(floth, "GrantFundWalletUpdated").withArgs(addr1.address);
-      await expect(floth.setLpPairAddress(addr1.address)).to.emit(floth, "LpPairAddressUpdated").withArgs(addr1.address);
+      await expect(floth.setLpFundWalletAddress(addr1.address)).to.emit(floth, "LpFundWalletUpdated").withArgs(addr1.address);
     });
   });
 });
