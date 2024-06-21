@@ -297,23 +297,33 @@ contract ProjectProposal is AccessControl {
         return proposals[_id];
     }
 
-    //Votes for a proposal within a round.
+    /**
+     * Function to add votes to a proposal
+     * @param _proposalId The ID of the proposal
+     * @param _numberOfVotes The number of votes to add
+     */
     function addVotesToProposal(
         uint256 _proposalId,
         uint256 _numberOfVotes
     ) external {
-        //Check if the user has FLOTH.
+        //Check if the user has FLOTH. TODO: This should check the voting power at snapshot! A user can dump after snapshot.
         if (floth.balanceOf(msg.sender) == 0) {
             revert InvalidFlothAmount();
         }
 
         Proposal storage proposal = proposals[_proposalId];
         Round storage currentRound = getLatestRound();
+
+        //TODO: Where is the votingPowerByRound set?
         uint256 currentVotingPower = votingPowerByRound[msg.sender][
             currentRound.id
         ];
+
+        //TODO: An address can vote on more than one proposal! Don't need this check.
+        // Is hasVoted needed if really we just need to check the voting power isn't 0?
+
         bool hasVoted = hasVotedByRound[msg.sender][currentRound.id];
-        //Check if the users doesn't have a voting power set and they haven't already voted in the round.
+        //Check if the users doesn't have a voting power set and they have already voted in the round.
         if (currentVotingPower == 0 && hasVoted) {
             revert InvalidVotingPower();
         } else if (currentVotingPower == 0 && !hasVoted) {
@@ -330,6 +340,9 @@ contract ProjectProposal is AccessControl {
         //If voting for the Abstain proposal.
         if (_proposalId == currentRound.abstainProposalId) {
             //Abstain vote can only be given to one proposal.
+            //TODO: Can just check their current voting power as abstain uses it all?
+            // We want people to be able to vote to abstain after voting already, but it should remove
+            // all their previous votes from the proposals and put them all towards abstaining.
             if (hasVoted) {
                 revert InvalidAbstainVote();
             } else {
