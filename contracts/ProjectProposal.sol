@@ -532,7 +532,8 @@ contract ProjectProposal is AccessControl {
             revert RoundIsClosed();
         }
 
-        //TODO: We want to set a time here too so we know when it was taken.
+        //TODO: Set the snapshot datetime (but we need to think of consequences of this)
+        // round.snapshotDateTime = block.timestamp;
         round.snapshotBlock = block.number;
 
         emit SnapshotTaken(round.id, round.snapshotBlock);
