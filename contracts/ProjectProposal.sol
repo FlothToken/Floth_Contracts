@@ -449,7 +449,6 @@ contract ProjectProposal is AccessControl {
 
         // Adjust the round end time and voting window by the same amount of time
         roundToUpdate.roundRuntime += timeDifference;
-        roundToUpdate.votingEndDate += timeDifference;
 
         // Emit events for updating the snapshot datetime and round runtime
         emit SnapshotDatetimeUpdated(roundId, _newSnapshotDatetime);
@@ -468,7 +467,6 @@ contract ProjectProposal is AccessControl {
         round.snapshotBlock = block.number;
         // Set voting period start and end times
         round.votingStartDate = block.timestamp;
-        round.votingEndDate = block.timestamp + round.votingRuntime;
         emit SnapshotTaken(round.id, round.snapshotBlock);
     }
 
@@ -574,7 +572,8 @@ contract ProjectProposal is AccessControl {
         Round storage latestRound = getLatestRound();
         return
             block.timestamp >= latestRound.votingStartDate &&
-            block.timestamp <= latestRound.votingEndDate;
+            block.timestamp <=
+            latestRound.votingStartDate + latestRound.votingRuntime;
     }
 
     function isSubmissionWindowOpen() public view returns (bool) {
