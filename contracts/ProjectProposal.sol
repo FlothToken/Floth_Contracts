@@ -553,16 +553,20 @@ contract ProjectProposal is AccessControl {
         return totalVotes;
     }
 
-    //Get a single round by ID.
-    //TODO: Do we need to give any round data to the UI? This is internal due to the mappings now
-    //TODO: There is an issue here becaus
+    /**
+     * Get a round given a particular id
+     * @param _id The ID of the round
+     */
     function getRoundById(uint256 _id) public view returns (Round memory) {
-        require(_id <= roundId, "RoundIdOutOfRange");
+        if (_id > roundId) {
+            revert ProposalIdOutOfRange();
+        }
         return rounds[_id];
     }
 
-    //Get the latest round.
-    //TODO: Do we need to give any round data to the UI? This is internal due to the mappings now
+    /**
+     * Function to get the latest round
+     */
     function getLatestRound() internal view returns (Round storage) {
         return rounds[roundId];
     }
