@@ -601,7 +601,13 @@ contract ProjectProposal is AccessControl {
         emit RoundKilled(_roundId);
     }
 
-    //Retrieve proposal ID's and the number of votes for each, using pagination.
+    /**
+     * Retrieve proposal ID's and the number of votes for each, using pagination
+     * @param _roundId The ID of the round
+     * @param _pageNumber The page number
+     * @param _pageSize The page size
+     */
+    //TODO: Review with Jake
     function voteRetrieval(
         uint256 _roundId,
         uint256 _pageNumber,
@@ -626,10 +632,14 @@ contract ProjectProposal is AccessControl {
         return voteRetrievals;
     }
 
-    //Get the remaining voting power for a user for a round.
+    /**
+     * Get remaining voting power for a wallet
+     * @param _address the address to get voting power
+     */
     function getRemainingVotingPower(
         address _address
     ) external view returns (uint256) {
+        // TODO: This is never set? Could this be calculated?
         return votingPowerByRound[_address][roundId];
     }
 
