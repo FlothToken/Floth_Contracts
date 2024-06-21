@@ -442,6 +442,10 @@ contract ProjectProposal is AccessControl {
             revert InvalidAmountRequested();
         }
 
+        if (!isSubmissionWindowOpen()) {
+            revert SubmissionWindowClosed();
+        }
+
         roundToUpdate.maxFlareAmount += msg.value;
         emit RoundMaxFlareSet(roundToUpdate.maxFlareAmount);
     }
