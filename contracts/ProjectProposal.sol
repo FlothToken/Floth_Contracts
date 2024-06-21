@@ -758,7 +758,9 @@ contract ProjectProposal is AccessControl {
         emit FundsClaimed(winningProposal.id, msg.sender, amountRequested);
     }
 
-    // Function to return the address of the floth contract
+    /**
+     * Function to get the address of the Floth contract
+     */
     function getFlothAddress() external view returns (address) {
         return address(floth);
     }
