@@ -539,7 +539,9 @@ contract ProjectProposal is AccessControl {
         emit SnapshotTaken(round.id, round.snapshotBlock);
     }
 
-    //Get the total votes for a specifc round.
+    /**
+     * Function to get the total votes for a round
+     */
     function getTotalVotesForRound(
         uint256 _roundId
     ) external view returns (uint256) {
