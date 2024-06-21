@@ -669,8 +669,6 @@ contract ProjectProposal is AccessControl {
     /**
      * Check if the submission window is open
      */
-    //TODO: We may want this to not go off the expected but of the snapshot time
-    // we should record when taking a snapshot
     function isSubmissionWindowOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         return
