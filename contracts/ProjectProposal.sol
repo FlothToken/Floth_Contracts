@@ -55,8 +55,6 @@ contract ProjectProposal is AccessControl {
         uint256 roundRuntime;
         uint256 snapshotDatetime;
         uint256 snapshotBlock;
-        uint256 votingRuntime;
-        uint256 votingStartDate;
         uint256[] proposalIds;
         bool isActive;
     }
@@ -351,8 +349,7 @@ contract ProjectProposal is AccessControl {
     function addRound(
         uint256 _flrAmount,
         uint256 _roundRuntime,
-        uint256 _snapshotDatetime,
-        uint256 _votingRuntime
+        uint256 _snapshotDatetime
     ) external payable roundManagerOrAdmin {
         if (msg.value < _flrAmount) {
             revert InsufficientFundsForRound();
@@ -365,9 +362,7 @@ contract ProjectProposal is AccessControl {
         newRound.roundStarttime = block.timestamp;
         newRound.roundRuntime = _roundRuntime;
         newRound.snapshotDatetime = _snapshotDatetime;
-        newRound.votingStartDate = 0;
         newRound.snapshotBlock = block.number; //?
-        newRound.votingRuntime = _votingRuntime;
         newRound.isActive = true;
         //newRound.proposals = []; Gets initialized by default.
 
@@ -414,20 +409,7 @@ contract ProjectProposal is AccessControl {
         }
         // Update the round runtime
         roundToUpdate.roundRuntime = _newRoundRuntime;
-        // Adjust voting runtime if necessary
-        if (roundToUpdate.votingStartDate != 0) {
-            uint256 newVotingEndDate = roundToUpdate.votingStartDate +
-                roundToUpdate.votingRuntime;
-            if (
-                newVotingEndDate >
-                (roundToUpdate.roundStarttime + _newRoundRuntime)
-            ) {
-                roundToUpdate.votingRuntime =
-                    (roundToUpdate.roundStarttime + _newRoundRuntime) -
-                    roundToUpdate.votingStartDate;
-            }
-        }
-        //?? TODO: Check if this is necessary
+
         // Emit an event for updating the round runtime
         emit RoundRuntimeUpdated(roundId, _newRoundRuntime);
     }
@@ -471,17 +453,8 @@ contract ProjectProposal is AccessControl {
             revert RoundIsClosed();
         }
         round.snapshotBlock = block.number;
-        // Set voting period start and end times
-        round.votingStartDate = block.timestamp;
-        emit SnapshotTaken(round.id, round.snapshotBlock);
-    }
 
-    //Allow owner to update the round voting runtime.
-    function setRoundVotingRuntime(
-        uint256 _newVotingRuntime
-    ) external roundManagerOrAdmin {
-        Round storage roundToUpdate = getLatestRound();
-        roundToUpdate.votingRuntime = _newVotingRuntime;
+        emit SnapshotTaken(round.id, round.snapshotBlock);
     }
 
     //Get the total votes for a specifc round.
@@ -577,9 +550,9 @@ contract ProjectProposal is AccessControl {
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         return
-            block.timestamp >= latestRound.votingStartDate &&
+            block.timestamp >= latestRound.snapshotDatetime &&
             block.timestamp <=
-            latestRound.votingStartDate + latestRound.votingRuntime;
+            latestRound.roundStarttime + latestRound.roundRuntime;
     }
 
     // Check if we are in submission window.
