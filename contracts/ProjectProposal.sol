@@ -89,7 +89,8 @@ contract ProjectProposal is AccessControl {
     // Mappings of mappings //
 
     // Number of proposals per wallet for a specific round.
-    mapping(address => mapping(uint256 => uint256)) public proposalsPerWallet; // (address => (roundId => count))
+    mapping(address => mapping(uint256 => uint256))
+        public proposalsPerWalletPerRound; // (address => (roundId => count))
 
     // Mapping to check if wallet has voted in particular round.
     mapping(address => mapping(uint256 => bool)) public hasVotedByRound; // (address => (roundId => voted))
@@ -219,7 +220,7 @@ contract ProjectProposal is AccessControl {
         newProposal.proposer = msg.sender;
         newProposal.fundsClaimed = false;
         rounds[latestRound.id].proposalIds.push(proposalId); //Add proposal ID to round struct.
-        proposalsPerWallet[msg.sender][latestRound.id]++; //Increase proposal count for a wallet by 1.
+        proposalsPerWalletPerRound[msg.sender][latestRound.id]++; //Increase proposal count for a wallet by 1.
         emit ProposalAdded(
             msg.sender,
             proposalId,
@@ -258,12 +259,16 @@ contract ProjectProposal is AccessControl {
         emit ProposalReceiverAddressUpdated(_proposalId, _newAddress);
     }
 
-    //Get proposals by user for a specific round.
+    /**
+     * Function to get all proposals for a specific round for a specific address
+     * @param _roundId The ID of the round
+     * @param _account The address of the account
+     */
     function getProposalsByAddress(
         uint256 _roundId,
         address _account
-    ) external view returns (Proposal[] memory) {
-        uint256 count = proposalsPerWallet[_account][_roundId];
+    ) public view returns (Proposal[] memory) {
+        uint256 count = proposalsPerWalletPerRound[_account][_roundId];
         Proposal[] memory accountProposals = new Proposal[](count);
         uint256 index = 0;
 
@@ -279,7 +284,6 @@ contract ProjectProposal is AccessControl {
         return accountProposals;
     }
 
-    //Get a single proposal by ID.
     function getProposalById(
         uint256 _id
     ) public view returns (Proposal memory) {
