@@ -4,39 +4,50 @@ pragma solidity 0.8.24;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+/**
+ * @title Floth ERC20 token on Flare.
+ * @author Ethereal Labs
+ */
 contract Floth is ERC20Votes, Ownable {
-    // Bot tax in basis points (100 basis points = 1%)
+    // Taxes in basis points (100 basis points = 1%)
     uint256 public buyTax = 2500; // 25%
     uint256 public sellTax = 3500; // 35%
 
-    uint256 public deploymentTime;
-
+    // LP tax status
     bool public lpTaxIsActive = true;
 
     // Store DEX addresses to calculate if buy/sell/transfer.
     mapping(address => bool) public dexAddresses;
 
-    address public grantFundWallet = 0x315c76C23e8815Fe0dFd8DD626782C49647924Ba; // Update to actual wallet.
-    address public lpPairAddress = 0x86d9c457969bd9Bb102D0876D959601aF681882D; // Update to actual address.
+    // FLOTH protocol wallets.
+    address public grantFundWallet = 0x315c76C23e8815Fe0dFd8DD626782C49647924Ba; // TODO Update to actual wallet.
+    address public lpFundWallet = 0x86d9c457969bd9Bb102D0876D959601aF681882D; // TODO Update to actual wallet.
 
+    // Events
     event SellTaxUpdate(uint256 newTax);
     event BuyTaxUpdate(uint256 newTax);
     event DexAddressAdded(address dexAddress);
     event DexAddressRemoved(address dexAddress);
     event GrantFundWalletUpdated(address newWallet);
-    event LpPairAddressUpdated(address newAddress);
+    event LpFundWalletUpdated(address newAddress);
 
+    // Errors
     error InvalidTaxAmount();
     error ZeroAddress();
     error SelfTransfer();
 
+    /**
+     * Constructor to initialize the contract.
+     * @param _dexAddresses Initial array of DEX addresses FLOTH is traded on
+     * @param _name Name of the token
+     * @param _symbol Symbol of the token
+     */
     constructor(
         address[] memory _dexAddresses,
         string memory _name,
         string memory _symbol
     ) ERC20(_name, _symbol) ERC20Permit(_name) {
-        _mint(msg.sender, 1000000 * 10 ** 18);
-        deploymentTime = block.timestamp;
+        _mint(msg.sender, 100 * 10 ** 9 * 10 ** 18); // 100 billion tokens with 18 decimals.
 
         for (uint256 i = 0; i < _dexAddresses.length; i++) {
             dexAddresses[_dexAddresses[i]] = true;
@@ -47,7 +58,7 @@ contract Floth is ERC20Votes, Ownable {
      * @notice Set sell bot tax.
      * @param _newSellTax New sell tax in basis points.
      */
-    function setSellBotTax(uint256 _newSellTax) external onlyOwner {
+    function setSellTax(uint256 _newSellTax) external onlyOwner {
         // Sell tax cannot be more than 5%.
         if (_newSellTax > 500) {
             revert InvalidTaxAmount();
@@ -60,7 +71,7 @@ contract Floth is ERC20Votes, Ownable {
      * @notice Set buy bot tax.
      * @param _newBuyTax New buy tax in basis points.
      */
-    function setBuyBotTax(uint256 _newBuyTax) external onlyOwner {
+    function setBuyTax(uint256 _newBuyTax) external onlyOwner {
         // Buy tax cannot be more than 5%.
         if (_newBuyTax > 500) {
             revert InvalidTaxAmount();
@@ -111,12 +122,12 @@ contract Floth is ERC20Votes, Ownable {
      * @notice Set LP Pair address.
      * @param _newAddress New LP pair address.
      */
-    function setLpPairAddress(address _newAddress) external onlyOwner {
+    function setLpFundWalletAddress(address _newAddress) external onlyOwner {
         if (_newAddress == address(0)) {
             revert ZeroAddress();
         }
-        lpPairAddress = _newAddress;
-        emit LpPairAddressUpdated(_newAddress);
+        lpFundWallet = _newAddress;
+        emit LpFundWalletUpdated(_newAddress);
     }
 
     /**
@@ -138,7 +149,7 @@ contract Floth is ERC20Votes, Ownable {
         address _recipient,
         uint256 _amount
     ) internal override {
-        if (_sender == _recipient || address(0) == _recipient) {
+        if (_sender == _recipient) {
             revert SelfTransfer();
         }
 
@@ -161,7 +172,7 @@ contract Floth is ERC20Votes, Ownable {
 
                 if (lpTaxIsActive) {
                     lpPairingAmount = taxAmount - grantFundAmount; // Remaining 16.7% of tax amount (0.5% from the 3%)
-                    super._transfer(_sender, lpPairAddress, lpPairingAmount);
+                    super._transfer(_sender, lpFundWallet, lpPairingAmount);
                 }
             }
         }
