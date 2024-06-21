@@ -53,7 +53,7 @@ contract ProjectProposal is AccessControl {
         uint256 maxFlareAmount;
         uint256 roundStarttime;
         uint256 roundRuntime;
-        uint256 snapshotDatetime;
+        uint256 expectedSnapshotDatetime;
         uint256 snapshotBlock;
         uint256[] proposalIds;
         bool isActive;
@@ -131,7 +131,10 @@ contract ProjectProposal is AccessControl {
         address winningAddress,
         uint256 amountRequested
     );
-    event SnapshotDatetimeUpdated(uint256 roundId, uint256 newSnapshotDatetime);
+    event expectedSnapshotDatetimeUpdated(
+        uint256 roundId,
+        uint256 newexpectedSnapshotDatetime
+    );
     event RoundRuntimeUpdated(uint256 roundId, uint256 newRoundRuntime);
     event RoundMaxFlareSet(uint256 newMaxFlare);
 
@@ -393,12 +396,12 @@ contract ProjectProposal is AccessControl {
      * Function to add a new round to the contract
      * @param _maxFlareAmount The amount of FLR for the round
      * @param _roundRuntime The runtime of the round
-     * @param _snapshotDatetime The snapshot datetime of the round
+     * @param _expectedSnapshotDatetime The snapshot datetime of the round
      */
     function addRound(
         uint256 _maxFlareAmount,
         uint256 _roundRuntime,
-        uint256 _snapshotDatetime
+        uint256 _expectedSnapshotDatetime
     ) external payable onlyRole(ADMIN_ROLE) {
         if (msg.value < _maxFlareAmount) {
             revert InsufficientFundsForRound();
@@ -410,7 +413,7 @@ contract ProjectProposal is AccessControl {
         newRound.maxFlareAmount = _maxFlareAmount;
         newRound.roundStarttime = block.timestamp;
         newRound.roundRuntime = _roundRuntime;
-        newRound.snapshotDatetime = _snapshotDatetime;
+        newRound.expectedSnapshotDatetime = _expectedSnapshotDatetime;
         newRound.snapshotBlock = block.number; //TODO: We can't set this here, but if we don't what happens?
         newRound.isActive = true;
 
@@ -479,39 +482,46 @@ contract ProjectProposal is AccessControl {
         emit RoundRuntimeUpdated(roundId, _newRoundRuntime);
     }
 
-    // Function to update the round snapshot datetime and adjust related windows
-    function changeRoundSnapshotDatetime(
-        uint256 _newSnapshotDatetime
+    /**
+     * Function to change the snapshot datetime of a round to a future datetime
+     * @param _newExpectedSnapshotDatetime The extended time to add to snapshot datetime and round runtime for the round
+     */
+    function extendRoundExpectedSnapshotDatetime(
+        uint256 _newExpectedSnapshotDatetime
     ) external managerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
+
         // Ensure the new snapshot time is in the future and within the round runtime
         if (
-            block.timestamp >= _newSnapshotDatetime ||
-            _newSnapshotDatetime >
+            block.timestamp >= _newExpectedSnapshotDatetime ||
+            _newExpectedSnapshotDatetime >
             (roundToUpdate.roundStarttime + roundToUpdate.roundRuntime)
         ) {
             revert InvalidSnapshotTime();
         }
 
         // Calculate the difference in time
-        uint256 timeDifference = _newSnapshotDatetime -
-            roundToUpdate.snapshotDatetime;
+        uint256 timeDifference = _newExpectedSnapshotDatetime -
+            roundToUpdate.expectedSnapshotDatetime;
 
         // Update the snapshot datetime
-        roundToUpdate.snapshotDatetime = _newSnapshotDatetime;
+        roundToUpdate.expectedSnapshotDatetime = _newExpectedSnapshotDatetime;
 
         // Adjust the round end time and voting window by the same amount of time
         roundToUpdate.roundRuntime += timeDifference;
 
         // Emit events for updating the snapshot datetime and round runtime
-        emit SnapshotDatetimeUpdated(roundId, _newSnapshotDatetime);
+        emit expectedSnapshotDatetimeUpdated(
+            roundId,
+            _newExpectedSnapshotDatetime
+        );
         emit RoundRuntimeUpdated(roundId, roundToUpdate.roundRuntime);
     }
 
     //Take a snapshot for the current round.
     function takeSnapshot() external managerOrAdmin {
         Round storage round = getLatestRound();
-        if (block.timestamp <= round.snapshotDatetime) {
+        if (block.timestamp <= round.expectedSnapshotDatetime) {
             revert InvalidSnapshotTime();
         }
         if (block.timestamp > (round.roundStarttime + round.roundRuntime)) {
@@ -615,7 +625,7 @@ contract ProjectProposal is AccessControl {
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         return
-            block.timestamp >= latestRound.snapshotDatetime &&
+            block.timestamp >= latestRound.expectedSnapshotDatetime &&
             block.timestamp <=
             latestRound.roundStarttime + latestRound.roundRuntime;
     }
@@ -624,7 +634,7 @@ contract ProjectProposal is AccessControl {
     function isSubmissionWindowOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         return
-            block.timestamp < latestRound.snapshotDatetime &&
+            block.timestamp < latestRound.expectedSnapshotDatetime &&
             block.timestamp > latestRound.roundStarttime;
     }
 
