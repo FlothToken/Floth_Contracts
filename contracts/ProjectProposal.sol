@@ -51,7 +51,7 @@ contract ProjectProposal is AccessControl {
         uint256 id;
         uint256 abstainProposalId;
         uint256 maxFlareAmount;
-        uint256 roundStarttime;
+        uint256 roundStartDatetime;
         uint256 roundRuntime;
         uint256 expectedSnapshotDatetime;
         uint256 snapshotBlock;
@@ -411,7 +411,7 @@ contract ProjectProposal is AccessControl {
         Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
         newRound.id = roundId;
         newRound.maxFlareAmount = _maxFlareAmount;
-        newRound.roundStarttime = block.timestamp;
+        newRound.roundStartDatetime = block.timestamp;
         newRound.roundRuntime = _roundRuntime;
         newRound.expectedSnapshotDatetime = _expectedSnapshotDatetime;
         newRound.snapshotBlock = block.number; //TODO: We can't set this here, but if we don't what happens?
@@ -470,7 +470,7 @@ contract ProjectProposal is AccessControl {
         // Check if round is closed
         if (
             block.timestamp >
-            (roundToUpdate.roundStarttime + roundToUpdate.roundRuntime)
+            (roundToUpdate.roundStartDatetime + roundToUpdate.roundRuntime)
         ) {
             revert RoundIsClosed();
         }
@@ -495,7 +495,7 @@ contract ProjectProposal is AccessControl {
         if (
             block.timestamp >= _newExpectedSnapshotDatetime ||
             _newExpectedSnapshotDatetime >
-            (roundToUpdate.roundStarttime + roundToUpdate.roundRuntime)
+            (roundToUpdate.roundStartDatetime + roundToUpdate.roundRuntime)
         ) {
             revert InvalidSnapshotTime();
         }
@@ -518,15 +518,21 @@ contract ProjectProposal is AccessControl {
         emit RoundRuntimeUpdated(roundId, roundToUpdate.roundRuntime);
     }
 
-    //Take a snapshot for the current round.
+    /**
+     * Function to take a snapshot of the current block
+     */
     function takeSnapshot() external managerOrAdmin {
         Round storage round = getLatestRound();
-        if (block.timestamp <= round.expectedSnapshotDatetime) {
+
+        if (block.timestamp < round.expectedSnapshotDatetime) {
             revert InvalidSnapshotTime();
         }
-        if (block.timestamp > (round.roundStarttime + round.roundRuntime)) {
+
+        if (block.timestamp > (round.roundStartDatetime + round.roundRuntime)) {
             revert RoundIsClosed();
         }
+
+        //TODO: We want to set a time here too so we know when it was taken.
         round.snapshotBlock = block.number;
 
         emit SnapshotTaken(round.id, round.snapshotBlock);
@@ -627,7 +633,7 @@ contract ProjectProposal is AccessControl {
         return
             block.timestamp >= latestRound.expectedSnapshotDatetime &&
             block.timestamp <=
-            latestRound.roundStarttime + latestRound.roundRuntime;
+            latestRound.roundStartDatetime + latestRound.roundRuntime;
     }
 
     // Check if we are in submission window.
@@ -635,7 +641,7 @@ contract ProjectProposal is AccessControl {
         Round storage latestRound = getLatestRound();
         return
             block.timestamp < latestRound.expectedSnapshotDatetime &&
-            block.timestamp > latestRound.roundStarttime;
+            block.timestamp > latestRound.roundStartDatetime;
     }
 
     //When a round is finished, allow winner to claim.
@@ -647,7 +653,7 @@ contract ProjectProposal is AccessControl {
         }
         //Check if round is over.
         if (
-            (latestRound.roundStarttime + latestRound.roundRuntime) <
+            (latestRound.roundStartDatetime + latestRound.roundRuntime) <
             block.timestamp
         ) {
             revert RoundIsOpen();
@@ -679,7 +685,7 @@ contract ProjectProposal is AccessControl {
         //Check if 30 days have passed since round finished. 86400 seconds in a day.
         Round storage claimRound = rounds[winningProposal.roundId];
         uint256 daysPassed = (block.timestamp -
-            claimRound.roundStarttime +
+            claimRound.roundStartDatetime +
             claimRound.roundRuntime) / 86400;
         if (daysPassed > 30) {
             revert FundsClaimingPeriod();
