@@ -571,17 +571,18 @@ contract ProjectProposal is AccessControl {
         return rounds[roundId];
     }
 
-    //Get all round.
-    //TODO: Need to rework this as an array containing a nested mapping cannot be constructed in memory
-    // function getAllRounds() internal view returns (Round[] storage) {
-    //     uint256 count = roundIds.length;
-    //     Round[] storage allRounds = new Round[](count);
-    //     for (uint256 i = 0; i < count; i++) {
-    //         Round storage round = rounds[roundIds[i]];
-    //         allRounds[i] = round;
-    //     }
-    //     return allRounds;
-    // }
+    /**
+     * Function to get all rounds
+     */
+    function getAllRounds() internal view returns (Round[] memory) {
+        uint256 count = roundIds.length;
+        Round[] memory allRounds = new Round[](count);
+        for (uint256 i = 0; i < count; i++) {
+            Round storage round = rounds[roundIds[i]];
+            allRounds[i] = round;
+        }
+        return allRounds;
+    }
 
     //Remove a round.
     function killRound(uint256 _roundId) external roundManagerOrAdmin {
