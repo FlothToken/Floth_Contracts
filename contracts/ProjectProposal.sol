@@ -180,16 +180,22 @@ contract ProjectProposal is AccessControl {
         _;
     }
 
-    //Add a new proposal using the users input - doesn't require to be owner.
+    /**
+     * Function to add a proposal to the contract
+     * @param _title The title of the proposal
+     * @param _amountRequested The amount requested for the proposal
+     */
     function addProposal(
         string memory _title,
         uint256 _amountRequested
     ) external {
         Round storage latestRound = getLatestRound();
+
         //If submission window is closed, revert.
         if (!isSubmissionWindowOpen()) {
             revert SubmissionWindowClosed();
         }
+
         //If within a voting period, revert.
         if (isVotingPeriodOpen()) {
             revert VotingPeriodOpen();
@@ -576,8 +582,9 @@ contract ProjectProposal is AccessControl {
             latestRound.votingStartDate + latestRound.votingRuntime;
     }
 
+    // Check if we are in submission window.
     function isSubmissionWindowOpen() public view returns (bool) {
-        Round storage latestRound = rounds[roundId];
+        Round storage latestRound = getLatestRound();
         return
             block.timestamp < latestRound.snapshotDatetime &&
             block.timestamp > latestRound.roundStarttime;
