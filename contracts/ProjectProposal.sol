@@ -4,28 +4,37 @@ pragma solidity 0.8.24;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./IFloth.sol";
 
+/**
+ * @title ProjectProposal contract for the Floth protocol
+ * @author Ethereal Labs
+ */
 contract ProjectProposal is AccessControl {
-    // /**
-    //  * TODO
-    //  * */
+    // Define roles for the contract
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant SNAPSHOTTER_ROLE = keccak256("SNAPSHOTTER_ROLE");
     bytes32 public constant ROUND_MANAGER_ROLE =
         keccak256("ROUND_MANAGER_ROLE");
 
+    // Define the Floth interface
     IFloth internal floth;
 
+    /**
+     * Constructor for the ProjectProposal contract
+     * @param _flothAddress The address of the Floth contract
+     */
     constructor(address _flothAddress) {
         if (_flothAddress == address(0)) {
             revert ZeroAddress();
         }
         floth = IFloth(_flothAddress);
-        _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
+
         _setRoleAdmin(SNAPSHOTTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
-        _grantRole(ADMIN_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // TODO Change address
+        _grantRole(ADMIN_ROLE, msg.sender); // TODO Change address
     }
 
+    // Proposal struct to store proposal data
     struct Proposal {
         uint256 id;
         uint256 roundId; //Tracked for claiming funds.
@@ -37,6 +46,7 @@ contract ProjectProposal is AccessControl {
         bool fundsClaimed; //Tracked here incase funds are not claimed before new round begins.
     }
 
+    // Round struct to store round data
     struct Round {
         uint256 id;
         uint256 abstainProposalId;
@@ -47,12 +57,11 @@ contract ProjectProposal is AccessControl {
         uint256 snapshotBlock;
         uint256 votingRuntime;
         uint256 votingStartDate;
-        uint256 votingEndDate;
         uint256[] proposalIds;
         bool isActive;
     }
 
-    //Used to return proposal id's and their vote count for a specific round.
+    //Used to return proposal ids and their vote count for a specific round.
     struct VoteRetrieval {
         uint256 proposalId;
         uint256 voteCount;
@@ -60,27 +69,42 @@ contract ProjectProposal is AccessControl {
 
     //Tracks ID number for each proposal.
     uint256 public proposalId = 0;
+
     //Tracks ID number for each round.
     uint256 public roundId = 0;
+
     //Maps IDs to a proposal.
     mapping(uint256 => Proposal) proposals;
+
     //Maps address to a bool for proposal winners.
     mapping(address => bool) hasWinningProposal;
+
     //Maps winning address to winning proposals.
     mapping(address => Proposal) winningProposals;
+
     //Maps winning roundID to winning proposals.
-    mapping(uint256 => Proposal) winningProposalsById;
+    mapping(uint256 => Proposal) winningProposalsByRoundId;
+
     //Maps IDs to a round.
     mapping(uint256 => Round) rounds;
 
+    // Mappings of mappings //
+
+    // Number of proposals per wallet for a specific round.
     mapping(address => mapping(uint256 => uint256)) public proposalsPerWallet; // (address => (roundId => count))
+
+    // Mapping to check if wallet has voted in particular round.
     mapping(address => mapping(uint256 => bool)) public hasVotedByRound; // (address => (roundId => voted))
+
+    // Voting power for a wallet in a specific round.
     mapping(address => mapping(uint256 => uint256)) public votingPowerByRound; // (address => (roundId => power))
 
     //Keeps track of all round IDs.
     uint256[] roundIds;
 
-    //Notify of a new proposal being added.
+    /**
+     * Events for the ProjectProposal contract
+     */
     event ProposalAdded(
         address creator,
         uint256 proposalId,
@@ -88,42 +112,30 @@ contract ProjectProposal is AccessControl {
         string title,
         uint256 amountRequested
     );
-    //Notify community when propsal receiver address is updated.
     event ProposalUpdated(uint256 proposalId, address newAddress);
-    //Notify of a proposal being killed.
     event ProposalKilled(uint256 proposalId);
-    //Notify of a new round being added.
     event RoundAdded(uint256 roundId, uint256 flrAmount, uint256 roundRuntime);
-    //Notify about round completed and the winning proposal ID.
     event RoundCompleted(uint256 roundId, uint256 proposalId);
-    //Notify of a round being killed.
     event RoundKilled(uint256 roundId);
-    //Notify of votes added to a proposal.
     event VotesAdded(uint256 proposalId, address wallet, uint256 numberofVotes);
-    //Notify of votes removed from a proposal.
     event VotesRemoved(
         uint256 proposalId,
         address wallet,
         uint256 numberofVotes
     );
-    //Notify when snapshots are taken.
     event SnapshotTaken(uint256 roundId, uint256 snapshotBlock);
-    //Notify when the winner has claimed the funds.
     event FundsClaimed(
         uint256 proposalId,
         address winningAddress,
         uint256 amountRequested
     );
-
-    // Notify when the snapshot datetime is updated
     event SnapshotDatetimeUpdated(uint256 roundId, uint256 newSnapshotDatetime);
-
-    // Notify when the round runtime is updated
     event RoundRuntimeUpdated(uint256 roundId, uint256 newRoundRuntime);
-
-    // Notify when max Flare is updated
     event RoundMaxFlareSet(uint256 newMaxFlare);
 
+    /**
+     * Error messages for the ProjectProposal contract
+     */
     error InvalidPermissions();
     error SubmissionWindowClosed();
     error VotingPeriodOpen();
@@ -146,6 +158,7 @@ contract ProjectProposal is AccessControl {
     error InvalidAbstainVote();
     error InvalidRoundRuntime();
 
+    //Modifiers for the ProjectProposal contract
     modifier roundManagerOrAdmin() {
         if (
             !hasRole(ROUND_MANAGER_ROLE, msg.sender) && // Check if user does not have ROUND_MANAGER_ROLE
@@ -347,7 +360,6 @@ contract ProjectProposal is AccessControl {
         newRound.roundRuntime = _roundRuntime;
         newRound.snapshotDatetime = _snapshotDatetime;
         newRound.votingStartDate = 0;
-        newRound.votingEndDate = 0;
         newRound.snapshotBlock = block.number; //?
         newRound.votingRuntime = _votingRuntime;
         newRound.isActive = true;
@@ -511,14 +523,6 @@ contract ProjectProposal is AccessControl {
         uint256 maxFlareAmount = rounds[_roundId].maxFlareAmount;
         //set round as inactive.
         rounds[_roundId].isActive = false;
-        //remove round id from array.
-        for (uint256 i = 0; i < roundIds.length; i++) {
-            if (roundIds[i] == _roundId) {
-                roundIds[i] = roundIds[roundIds.length - 1];
-                roundIds.pop();
-                break;
-            }
-        }
 
         //Send funds back to grant pool.
         (bool success, ) = msg.sender.call{value: maxFlareAmount}("");
@@ -606,7 +610,7 @@ contract ProjectProposal is AccessControl {
         }
         //Add winning proposal to mappings.
         winningProposals[mostVotedProposal.receiver] = mostVotedProposal;
-        winningProposalsById[latestRound.id] = mostVotedProposal;
+        winningProposalsByRoundId[latestRound.id] = mostVotedProposal;
         hasWinningProposal[mostVotedProposal.receiver] = true;
         emit RoundCompleted(latestRound.id, mostVotedProposal.id);
     }
