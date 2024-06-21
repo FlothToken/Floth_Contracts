@@ -150,7 +150,7 @@ contract ProjectProposal is AccessControl {
     error InsufficientBalance();
     error InsufficientFundsForRound();
     error FundsAlreadyClaimed();
-    error FundsClaimingPeriod();
+    error FundsClaimingPeriodExpired();
     error InvalidClaimer();
     error ClaimerNotRecipient();
     error NoProposalsInRound();
@@ -713,39 +713,48 @@ contract ProjectProposal is AccessControl {
         emit RoundCompleted(latestRound.id, mostVotedProposal.id);
     }
 
-    //When a round is finished, allow winner to claim.
+    /**
+     * Function to claim funds for a winning proposal
+     */
+    //TODO: We need a way to get the funds out if they are not claimed
+    // perhaps a new admin function that can be called 30 days after a winning proposal has expired?
     function claimFunds() external {
+        //TODO: Need to probably add round ID, what happens if this wallet has multiple winning proposals?
         //Check if the wallet has won a round.
         if (!hasWinningProposal[msg.sender]) {
             revert InvalidClaimer();
         }
+
         Proposal storage winningProposal = winningProposals[msg.sender];
+
         //Check if 30 days have passed since round finished. 86400 seconds in a day.
         Round storage claimRound = rounds[winningProposal.roundId];
+
         uint256 daysPassed = (block.timestamp -
             claimRound.roundStartDatetime +
             claimRound.roundRuntime) / 86400;
         if (daysPassed > 30) {
-            revert FundsClaimingPeriod();
+            revert FundsClaimingPeriodExpired();
         }
+
         //Check if the funds have already been claimed.
         if (winningProposal.fundsClaimed) {
             revert FundsAlreadyClaimed();
         }
 
-        if (winningProposal.receiver != msg.sender) {
-            revert ClaimerNotRecipient();
-        }
         uint256 amountRequested = winningProposal.amountRequested;
         if (address(this).balance < amountRequested) {
             revert InsufficientBalance();
         }
+
         winningProposal.fundsClaimed = true; //Set as claimed so winner cannot reclaim for the proposal.
+
         //Send amount requested to winner.
         (bool success, ) = winningProposal.receiver.call{
             value: amountRequested
         }("");
         require(success);
+
         emit FundsClaimed(winningProposal.id, msg.sender, amountRequested);
     }
 
