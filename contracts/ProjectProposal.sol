@@ -584,13 +584,17 @@ contract ProjectProposal is AccessControl {
         return allRounds;
     }
 
-    //Remove a round.
+    /**
+     * Function to kill a round
+     * @param _roundId The ID of the round
+     */
     function killRound(uint256 _roundId) external roundManagerOrAdmin {
         uint256 maxFlareAmount = rounds[_roundId].maxFlareAmount;
         //set round as inactive.
         rounds[_roundId].isActive = false;
 
-        //Send funds back to grant pool.
+        //Send funds back to msg sender.
+        //TODO: Send to grant fund wallet not msg.sender
         (bool success, ) = msg.sender.call{value: maxFlareAmount}("");
         require(success);
 
