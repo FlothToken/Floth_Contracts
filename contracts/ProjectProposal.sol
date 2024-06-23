@@ -317,15 +317,21 @@ contract ProjectProposal is AccessControl {
         Proposal storage proposal = proposals[_proposalId];
         Round storage currentRound = getLatestRound();
 
-        //TODO: Where is the votingPowerByRound set?
-        uint256 currentVotingPower = votingPowerByRound[msg.sender][
-            currentRound.id
-        ];
+        bool hasVoted = hasVotedByRound[msg.sender][currentRound.id];
+        uint256 currentVotingPower;
+
+        //If they haven't voted yet, set votingPowerByRound, else retrieve current voting power.
+        if(!hasVoted){
+            currentVotingPower = getVotingPower(msg.sender);
+            votingPowerByRound[msg.sender][currentRound.id] = currentVotingPower;
+        }else{
+         currentVotingPower = votingPowerByRound[msg.sender][currentRound.id];
+        }
+
 
         //TODO: An address can vote on more than one proposal! Don't need this check.
         // Is hasVoted needed if really we just need to check the voting power isn't 0?
 
-        bool hasVoted = hasVotedByRound[msg.sender][currentRound.id];
         //Check if the users doesn't have a voting power set and they have already voted in the round.
         if (currentVotingPower == 0 && hasVoted) {
             revert InvalidVotingPower();
