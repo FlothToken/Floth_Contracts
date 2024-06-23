@@ -309,8 +309,8 @@ contract ProjectProposal is AccessControl {
         uint256 _proposalId,
         uint256 _numberOfVotes
     ) external {
-        //Check if the user has FLOTH. TODO: This should check the voting power at snapshot! A user can dump after snapshot.
-        if (floth.balanceOf(msg.sender) == 0) {
+        //Check if the user has voting power.
+        if (getVotingPower(msg.sender) == 0) {
             revert InvalidFlothAmount();
         }
 
@@ -616,6 +616,9 @@ contract ProjectProposal is AccessControl {
     ) external view returns (VoteRetrieval[] memory) {
         uint256 startIndex = (_pageNumber - 1) * _pageSize;
         uint256 endIndex = startIndex + _pageSize;
+
+        //Add page number and page size 0 check.
+
         if (endIndex > rounds[_roundId].proposalIds.length) {
             endIndex = rounds[_roundId].proposalIds.length;
         }
