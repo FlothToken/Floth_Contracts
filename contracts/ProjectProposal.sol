@@ -98,6 +98,9 @@ contract ProjectProposal is AccessControl {
     // Voting power for a wallet in a specific round.
     mapping(address => mapping(uint256 => uint256)) public votingPowerByRound; // (address => (roundId => power))
 
+    // Tracks the proposals that an address has voted on.
+    mapping(address => mapping(uint256 => uint256[])) public votedOnProposals; // (address => (roundId => proposals))
+
     //Keeps track of all round IDs.
     uint256[] roundIds;
 
@@ -328,7 +331,25 @@ contract ProjectProposal is AccessControl {
          currentVotingPower = votingPowerByRound[msg.sender][currentRound.id];
         }
 
-        //Check if the user doesn't have any voting power set, revert.
+        //If voting for the Abstain proposal.
+        if (_proposalId == currentRound.abstainProposalId) {
+            //Abstain vote can only be given to one proposal.
+
+            proposal.votesReceived += getVotingPower(msg.sender); //Voting power re-retrieved as may be reduced if previously voted.
+            votingPowerByRound[msg.sender][currentRound.id] = 0; //All voting power is removed.
+            hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
+            
+            uint256[] memory previousVotedProposals = votedOnProposals[msg.sender][currentRound.id];
+            //Remove votes on other proposals.
+            if(previousVotedProposals.length > 0){
+                for (uint256 i = 0; i < previousVotedProposals.length; i++) {
+                    //TODO: how do we know how many votes a user gave to previous proposals? Track this in another mapping too?
+                }
+            }
+        }
+
+
+        //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
         if (currentVotingPower == 0) {
             revert InvalidVotingPower();
         } 
@@ -338,25 +359,12 @@ contract ProjectProposal is AccessControl {
             revert InvalidVotingPower();
         }
 
-        //If voting for the Abstain proposal.
-        if (_proposalId == currentRound.abstainProposalId) {
-            //Abstain vote can only be given to one proposal.
-            //TODO: Can just check their current voting power as abstain uses it all?
-            // We want people to be able to vote to abstain after voting already, but it should remove
-            // all their previous votes from the proposals and put them all towards abstaining.
-            if (hasVoted) {
-                revert InvalidAbstainVote();
-            } else {
-                proposal.votesReceived += currentVotingPower; //Total voting power is voted.
-                votingPowerByRound[msg.sender][currentRound.id] = 0; //All voting power is removed.
-                hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
-            }
-        }
         //Otherwise vote is for non-abstain proposal.
-        else {
+        else {            
             proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
             votingPowerByRound[msg.sender][currentRound.id] -= _numberOfVotes; //Reduce voting power in a round.
             hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
+            votedOnProposals[msg.sender][currentRound.id].push(_proposalId); // Track proposals that a user has voted on (needed to abstain).
         }
 
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
