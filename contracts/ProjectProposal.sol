@@ -348,7 +348,6 @@ contract ProjectProposal is AccessControl {
             }
         }
 
-
         //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
         if (currentVotingPower == 0) {
             revert InvalidVotingPower();
@@ -377,7 +376,6 @@ contract ProjectProposal is AccessControl {
     function removeVotesFromProposal(uint256 _proposalId) external {
         Round storage currentRound = getLatestRound();
 
-        //TODO: IF we are not using this bool flag, we may need another way?
         //Check if the user hasn't voted.
         if (!hasVotedByRound[msg.sender][currentRound.id]) {
             revert UserVoteNotFound();
