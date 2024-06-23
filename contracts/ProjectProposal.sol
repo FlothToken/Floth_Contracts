@@ -328,19 +328,11 @@ contract ProjectProposal is AccessControl {
          currentVotingPower = votingPowerByRound[msg.sender][currentRound.id];
         }
 
-
-        //TODO: An address can vote on more than one proposal! Don't need this check.
-        // Is hasVoted needed if really we just need to check the voting power isn't 0?
-
-        //Check if the users doesn't have a voting power set and they have already voted in the round.
-        if (currentVotingPower == 0 && hasVoted) {
+        //Check if the user doesn't have any voting power set, revert.
+        if (currentVotingPower == 0) {
             revert InvalidVotingPower();
-        } else if (currentVotingPower == 0 && !hasVoted) {
-            currentVotingPower = floth.getPastVotes(
-                msg.sender,
-                currentRound.snapshotBlock
-            );
-        }
+        } 
+        
         //If the user doesn't have enough voting power, stop them from voting.
         if (currentVotingPower < _numberOfVotes) {
             revert InvalidVotingPower();
