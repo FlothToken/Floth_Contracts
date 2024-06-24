@@ -391,7 +391,7 @@ contract ProjectProposal is AccessControl {
             revert UserVoteNotFound();
         }
 
-        Votes[] memory votesByUser = votedOnProposals[msg.sender][currentRound.id];
+        Votes[] storage votesByUser = votedOnProposals[msg.sender][currentRound.id];
         if(votesByUser.length == 0){
             revert UserVoteNotFound();
         }
@@ -404,7 +404,14 @@ contract ProjectProposal is AccessControl {
                 proposal.votesReceived -= votesToRemove; //Remove votes given to proposal.
                 votingPowerByRound[msg.sender][currentRound.id] += votesToRemove; //Give voting power back to user.
 
-                hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
+                // Move the struct into the place to delete.
+                votesByUser[i] = votesByUser[votesByUser.length - 1];
+                // Remove the struct.
+                votesByUser.pop();
+
+                if(votesByUser.length == 1){
+                    hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
+                }
 
                 emit VotesRemoved(_proposalId, msg.sender, votesToRemove);
                 break; //Don't need to continue looping through the struct array.
