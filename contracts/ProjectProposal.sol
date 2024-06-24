@@ -59,8 +59,8 @@ contract ProjectProposal is AccessControl {
         bool isActive;
     }
 
-    //Used to return proposal ids and their vote count for a specific round.
-    struct VoteRetrieval {
+    //Used to return proposal ids and their vote count for a specific round. And used for votedOnProposals mapping.
+    struct Votes {
         uint256 proposalId;
         uint256 voteCount;
     }
@@ -99,7 +99,7 @@ contract ProjectProposal is AccessControl {
     mapping(address => mapping(uint256 => uint256)) public votingPowerByRound; // (address => (roundId => power))
 
     // Tracks the proposals that an address has voted on.
-    mapping(address => mapping(uint256 => uint256[])) public votedOnProposals; // (address => (roundId => proposals))
+    mapping(address => mapping(uint256 => Votes[])) public votedOnProposals; // (address => (roundId => Votes[]))
 
     //Keeps track of all round IDs.
     uint256[] roundIds;
@@ -334,18 +334,20 @@ contract ProjectProposal is AccessControl {
         //If voting for the Abstain proposal.
         if (_proposalId == currentRound.abstainProposalId) {
             //Abstain vote can only be given to one proposal.
-
-            proposal.votesReceived += getVotingPower(msg.sender); //Voting power re-retrieved as may be reduced if previously voted.
-            votingPowerByRound[msg.sender][currentRound.id] = 0; //All voting power is removed.
-            hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
             
-            uint256[] memory previousVotedProposals = votedOnProposals[msg.sender][currentRound.id];
+            Votes[] memory votesByUser = votedOnProposals[msg.sender][currentRound.id]; 
             //Remove votes on other proposals.
-            if(previousVotedProposals.length > 0){
-                for (uint256 i = 0; i < previousVotedProposals.length; i++) {
-                    //TODO: how do we know how many votes a user gave to previous proposals? Track this in another mapping too?
+            if(votesByUser.length > 0){
+                for (uint256 i = 0; i < votesByUser.length; i++) {
+                    //Remove votes from proposal.
+                    proposals[votesByUser[i].proposalId].votesReceived -= votesByUser[i].voteCount;
                 }
             }
+
+            uint256 votingPower = getVotingPower(msg.sender); //Voting power re-retrieved as may be reduced if previously voted.
+            proposal.votesReceived += votingPower; //Give all voting power to abstain proposal.
+            votingPowerByRound[msg.sender][currentRound.id] = 0; //All voting power is removed.
+            hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
         }
 
         //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
@@ -358,12 +360,20 @@ contract ProjectProposal is AccessControl {
             revert InvalidVotingPower();
         }
 
-        //Otherwise vote is for non-abstain proposal.
-        else {            
+        //Vote is for non-abstain proposal.
+        if(_proposalId != currentRound.abstainProposalId) {            
             proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
             votingPowerByRound[msg.sender][currentRound.id] -= _numberOfVotes; //Reduce voting power in a round.
             hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
-            votedOnProposals[msg.sender][currentRound.id].push(_proposalId); // Track proposals that a user has voted on (needed to abstain).
+            votedOnProposals[msg.sender][currentRound.id] ; // Track proposals that a user has voted on.
+
+            //Create votes struct object of the users vote.
+             Votes memory newVote = Votes({
+                proposalId: _proposalId,
+                voteCount: _numberOfVotes
+             });
+
+            votedOnProposals[msg.sender][currentRound.id].push(newVote); //Track proposal votes given by a user.
         }
 
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
@@ -385,13 +395,12 @@ contract ProjectProposal is AccessControl {
             currentRound.id
         ];
 
-        //TODO: This is the total votes given, but we are just removing votes given to a particular proposal?
+        //TODO: This is the total votes given, but we are just removing votes given to a particular proposal? How are we tracking votes given to a particular project?
         uint256 votesGiven = getVotingPower(msg.sender) - currentVotingPower; //Calculate votes given.
         Proposal storage proposal = proposals[_proposalId];
         proposal.votesReceived -= votesGiven; //Remove votes given to proposal.
         votingPowerByRound[msg.sender][currentRound.id] += votesGiven; //Give voting power back to user.
 
-        //TODO: May not need this voting flag.
         hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
         emit VotesRemoved(_proposalId, msg.sender, votesGiven);
     }
@@ -418,7 +427,7 @@ contract ProjectProposal is AccessControl {
         newRound.roundStartDatetime = block.timestamp;
         newRound.roundRuntime = _roundRuntime;
         newRound.expectedSnapshotDatetime = _expectedSnapshotDatetime;
-        newRound.snapshotBlock = block.number; //TODO: We can't set this here, but if we don't what happens?
+        newRound.snapshotBlock = 0; //TODO: We can't set this here, but if we don't what happens?
         newRound.isActive = true;
 
         //Add 'Abstain' proposal for the new round.
@@ -617,7 +626,7 @@ contract ProjectProposal is AccessControl {
         uint256 _roundId,
         uint256 _pageNumber,
         uint256 _pageSize
-    ) external view returns (VoteRetrieval[] memory) {
+    ) external view returns (Votes[] memory) {
         uint256 startIndex = (_pageNumber - 1) * _pageSize;
         uint256 endIndex = startIndex + _pageSize;
 
@@ -627,12 +636,12 @@ contract ProjectProposal is AccessControl {
             endIndex = rounds[_roundId].proposalIds.length;
         }
         uint256 resultSize = endIndex - startIndex;
-        VoteRetrieval[] memory voteRetrievals = new VoteRetrieval[](resultSize);
+        Votes[] memory voteRetrievals = new Votes[](resultSize);
         for (uint256 i = 0; i < resultSize; i++) {
             Proposal storage proposal = proposals[
                 rounds[_roundId].proposalIds[startIndex + i]
             ];
-            voteRetrievals[i] = VoteRetrieval({
+            voteRetrievals[i] = Votes({
                 proposalId: proposal.id,
                 voteCount: proposal.votesReceived
             });
