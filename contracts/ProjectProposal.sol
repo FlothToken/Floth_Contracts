@@ -391,18 +391,25 @@ contract ProjectProposal is AccessControl {
             revert UserVoteNotFound();
         }
 
-        uint256 currentVotingPower = votingPowerByRound[msg.sender][
-            currentRound.id
-        ];
+        Votes[] memory votesByUser = votedOnProposals[msg.sender][currentRound.id];
+        if(votesByUser.length == 0){
+            revert UserVoteNotFound();
+        }
 
-        //TODO: This is the total votes given, but we are just removing votes given to a particular proposal? How are we tracking votes given to a particular project?
-        uint256 votesGiven = getVotingPower(msg.sender) - currentVotingPower; //Calculate votes given.
-        Proposal storage proposal = proposals[_proposalId];
-        proposal.votesReceived -= votesGiven; //Remove votes given to proposal.
-        votingPowerByRound[msg.sender][currentRound.id] += votesGiven; //Give voting power back to user.
+        for (uint256 i = 0; i < votesByUser.length; i++) {
+            if(_proposalId == votesByUser[i].proposalId){
+                uint256 votesToRemove = votesByUser[i].voteCount;
+    
+                Proposal storage proposal = proposals[_proposalId];
+                proposal.votesReceived -= votesToRemove; //Remove votes given to proposal.
+                votingPowerByRound[msg.sender][currentRound.id] += votesToRemove; //Give voting power back to user.
 
-        hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
-        emit VotesRemoved(_proposalId, msg.sender, votesGiven);
+                hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
+
+                emit VotesRemoved(_proposalId, msg.sender, votesToRemove);
+                break; //Don't need to continue looping through the struct array.
+            }
+        }
     }
 
     /**
