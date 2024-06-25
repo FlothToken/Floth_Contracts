@@ -55,6 +55,7 @@ contract ProjectProposal is AccessControl {
         uint256 roundRuntime;
         uint256 expectedSnapshotDatetime;
         uint256 snapshotBlock;
+        bool snapshotTaken;
         uint256[] proposalIds;
         bool isActive;
     }
@@ -444,6 +445,7 @@ contract ProjectProposal is AccessControl {
         newRound.roundRuntime = _roundRuntime;
         newRound.expectedSnapshotDatetime = _expectedSnapshotDatetime;
         newRound.snapshotBlock = 0; //TODO: We can't set this here, but if we don't what happens?
+        newRound.snapshotTaken = false;
         newRound.isActive = true;
 
         //Add 'Abstain' proposal for the new round.
@@ -563,8 +565,11 @@ contract ProjectProposal is AccessControl {
 
         //TODO: Set the snapshot datetime (but we need to think of consequences of this)
         // round.snapshotDateTime = block.timestamp;
-        // need a way to check if the snapshot has been taken already
-        round.snapshotBlock = block.number;
+        
+        if(!round.snapshotTaken){
+            round.snapshotBlock = block.number;
+            round.snapshotTaken = true;
+        }
 
         emit SnapshotTaken(round.id, round.snapshotBlock);
     }
