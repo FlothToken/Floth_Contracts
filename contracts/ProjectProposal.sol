@@ -54,6 +54,7 @@ contract ProjectProposal is AccessControl {
         uint256 roundStartDatetime;
         uint256 roundRuntime;
         uint256 expectedSnapshotDatetime;
+        uint256 snapshotDatetime;
         uint256 snapshotBlock;
         bool snapshotTaken;
         uint256[] proposalIds;
@@ -445,6 +446,7 @@ contract ProjectProposal is AccessControl {
         newRound.roundRuntime = _roundRuntime;
         newRound.expectedSnapshotDatetime = _expectedSnapshotDatetime;
         newRound.snapshotBlock = 0; //TODO: We can't set this here, but if we don't what happens?
+        newRound.snapshotDatetime = 0; 
         newRound.snapshotTaken = false;
         newRound.isActive = true;
 
@@ -563,11 +565,9 @@ contract ProjectProposal is AccessControl {
             revert RoundIsClosed();
         }
 
-        //TODO: Set the snapshot datetime (but we need to think of consequences of this)
-        // round.snapshotDateTime = block.timestamp;
-        
         if(!round.snapshotTaken){
             round.snapshotBlock = block.number;
+            round.snapshotDatetime = block.timestamp; //Set the actual snapshot time.
             round.snapshotTaken = true;
         }
 
@@ -691,14 +691,15 @@ contract ProjectProposal is AccessControl {
     /**
      * Check if the voting period is open
      */
-    //TODO: We may want this to not go off the expected but of the snapshot time
-    // we should record when taking a snapshot
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
-        return
-            block.timestamp >= latestRound.expectedSnapshotDatetime &&
-            block.timestamp <=
-            latestRound.roundStartDatetime + latestRound.roundRuntime;
+        
+        //If snapshot hasn't been taken yet.
+        if(latestRound.snapshotDatetime == 0){
+            return (block.timestamp >= latestRound.expectedSnapshotDatetime && block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime);
+        }else{
+            return (block.timestamp >= latestRound.expectedSnapshotDatetime && block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime);
+        }
     }
 
     /**
