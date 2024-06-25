@@ -671,7 +671,6 @@ contract ProjectProposal is AccessControl {
     function getRemainingVotingPower(
         address _address
     ) external view returns (uint256) {
-        // TODO: This is never set? Could this be calculated?
         return votingPowerByRound[_address][roundId];
     }
 
