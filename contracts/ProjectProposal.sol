@@ -169,6 +169,7 @@ contract ProjectProposal is AccessControl {
     error ProposalIdOutOfRange();
     error InvalidAbstainVote();
     error InvalidRoundRuntime();
+    error InvalidPageNumberPageSize();
 
     //Modifiers for the ProjectProposal contract
     modifier roundManagerOrAdmin() {
@@ -641,7 +642,6 @@ contract ProjectProposal is AccessControl {
      * @param _pageNumber The page number
      * @param _pageSize The page size
      */
-    //TODO: Review with Jake
     function voteRetrieval(
         uint256 _roundId,
         uint256 _pageNumber,
@@ -650,7 +650,9 @@ contract ProjectProposal is AccessControl {
         uint256 startIndex = (_pageNumber - 1) * _pageSize;
         uint256 endIndex = startIndex + _pageSize;
 
-        //Add page number and page size 0 check.
+        if(_pageNumber == 0 || _pageSize == 0){
+            revert InvalidPageNumberPageSize();
+        }
 
         if (endIndex > rounds[_roundId].proposalIds.length) {
             endIndex = rounds[_roundId].proposalIds.length;
