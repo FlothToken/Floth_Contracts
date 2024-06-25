@@ -65,6 +65,8 @@ contract ProjectProposal is AccessControl {
         uint256 voteCount;
     }
 
+    address public grantFundWallet = 0x315c76C23e8815Fe0dFd8DD626782C49647924Ba; // TODO Update to actual wallet.
+
     //Tracks ID number for each proposal.
     uint256 public proposalId = 0;
 
@@ -621,9 +623,8 @@ contract ProjectProposal is AccessControl {
         //set round as inactive.
         rounds[_roundId].isActive = false;
 
-        //Send funds back to msg sender.
-        //TODO: Send to grant fund wallet not msg.sender
-        (bool success, ) = msg.sender.call{value: maxFlareAmount}("");
+        //Send funds back to grant fund wallet.
+        (bool success, ) = grantFundWallet.call{value: maxFlareAmount}("");
         require(success);
 
         emit RoundKilled(_roundId);
