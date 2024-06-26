@@ -800,15 +800,19 @@ contract ProjectProposal is AccessControl {
      * Function for admin to reclaim funds for a winning proposal if the 30 day period has passed.
      */
     function reclaimFunds(address _user, uint256 _proposalId) external roundManagerOrAdmin {
-        Proposal[] storage userProposals = proposalsNotClaimed[_user];
+        Proposal[] storage unclaimedProposals = proposalsNotClaimed[_user];
 
-        for (uint256 i = 0; i < userProposals.length; i++) {
-            if (userProposals[i].id == _proposalId && !userProposals[i].fundsClaimed) {
-                uint256 amountRequested = userProposals[i].amountRequested;
+        for (uint256 i = 0; i < unclaimedProposals.length; i++) {
+            if (unclaimedProposals[i].id == _proposalId && !unclaimedProposals[i].fundsClaimed) {
+                uint256 amountRequested = unclaimedProposals[i].amountRequested;
 
                 // Set as claimed so it can't be reclaimed again.
-                userProposals[i].fundsClaimed = true; 
-                winningProposalByRoundId[userProposals[i].roundId].fundsClaimed = true;
+                unclaimedProposals[i].fundsClaimed = true; 
+                winningProposalByRoundId[unclaimedProposals[i].roundId].fundsClaimed = true;
+                
+                //Remove unclaimedProposals[i] from proposalsNotClaimed mapping
+                unclaimedProposals[i] = unclaimedProposals[unclaimedProposals.length - 1];
+                unclaimedProposals.pop();
                 
                 // Send amount to the grant wallet.
                 (bool success, ) = grantFundWallet.call{value: amountRequested}("");
