@@ -76,19 +76,22 @@ contract ProjectProposal is AccessControl {
     uint256 public roundId = 0;
 
     //Maps IDs to a proposal.
-    mapping(uint256 => Proposal) proposals;
+    mapping(uint256 => Proposal) public proposals;
 
     //Maps address to a bool for proposal winners.
-    mapping(address => bool) hasWinningProposal;
+    mapping(address => bool) public hasWinningProposal;
 
     //Maps winning address to winning proposals.
-    mapping(address => Proposal) winningProposals;
+    mapping(address => Proposal[]) public winningProposals;
 
     //Maps winning roundID to winning proposals.
-    mapping(uint256 => Proposal) winningProposalsByRoundId;
+    mapping(uint256 => Proposal) public winningProposalByRoundId;
+
+    //Tracks proposals not been claimed after the 30 days claiming period.
+    mapping(address => Proposal[]) public proposalsNotClaimed;
 
     //Maps IDs to a round.
-    mapping(uint256 => Round) rounds;
+    mapping(uint256 => Round) public rounds;
 
     // Mappings of mappings //
 
@@ -138,6 +141,7 @@ contract ProjectProposal is AccessControl {
         address winningAddress,
         uint256 amountRequested
     );
+    event FundsReclaimed(uint256 proposalId, address wallet, uint256 amount);
     event expectedSnapshotDatetimeUpdated(
         uint256 roundId,
         uint256 newexpectedSnapshotDatetime
@@ -745,8 +749,8 @@ contract ProjectProposal is AccessControl {
         }
 
         //Add winning proposal to mappings.
-        winningProposals[mostVotedProposal.receiver] = mostVotedProposal;
-        winningProposalsByRoundId[latestRound.id] = mostVotedProposal;
+        winningProposals[mostVotedProposal.receiver].push(mostVotedProposal);
+        winningProposalByRoundId[latestRound.id] = mostVotedProposal;
         hasWinningProposal[mostVotedProposal.receiver] = true;
         emit RoundCompleted(latestRound.id, mostVotedProposal.id);
     }
@@ -754,46 +758,99 @@ contract ProjectProposal is AccessControl {
     /**
      * Function to claim funds for a winning proposal
      */
-    //TODO: We need a way to get the funds out if they are not claimed
-    // perhaps a new admin function that can be called 30 days after a winning proposal has expired?
     function claimFunds() external {
-        //TODO: Need to probably add round ID, what happens if this wallet has multiple winning proposals?
-        //Check if the wallet has won a round.
+
         if (!hasWinningProposal[msg.sender]) {
             revert InvalidClaimer();
         }
 
-        Proposal storage winningProposal = winningProposals[msg.sender];
+        Proposal[] storage usersWinningProposals = winningProposals[msg.sender];
 
-        //Check if 30 days have passed since round finished. 86400 seconds in a day.
-        Round storage claimRound = rounds[winningProposal.roundId];
+        for (uint256 i = 0; i < usersWinningProposals.length; i++) {
+            if(!usersWinningProposals[i].fundsClaimed){
+                Round storage claimRound = rounds[usersWinningProposals[i].roundId];
 
-        uint256 daysPassed = (block.timestamp -
-            claimRound.roundStartDatetime +
-            claimRound.roundRuntime) / 86400;
-        if (daysPassed > 30) {
-            revert FundsClaimingPeriodExpired();
+                //Check if 30 days have passed since round finished. 86400 seconds in a day.
+                uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
+                if (daysPassed > 30) {
+                    proposalsNotClaimed[msg.sender].push(usersWinningProposals[i]); //Add unclaimed proposal to mapping.
+                    continue;
+                }
+
+                uint256 amountRequested = usersWinningProposals[0].amountRequested;
+                if (address(this).balance < amountRequested) {
+                    revert InsufficientBalance();
+                }
+
+                //Set as claimed so winner cannot reclaim for the proposal.
+                usersWinningProposals[i].fundsClaimed = true; 
+                winningProposalByRoundId[usersWinningProposals[i].roundId].fundsClaimed = true;
+
+                //Send amount requested to winner.
+                (bool success, ) = usersWinningProposals[i].receiver.call{value: amountRequested}("");
+                require(success);
+
+                emit FundsClaimed(usersWinningProposals[i].id, msg.sender, amountRequested);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Function for admin to reclaim funds for a winning proposal if the 30 day period has passed.
+     */
+    function reclaimFunds(address _user, uint256 _proposalId) external roundManagerOrAdmin {
+        Proposal[] storage userProposals = proposalsNotClaimed[_user];
+
+        for (uint256 i = 0; i < userProposals.length; i++) {
+            if (userProposals[i].id == _proposalId && !userProposals[i].fundsClaimed) {
+                uint256 amountRequested = userProposals[i].amountRequested;
+
+                // Set as claimed so it can't be reclaimed again.
+                userProposals[i].fundsClaimed = true; 
+                winningProposalByRoundId[userProposals[i].roundId].fundsClaimed = true;
+                
+                // Send amount to the grant wallet.
+                (bool success, ) = grantFundWallet.call{value: amountRequested}("");
+                require(success);
+
+                emit FundsReclaimed(proposalId, grantFundWallet, amountRequested);
+                return;
+            }
         }
 
-        //Check if the funds have already been claimed.
-        if (winningProposal.fundsClaimed) {
-            revert FundsAlreadyClaimed();
+        revert FundsAlreadyClaimed();
+    }
+
+    /**
+     * Function to manually check if winning proposal hasn't been claimed.
+     */
+    function checkProposalUnclaimed(uint256 _roundId) external roundManagerOrAdmin {
+        Proposal storage proposal = winningProposalByRoundId[_roundId];
+        Round memory claimRound = getRoundById(_roundId);
+
+        if(!proposal.fundsClaimed){
+            uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
+
+            if (daysPassed > 30) {
+                //Set bool for funds claimed to true in both mappings.
+                proposal.fundsClaimed = true; 
+
+                Proposal[] storage userProposals = winningProposals[proposal.receiver];
+                for (uint256 i = 0; i < userProposals.length; i++) {
+                    if (userProposals[i].id == proposal.id) {
+                        userProposals[i].fundsClaimed = true;
+                        return;
+                    }
+                }
+                
+                // Send amount to the grant wallet.
+                (bool success, ) = grantFundWallet.call{value: proposal.amountRequested}("");
+                require(success);
+
+                emit FundsReclaimed(proposalId, grantFundWallet, proposal.amountRequested);
+            }
         }
-
-        uint256 amountRequested = winningProposal.amountRequested;
-        if (address(this).balance < amountRequested) {
-            revert InsufficientBalance();
-        }
-
-        winningProposal.fundsClaimed = true; //Set as claimed so winner cannot reclaim for the proposal.
-
-        //Send amount requested to winner.
-        (bool success, ) = winningProposal.receiver.call{
-            value: amountRequested
-        }("");
-        require(success);
-
-        emit FundsClaimed(winningProposal.id, msg.sender, amountRequested);
     }
 
     /**
