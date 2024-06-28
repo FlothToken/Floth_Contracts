@@ -56,7 +56,6 @@ contract ProjectProposal is AccessControl {
         uint256 expectedSnapshotDatetime;
         uint256 snapshotDatetime;
         uint256 snapshotBlock;
-        bool snapshotTaken;
         uint256[] proposalIds;
         bool isActive;
     }
@@ -337,7 +336,7 @@ contract ProjectProposal is AccessControl {
             currentVotingPower = getVotingPower(msg.sender);
             votingPowerByRound[msg.sender][currentRound.id] = currentVotingPower;
         }else{
-         currentVotingPower = votingPowerByRound[msg.sender][currentRound.id];
+            currentVotingPower = votingPowerByRound[msg.sender][currentRound.id];
         }
 
         //If voting for the Abstain proposal.
@@ -357,34 +356,34 @@ contract ProjectProposal is AccessControl {
             proposal.votesReceived += votingPower; //Give all voting power to abstain proposal.
             votingPowerByRound[msg.sender][currentRound.id] = 0; //All voting power is removed.
             hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
-        }
-
-        //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
-        if (currentVotingPower == 0) {
-            revert InvalidVotingPower();
-        } 
         
-        //If the user doesn't have enough voting power, stop them from voting.
-        if (currentVotingPower < _numberOfVotes) {
-            revert InvalidVotingPower();
+        } else {
+
+            //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
+            if (currentVotingPower == 0) {
+                revert InvalidVotingPower();
+            } 
+            
+            //If the user doesn't have enough voting power, stop them from voting.
+            if (currentVotingPower < _numberOfVotes) {
+                revert InvalidVotingPower();
+            }
+
+            //Vote is for non-abstain proposal.
+            if(_proposalId != currentRound.abstainProposalId) {            
+                proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
+                votingPowerByRound[msg.sender][currentRound.id] -= _numberOfVotes; //Reduce voting power in a round.
+                hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
+
+                //Create votes struct object of the users vote.
+                Votes memory newVote = Votes({
+                    proposalId: _proposalId,
+                    voteCount: _numberOfVotes
+                });
+
+                votedOnProposals[msg.sender][currentRound.id].push(newVote); //Track proposal votes given by a user.
+            }
         }
-
-        //Vote is for non-abstain proposal.
-        if(_proposalId != currentRound.abstainProposalId) {            
-            proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
-            votingPowerByRound[msg.sender][currentRound.id] -= _numberOfVotes; //Reduce voting power in a round.
-            hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
-            votedOnProposals[msg.sender][currentRound.id] ; // Track proposals that a user has voted on.
-
-            //Create votes struct object of the users vote.
-             Votes memory newVote = Votes({
-                proposalId: _proposalId,
-                voteCount: _numberOfVotes
-             });
-
-            votedOnProposals[msg.sender][currentRound.id].push(newVote); //Track proposal votes given by a user.
-        }
-
         emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
     }
 
@@ -413,8 +412,9 @@ contract ProjectProposal is AccessControl {
                 proposal.votesReceived -= votesToRemove; //Remove votes given to proposal.
                 votingPowerByRound[msg.sender][currentRound.id] += votesToRemove; //Give voting power back to user.
 
-                // Move the struct into the place to delete.
+                // Copy last element to current element so last element can be popped
                 votesByUser[i] = votesByUser[votesByUser.length - 1];
+
                 // Remove the struct.
                 votesByUser.pop();
 
@@ -450,9 +450,8 @@ contract ProjectProposal is AccessControl {
         newRound.roundStartDatetime = block.timestamp;
         newRound.roundRuntime = _roundRuntime;
         newRound.expectedSnapshotDatetime = _expectedSnapshotDatetime;
-        newRound.snapshotBlock = 0; //TODO: We can't set this here, but if we don't what happens?
+        newRound.snapshotBlock = 0;
         newRound.snapshotDatetime = 0; 
-        newRound.snapshotTaken = false;
         newRound.isActive = true;
 
         //Add 'Abstain' proposal for the new round.
@@ -570,10 +569,9 @@ contract ProjectProposal is AccessControl {
             revert RoundIsClosed();
         }
 
-        if(!round.snapshotTaken){
+        if(round.snapshotBlock == 0){
             round.snapshotBlock = block.number;
             round.snapshotDatetime = block.timestamp; //Set the actual snapshot time.
-            round.snapshotTaken = true;
         }
 
         emit SnapshotTaken(round.id, round.snapshotBlock);
@@ -690,6 +688,11 @@ contract ProjectProposal is AccessControl {
      * @param _address the address to get voting power
      */
     function getVotingPower(address _address) public view returns (uint256) {
+        Round memory latestRound = getLatestRound();
+
+        if(latestRound.snapshotBlock == 0){
+            return 0;
+        }
         uint256 snapshotBlock = getLatestRound().snapshotBlock;
         return floth.getPastVotes(_address, snapshotBlock);
     }
@@ -701,6 +704,7 @@ contract ProjectProposal is AccessControl {
         Round storage latestRound = getLatestRound();
         
         //If snapshot hasn't been taken yet.
+        // TODO: SPEAK TO KYLE do we want to use snapshotDatetime or expectedSnapshotDatetime?
         if(latestRound.snapshotDatetime == 0){
             return (block.timestamp >= latestRound.expectedSnapshotDatetime && block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime);
         }else{
