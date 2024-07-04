@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  */
 
 // ERC20 contract for presale floth token
-contract pFLOTH is ERC20, Ownable, ReentrancyGuard {
+contract pFloth is ERC20, Ownable, ReentrancyGuard {
     //Constants
     uint256 public constant MAX_SUPPLY = 30 * 10 ** 9 * 10 ** 18; // 30 billion pFLOTH
     uint256 public constant EXCHANGE_RATE = 10000; // 1 FLR = 10,000 pFLOTH
