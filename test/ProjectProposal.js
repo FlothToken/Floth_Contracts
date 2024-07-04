@@ -35,7 +35,9 @@ describe("ProjectProposal Contract", function () {
 
   describe("Proposal Management", function () {
     it("Should allow adding a new proposal", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
       const proposal = await projectProposal.getProposalById(2);
       expect(proposal.title).to.equal("Test Proposal");
@@ -44,12 +46,19 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert when adding a proposal with zero amount", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
-      await expect(projectProposal.connect(addr1).addProposal("Test Proposal", 0)).to.be.revertedWithCustomError(projectProposal, "InvalidAmountRequested");
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+      await expect(projectProposal.connect(addr1).addProposal("Test Proposal", 0)).to.be.revertedWithCustomError(
+        projectProposal,
+        "InvalidAmountRequested"
+      );
     });
 
     it("Should revert when adding a proposal with amount greater than round's maxFlareAmount", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
       await expect(projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("200", 18))).to.be.revertedWithCustomError(
         projectProposal,
         "InvalidAmountRequested"
@@ -57,7 +66,9 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow updating the proposal receiver address", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
       await projectProposal.connect(addr1).setProposalReceiverAddress(2, addr2.address);
       const proposal = await projectProposal.getProposalById(2);
@@ -65,7 +76,9 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if non-proposer tries to update proposal receiver address", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
       await expect(projectProposal.connect(addr2).setProposalReceiverAddress(2, addr2.address)).to.be.revertedWithCustomError(
         projectProposal,
@@ -74,9 +87,14 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if trying to update proposal receiver address to zero address", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      await expect(projectProposal.connect(addr1).setProposalReceiverAddress(2, zeroAddress)).to.be.revertedWithCustomError(projectProposal, "ZeroAddress");
+      await expect(projectProposal.connect(addr1).setProposalReceiverAddress(2, zeroAddress)).to.be.revertedWithCustomError(
+        projectProposal,
+        "ZeroAddress"
+      );
     });
 
     it("Should revert if trying to add a proposal outside submission window", async function () {
@@ -92,21 +110,33 @@ describe("ProjectProposal Contract", function () {
 
   describe("Round Management", function () {
     it("Should allow adding a new round", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
       const round = await projectProposal.getRoundById(1);
       expect(round.id).to.equal(1);
       expect(round.maxFlareAmount).to.equal(ethers.parseUnits("10", 18));
     });
 
     it("Should allow updating round max flare amount", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
-      await projectProposal.setRoundMaxFlare(ethers.parseUnits("5", 18));
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      const isWindowOpen = await projectProposal.isSubmissionWindowOpen();
+      expect(isWindowOpen).to.equal(true);
+
+      await projectProposal.increaseRoundMaxFlare({
+        value: ethers.parseUnits("1", 18),
+      });
       const round = await projectProposal.getRoundById(1);
-      expect(round.maxFlareAmount).to.equal(ethers.parseUnits("5", 18));
+      expect(round.maxFlareAmount).to.equal(ethers.parseUnits("11", 18));
     });
 
     it("Should revert if non-manager tries to update round max flare amount", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
       await expect(projectProposal.connect(addr1).setRoundMaxFlare(ethers.parseUnits("2000", 18))).to.be.revertedWithCustomError(
         projectProposal,
         "InvalidPermissions"
@@ -114,19 +144,24 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if trying to set round max flare amount higher than contract balance", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
-      await expect(projectProposal.setRoundMaxFlare(ethers.parseUnits("200", 18))).to.be.revertedWithCustomError(projectProposal, "InsufficientBalance");
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+      await expect(projectProposal.setRoundMaxFlare(ethers.parseUnits("200", 18))).to.be.revertedWithCustomError(
+        projectProposal,
+        "InsufficientBalance"
+      );
     });
 
     it("Should allow taking a snapshot", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), { value: ethers.parseUnits("10", 18) });
       await projectProposal.takeSnapshot();
       const round = await projectProposal.getRoundById(1);
       expect(round.snapshotBlock).to.be.gt(0);
     });
 
     it("Should revert if non-manager tries to take a snapshot", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), { value: ethers.parseUnits("10", 18) });
       await expect(projectProposal.connect(addr1).takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "InvalidPermissions");
     });
 
@@ -139,7 +174,7 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow killing a round", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       await projectProposal.killRound(1);
@@ -148,7 +183,7 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if non-manager tries to kill a round", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       await expect(projectProposal.connect(addr1).killRound(1)).to.be.revertedWithCustomError(projectProposal, "InvalidPermissions");
