@@ -119,7 +119,8 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow updating round max flare amount", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, Math.floor(Date.now() / 1000) + 3600, {
+      const expectedSnapshot = Math.floor(Date.now() / 1000) + 3600;
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, expectedSnapshot, {
         value: ethers.parseUnits("10", 18),
       });
 
@@ -137,20 +138,22 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
         value: ethers.parseUnits("10", 18),
       });
-      await expect(projectProposal.connect(addr1).setRoundMaxFlare(ethers.parseUnits("2000", 18))).to.be.revertedWithCustomError(
-        projectProposal,
-        "InvalidPermissions"
-      );
+      await expect(
+        projectProposal.connect(addr1).increaseRoundMaxFlare({
+          value: ethers.parseUnits("1", 18),
+        })
+      ).to.be.revertedWithCustomError(projectProposal, "InvalidPermissions");
     });
 
     it("Should revert if trying to set round max flare amount higher than contract balance", async function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
         value: ethers.parseUnits("10", 18),
       });
-      await expect(projectProposal.setRoundMaxFlare(ethers.parseUnits("200", 18))).to.be.revertedWithCustomError(
-        projectProposal,
-        "InsufficientBalance"
-      );
+      await expect(
+        projectProposal.increaseRoundMaxFlare({
+          value: ethers.parseUnits("1", 18),
+        })
+      ).to.be.revertedWithCustomError(projectProposal, "InsufficientBalance");
     });
 
     it("Should allow taking a snapshot", async function () {
