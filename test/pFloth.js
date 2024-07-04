@@ -31,12 +31,20 @@ describe("pFLOTH Contract", function () {
 
   describe("Presale", function () {
     it("Should revert if presale has ended", async function () {
-      // Increase time by the presale duration plus one second
       await ethers.provider.send("evm_increaseTime", [PRESALE_DURATION + 1]);
       await ethers.provider.send("evm_mine", []);
 
-      // Attempt to participate in the presale after the presale period has ended
       await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.be.revertedWithCustomError(pFLOTH, "PresaleEnded");
+    });
+
+    it("Should be able to extend the presale end time", async function () {
+      const additionalTime = 3600; // 1 hour
+      const presaleEndTime = await pFLOTH.presaleEndTime();
+      await pFLOTH.extendPresale(additionalTime);
+
+      const newEndTime = BigInt(presaleEndTime) + BigInt(additionalTime);
+
+      expect(await pFLOTH.presaleEndTime()).to.equal(newEndTime);
     });
 
     it("Should mint the correct amount of pFLOTH tokens", async function () {
@@ -53,7 +61,6 @@ describe("pFLOTH Contract", function () {
       const newSupply = BigInt(1000) * BigInt(10 ** 18);
       await pFLOTHTest.setTotalSupply(newSupply);
 
-      // Calculate the amount that will exceed the supply
       const amountFLR = newSupply / EXCHANGE_RATE + BigInt(1);
 
       await expect(pFLOTHTest.connect(addr1).presale({ value: amountFLR })).to.be.revertedWithCustomError(pFLOTHTest, "ExceedsSupply");
@@ -63,7 +70,6 @@ describe("pFLOTH Contract", function () {
       const newWalletLimit = BigInt(1000) * BigInt(10 ** 18);
       await pFLOTHTest.setWalletLimit(newWalletLimit);
 
-      // Calculate the amount that will exceed the wallet limit
       const amountFLR = newWalletLimit / EXCHANGE_RATE + BigInt(1);
 
       await expect(pFLOTHTest.connect(addr1).presale({ value: amountFLR })).to.be.revertedWithCustomError(pFLOTHTest, "WalletLimitExceeded");
@@ -91,6 +97,29 @@ describe("pFLOTH Contract", function () {
       expect(await pFLOTH.balanceOf(addr1.address)).to.equal(amountpFLOTH1);
       expect(await pFLOTH.balanceOf(addr2.address)).to.equal(amountpFLOTH2);
       expect(await pFLOTH.totalSupply()).to.equal(amountpFLOTH1 + amountpFLOTH2);
+    });
+
+    it("Should revert if non-owner tries to extend presale", async function () {
+      await expect(pFLOTH.connect(addr1).extendPresale(3600)).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("Should allow presale right before the end time", async function () {
+      await ethers.provider.send("evm_increaseTime", [PRESALE_DURATION - 10]);
+      await ethers.provider.send("evm_mine", []);
+
+      const amountFLR = ethers.parseUnits("1", 18);
+      const amountpFLOTH = amountFLR * EXCHANGE_RATE;
+
+      await pFLOTH.connect(addr1).presale({ value: amountFLR });
+
+      expect(await pFLOTH.balanceOf(addr1.address)).to.equal(amountpFLOTH);
+    });
+
+    it("Should revert presale right after the end time", async function () {
+      await ethers.provider.send("evm_increaseTime", [PRESALE_DURATION]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.be.revertedWithCustomError(pFLOTH, "PresaleEnded");
     });
   });
 
