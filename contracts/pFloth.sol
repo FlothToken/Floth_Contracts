@@ -24,10 +24,10 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     mapping(address => uint256) public pFLOTHBalance;
 
     /**
-     * Constructor for the pFLOTH contract
+     * Constructor for the pFloth contract
      * @param _presaleDuration The duration of the presale in seconds
      */
-    constructor(uint256 _presaleDuration) ERC20("Presale Floth", "pFLOTH") {
+    constructor(uint256 _presaleDuration) ERC20("Presale Floth", "pFloth") {
         presaleEndTime = block.timestamp + _presaleDuration;
     }
 

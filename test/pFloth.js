@@ -13,7 +13,7 @@ describe("pFLOTH Contract", function () {
   beforeEach(async function () {
     [owner, addr1, addr2, _] = await ethers.getSigners();
 
-    const pFLOTHFactory = await ethers.getContractFactory("pFLOTH");
+    const pFLOTHFactory = await ethers.getContractFactory("pFloth");
     pFLOTH = await pFLOTHFactory.deploy(PRESALE_DURATION);
     await pFLOTH.waitForDeployment();
 
