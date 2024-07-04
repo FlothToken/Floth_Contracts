@@ -11,7 +11,10 @@ async function main() {
   console.log("Deploying contracts with the account:", deployer.address);
 
   const pFloth = await ethers.getContractFactory("pFloth");
-  const pFlothContract = await ProjectProposal.deploy(pFloth);
+
+  const presaleDuration = 1209600; // 2 weeks in seconds
+
+  const pFlothContract = await pFloth.deploy(presaleDuration);
 
   await pFlothContract.waitForDeployment();
 
