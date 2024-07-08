@@ -119,10 +119,18 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow updating round max flare amount", async function () {
-      const expectedSnapshot = Math.floor(Date.now() / 1000) + 3600;
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, expectedSnapshot, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
         value: ethers.parseUnits("10", 18),
       });
+
+      const roundStartTime = await projectProposal.getRoundTime();
+      const currentTime = await projectProposal.getTime();
+      const snapshotTime = await projectProposal.getSnapshot();
+      //Why is currentTime later than snapshotTime it should be before
+
+      console.log("Round start time = " + roundStartTime);
+      console.log("Current time = " + currentTime);
+      console.log("Snapshot time = " + snapshotTime);
 
       const isWindowOpen = await projectProposal.isSubmissionWindowOpen();
       expect(isWindowOpen).to.equal(true);
@@ -131,6 +139,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("1", 18),
       });
       const round = await projectProposal.getRoundById(1);
+      console.log("Max flare = " + round.maxFlareAmount);
       expect(round.maxFlareAmount).to.equal(ethers.parseUnits("11", 18));
     });
 

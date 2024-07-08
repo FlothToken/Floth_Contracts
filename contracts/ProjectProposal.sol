@@ -66,8 +66,6 @@ contract ProjectProposal is AccessControl {
         uint256 voteCount;
     }
 
-    address public grantFundWallet = 0x315c76C23e8815Fe0dFd8DD626782C49647924Ba; // TODO Update to actual wallet.
-
     //Tracks ID number for each proposal.
     uint256 public proposalId = 0;
 
@@ -632,7 +630,7 @@ contract ProjectProposal is AccessControl {
         rounds[_roundId].isActive = false;
 
         //Send funds back to grant fund wallet.
-        (bool success, ) = grantFundWallet.call{value: maxFlareAmount}("");
+        (bool success, ) = floth.getGrantFundWallet().call{value: maxFlareAmount}("");
         require(success);
 
         emit RoundKilled(_roundId);
@@ -721,7 +719,23 @@ contract ProjectProposal is AccessControl {
             block.timestamp < latestRound.expectedSnapshotDatetime &&
             block.timestamp > latestRound.roundStartDatetime;
     }
+    function getTime() public view returns (uint256) {
+        
+        return block.timestamp;
+    }
 
+    function getRoundTime() public view returns (uint256) {
+        Round storage latestRound = getLatestRound();
+
+        return latestRound.roundStartDatetime;
+    }
+
+    function getSnapshot() public view returns (uint256) {
+        Round storage latestRound = getLatestRound();
+        return latestRound.expectedSnapshotDatetime;
+    }
+
+    //
     /**
      * Function to finish a round
      */
@@ -819,10 +833,10 @@ contract ProjectProposal is AccessControl {
                 unclaimedProposals.pop();
                 
                 // Send amount to the grant wallet.
-                (bool success, ) = grantFundWallet.call{value: amountRequested}("");
+                (bool success, ) = floth.getGrantFundWallet().call{value: amountRequested}("");
                 require(success);
 
-                emit FundsReclaimed(proposalId, grantFundWallet, amountRequested);
+                emit FundsReclaimed(proposalId, floth.getGrantFundWallet(), amountRequested);
                 return;
             }
         }
@@ -853,10 +867,10 @@ contract ProjectProposal is AccessControl {
                 }
                 
                 // Send amount to the grant wallet.
-                (bool success, ) = grantFundWallet.call{value: proposal.amountRequested}("");
+                (bool success, ) = floth.getGrantFundWallet().call{value: proposal.amountRequested}("");
                 require(success);
 
-                emit FundsReclaimed(proposalId, grantFundWallet, proposal.amountRequested);
+                emit FundsReclaimed(proposalId, floth.getGrantFundWallet(), proposal.amountRequested);
             }
         }
     }

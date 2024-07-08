@@ -107,6 +107,13 @@ contract Floth is ERC20Votes, Ownable {
     }
 
     /**
+     * Gets the grant fund wallet address.
+     */
+    function getGrantFundWallet() external view returns(address) {
+        return grantFundWallet;
+    }
+
+    /**
      * @notice Set grant fund wallet address.
      * @param _newWallet New grant fund wallet address.
      */
