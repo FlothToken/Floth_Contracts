@@ -5,10 +5,10 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./IFloth.sol";
 
 /**
- * @title ProjectProposal contract for the Floth protocol
+ * @title ProjectProposalTest contract for the Floth protocol
  * @author Ethereal Labs
  */
-contract ProjectProposal is AccessControl {
+contract ProjectProposalTest is AccessControl {
     // Define roles for the contract
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant SNAPSHOTTER_ROLE = keccak256("SNAPSHOTTER_ROLE");
@@ -618,6 +618,11 @@ contract ProjectProposal is AccessControl {
             allRounds[i] = round;
         }
         return allRounds;
+    }
+
+    // Public function to test getAllRounds.
+    function testGetAllRounds() public view returns (Round[] memory) {
+      return getAllRounds();
     }
 
     /**

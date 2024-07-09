@@ -1,6 +1,7 @@
 require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-verify");
+require("solidity-coverage");
 
 module.exports = {
   solidity: {

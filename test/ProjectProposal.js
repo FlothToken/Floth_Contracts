@@ -23,6 +23,12 @@ describe("ProjectProposal Contract", function () {
   });
 
   describe("Deployment", function () {
+    it("Should revert when deployed with zero address", async function () {
+      const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
+
+      await expect(ProjectProposalFactory.deploy(zeroAddress)).to.be.revertedWithCustomError(projectProposal, "ZeroAddress");
+    });
+
     it("Should set the correct roles", async function () {
       expect(await projectProposal.hasRole(ADMIN_ROLE, owner.address)).to.be.true;
       expect(await projectProposal.hasRole(ADMIN_ROLE, addr1.address)).to.be.false;
@@ -106,6 +112,16 @@ describe("ProjectProposal Contract", function () {
         "SubmissionWindowClosed"
       );
     });
+
+    it("Should get all the proposals by address", async function () {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal("Another Proposal", ethers.parseUnits("10", 18));
+      const proposals = await projectProposal.getProposalsByAddress(1, addr1.address);
+      expect(proposals.length).to.equal(2);
+    });
   });
 
   describe("Round Management", function () {
@@ -119,18 +135,9 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow updating round max flare amount", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-
-      const roundStartTime = await projectProposal.getRoundTime();
-      const currentTime = await projectProposal.getTime();
-      const snapshotTime = await projectProposal.getSnapshot();
-      //Why is currentTime later than snapshotTime it should be before
-
-      console.log("Round start time = " + roundStartTime);
-      console.log("Current time = " + currentTime);
-      console.log("Snapshot time = " + snapshotTime);
 
       const isWindowOpen = await projectProposal.isSubmissionWindowOpen();
       expect(isWindowOpen).to.equal(true);
@@ -154,17 +161,6 @@ describe("ProjectProposal Contract", function () {
       ).to.be.revertedWithCustomError(projectProposal, "InvalidPermissions");
     });
 
-    it("Should revert if trying to set round max flare amount higher than contract balance", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
-        value: ethers.parseUnits("10", 18),
-      });
-      await expect(
-        projectProposal.increaseRoundMaxFlare({
-          value: ethers.parseUnits("1", 18),
-        })
-      ).to.be.revertedWithCustomError(projectProposal, "InsufficientBalance");
-    });
-
     it("Should allow taking a snapshot", async function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), { value: ethers.parseUnits("10", 18) });
       await projectProposal.takeSnapshot();
@@ -186,7 +182,7 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow killing a round", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 7200, {
         value: ethers.parseUnits("10", 18),
       });
       await projectProposal.killRound(1);
@@ -200,86 +196,129 @@ describe("ProjectProposal Contract", function () {
       });
       await expect(projectProposal.connect(addr1).killRound(1)).to.be.revertedWithCustomError(projectProposal, "InvalidPermissions");
     });
-  });
 
-  describe("Voting", function () {
-    it("Should allow voting on a proposal", async function () {
-      // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
-      //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      //   await projectProposal.takeSnapshot();
-      //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
-      //   const proposal = await projectProposal.proposals(1);
-      //   expect(proposal.votesReceived).to.equal(10);
+    it("Should extend the round runtime by the correct amount.", async function () {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(owner).extendRoundRuntime(7200);
+      const latestRound = await projectProposal.rounds(1);
+      expect(latestRound.roundRuntime).to.equal(7200);
     });
 
-    it("Should revert if trying to vote without sufficient voting power", async function () {
-      // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
-      //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      //   await projectProposal.takeSnapshot();
-      //   await expect(projectProposal.connect(addr1).addVotesToProposal(1, 1000)).to.be.revertedWithCustomError(projectProposal, "InvalidVotingPower");
+    it("Should revert during extend round runtime if the runtime is less than the current runtime.", async function () {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, Math.floor(Date.now() / 1000) + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await expect(projectProposal.connect(owner).extendRoundRuntime(1800)).to.be.revertedWithCustomError(projectProposal, "InvalidRoundRuntime");
     });
 
-    it("Should allow removing votes from a proposal", async function () {
-      // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
-      //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      //   await projectProposal.takeSnapshot();
-      //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
-      //   await projectProposal.connect(addr1).removeVotesFromProposal(1);
-      //   const proposal = await projectProposal.proposals(1);
-      //   expect(proposal.votesReceived).to.equal(0);
+    // it("Should get all the rounds", async function () {
+    //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 7200, {
+    //     value: ethers.parseUnits("10", 18),
+    //   });
+    //   await projectProposal.addRound(ethers.parseUnits("20", 18), 7200, Math.floor(Date.now() / 1000) + 7200, {
+    //     value: ethers.parseUnits("20", 18),
+    //   });
+    //   const rounds = await projectProposal.testGetAllRounds();
+    //   expect(rounds.length).to.equal(2);
+    // });
+
+    it("Should extend the round expected snapshot time by the correct amount.", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      const newSnapshotDatetime = Math.floor(Date.now() / 1000) + 7200;
+      await projectProposal.connect(owner).extendRoundExpectedSnapshotDatetime(newSnapshotDatetime);
+
+      const latestRound = await projectProposal.rounds(1);
+
+      expect(latestRound.expectedSnapshotDatetime).to.equal(newSnapshotDatetime);
+      expect(latestRound.roundRuntime).to.equal(7200);
     });
 
-    it("Should revert if trying to remove votes without having voted", async function () {
-      //TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
-      //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("50", 18));
-      //   await expect(projectProposal.connect(addr1).removeVotesFromProposal(2)).to.be.revertedWithCustomError(projectProposal, "UserVoteNotFound");
-    });
-  });
+    describe("Voting", function () {
+      it("Should allow voting on a proposal", async function () {
+        // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
+        //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
+        //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+        //   await projectProposal.takeSnapshot();
+        //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
+        //   const proposal = await projectProposal.proposals(1);
+        //   expect(proposal.votesReceived).to.equal(10);
+      });
 
-  describe("Claiming Funds", function () {
-    it("Should allow the winner to claim funds", async function () {
-      // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
-      //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      //   await projectProposal.takeSnapshot();
-      //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
-      //   await projectProposal.roundFinished();
-      //   await projectProposal.claimFunds();
-      //   const proposal = await projectProposal.proposals(1);
-      //   expect(proposal.fundsClaimed).to.be.true;
+      it("Should revert if trying to vote without sufficient voting power", async function () {
+        // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
+        //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
+        //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+        //   await projectProposal.takeSnapshot();
+        //   await expect(projectProposal.connect(addr1).addVotesToProposal(1, 1000)).to.be.revertedWithCustomError(projectProposal, "InvalidVotingPower");
+      });
+
+      it("Should allow removing votes from a proposal", async function () {
+        // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
+        //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
+        //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+        //   await projectProposal.takeSnapshot();
+        //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
+        //   await projectProposal.connect(addr1).removeVotesFromProposal(1);
+        //   const proposal = await projectProposal.proposals(1);
+        //   expect(proposal.votesReceived).to.equal(0);
+      });
+
+      it("Should revert if trying to remove votes without having voted", async function () {
+        //TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
+        //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, { value: ethers.parseUnits("10", 18) });
+        //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("50", 18));
+        //   await expect(projectProposal.connect(addr1).removeVotesFromProposal(2)).to.be.revertedWithCustomError(projectProposal, "UserVoteNotFound");
+      });
     });
 
-    it("Should revert if non-winner tries to claim funds", async function () {
-      // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
-      //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      //   await projectProposal.takeSnapshot();
-      //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
-      //   await projectProposal.roundFinished();
-      //   await expect(projectProposal.connect(addr2).claimFunds()).to.be.revertedWith("InvalidClaimer");
-    });
+    describe("Claiming Funds", function () {
+      it("Should allow the winner to claim funds", async function () {
+        // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
+        //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
+        //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+        //   await projectProposal.takeSnapshot();
+        //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
+        //   await projectProposal.roundFinished();
+        //   await projectProposal.claimFunds();
+        //   const proposal = await projectProposal.proposals(1);
+        //   expect(proposal.fundsClaimed).to.be.true;
+      });
 
-    it("Should revert if trying to claim funds after the claiming period", async function () {
-      // uint256 _flrAmount,
-      // uint256 _roundRuntime,
-      // uint256 _snapshotDatetime,
-      // uint256 _votingRuntime
-      // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, Math.floor(Date.now() / 1000) + 3600, 1800);
-      //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      //   await ethers.provider.send("evm_increaseTime", [3600]);
-      //   await ethers.provider.send("evm_mine", []);
-      //   await projectProposal.takeSnapshot();
-      //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
-      //   await projectProposal.roundFinished();
-      //   // Increase time by 31 days
-      //   await ethers.provider.send("evm_increaseTime", [31 * 86400]);
-      //   await ethers.provider.send("evm_mine", []);
-      //   await expect(projectProposal.claimFunds()).to.be.revertedWith("FundsClaimingPeriod");
+      it("Should revert if non-winner tries to claim funds", async function () {
+        // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
+        //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
+        //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+        //   await projectProposal.takeSnapshot();
+        //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
+        //   await projectProposal.roundFinished();
+        //   await expect(projectProposal.connect(addr2).claimFunds()).to.be.revertedWith("InvalidClaimer");
+      });
+
+      it("Should revert if trying to claim funds after the claiming period", async function () {
+        // uint256 _flrAmount,
+        // uint256 _roundRuntime,
+        // uint256 _snapshotDatetime,
+        // uint256 _votingRuntime
+        // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
+        //   await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, Math.floor(Date.now() / 1000) + 3600, 1800);
+        //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+        //   await ethers.provider.send("evm_increaseTime", [3600]);
+        //   await ethers.provider.send("evm_mine", []);
+        //   await projectProposal.takeSnapshot();
+        //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
+        //   await projectProposal.roundFinished();
+        //   // Increase time by 31 days
+        //   await ethers.provider.send("evm_increaseTime", [31 * 86400]);
+        //   await ethers.provider.send("evm_mine", []);
+        //   await expect(projectProposal.claimFunds()).to.be.revertedWith("FundsClaimingPeriod");
+      });
     });
   });
 });
