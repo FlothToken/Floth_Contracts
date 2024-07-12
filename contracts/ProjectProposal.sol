@@ -851,7 +851,6 @@ contract ProjectProposal is AccessControl {
                 for (uint256 i = 0; i < userProposals.length; i++) {
                     if (userProposals[i].id == proposal.id) {
                         userProposals[i].fundsClaimed = true;
-                        return;
                     }
                 }
                 
