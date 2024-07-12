@@ -155,7 +155,6 @@ contract ProjectProposal is AccessControl {
     error VotingPeriodOpen();
     error InvalidAmountRequested();
     error InvalidVotingPower();
-    error InvalidFlothAmount();
     error InsufficientBalance();
     error InsufficientFundsForRound();
     error FundsAlreadyClaimed();
@@ -321,7 +320,7 @@ contract ProjectProposal is AccessControl {
     ) external {
         //Check if the user has voting power.
         if (getVotingPower(msg.sender) == 0) {
-            revert InvalidFlothAmount();
+            revert InvalidVotingPower();
         }
 
         Proposal storage proposal = proposals[_proposalId];
