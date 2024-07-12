@@ -267,13 +267,13 @@ describe("ProjectProposal Contract", function () {
 
         //Send some floth to addr1.
         await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
-        await floth.connect(addr1).delgate(addr1.address);
+        await floth.connect(addr1).delegate(addr1.address);
 
         await projectProposal.takeSnapshot();
 
-        await projectProposal.connect(addr1).addVotesToProposal(1, 10);
+        await projectProposal.connect(addr1).addVotesToProposal(2, 10);
 
-        const proposal = await projectProposal.proposals(1);
+        const proposal = await projectProposal.proposals(2);
         expect(proposal.votesReceived).to.equal(10);
       });
 
