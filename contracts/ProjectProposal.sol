@@ -791,6 +791,7 @@ contract ProjectProposal is AccessControl {
                 //Set as claimed so winner cannot reclaim for the proposal.
                 usersWinningProposals[i].fundsClaimed = true; 
                 winningProposalByRoundId[usersWinningProposals[i].roundId].fundsClaimed = true;
+                proposals[usersWinningProposals[i].id].fundsClaimed = true;
 
                 //Send amount requested to winner.
                 (bool success, ) = usersWinningProposals[i].receiver.call{value: amountRequested}("");
