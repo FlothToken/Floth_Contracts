@@ -244,13 +244,13 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      const newSnapshotDatetime = Math.floor(Date.now() / 1000) + 7200;
+      const newSnapshotDatetime = currentTime + 3600;
       await projectProposal.connect(owner).extendRoundExpectedSnapshotDatetime(newSnapshotDatetime);
 
       const latestRound = await projectProposal.rounds(1);
 
       expect(latestRound.expectedSnapshotDatetime).to.equal(newSnapshotDatetime);
-      expect(latestRound.roundRuntime).to.equal(7200);
+      expect(latestRound.roundRuntime).to.equal(3600);
     });
   });
 
