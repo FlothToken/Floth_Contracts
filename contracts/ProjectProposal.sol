@@ -816,6 +816,7 @@ contract ProjectProposal is AccessControl {
                 // Set as claimed so it can't be reclaimed again.
                 unclaimedProposals[i].fundsClaimed = true; 
                 winningProposalByRoundId[unclaimedProposals[i].roundId].fundsClaimed = true;
+                proposals[unclaimedProposals[i].id].fundsClaimed = true;
                 
                 //Remove unclaimedProposals[i] from proposalsNotClaimed mapping
                 unclaimedProposals[i] = unclaimedProposals[unclaimedProposals.length - 1];
