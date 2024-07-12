@@ -30,10 +30,6 @@ describe("ProjectProposal Contract", function () {
     const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
     projectProposal = await ProjectProposalFactory.deploy(flothAddress);
     await projectProposal.waitForDeployment();
-
-    // Set up mock voting power
-    // const currentBlock = await ethers.provider.getBlockNumber();
-    // await floth.setPastVotes(floth.address, currentBlock, 100);
   });
 
   describe("Deployment", function () {
@@ -241,7 +237,10 @@ describe("ProjectProposal Contract", function () {
     // });
 
     it("Should extend the round expected snapshot time by the correct amount.", async function () {
-      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      const block = await ethers.provider.getBlock("latest");
+      let currentTime = block.timestamp;
+
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
 
@@ -257,13 +256,15 @@ describe("ProjectProposal Contract", function () {
 
   describe("Voting", function () {
     it("Should allow voting on a proposal", async function () {
-      // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, Math.floor(Date.now() / 1000) + 7200, {
+      const block = await ethers.provider.getBlock("latest");
+      let currentTime = block.timestamp;
+
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
 
-      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
 
       //Send some floth to addr1.
@@ -279,8 +280,11 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow voting on a proposal 2", async function () {
-      // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, Math.floor(Date.now() / 1000) + 7200, {
+      // Capture the initial block time
+      const block = await ethers.provider.getBlock("latest");
+      let currentTime = block.timestamp;
+
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
