@@ -7,6 +7,9 @@ const zeroAddress = "0x0000000000000000000000000000000000000000";
 describe("ProjectProposal Contract", function () {
   let projectProposal;
   let owner;
+  let floth;
+  let dexAddress;
+  let flothAddress;
   let addr1;
   let addr2;
 
@@ -15,11 +18,22 @@ describe("ProjectProposal Contract", function () {
   const ROUND_MANAGER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ROUND_MANAGER_ROLE"));
 
   beforeEach(async function () {
-    [owner, addr1, addr2, _] = await ethers.getSigners();
+    [owner, addr1, addr2, dexAddress, _] = await ethers.getSigners();
+
+    // Deploy the Floth mock contract
+    const FlothFactory = await ethers.getContractFactory("Floth");
+    floth = await FlothFactory.deploy([dexAddress.address], "FlothToken", "FLOTH");
+    await floth.waitForDeployment();
+
+    flothAddress = await floth.getAddress();
 
     const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
-    projectProposal = await ProjectProposalFactory.deploy(addr1.address);
+    projectProposal = await ProjectProposalFactory.deploy(flothAddress);
     await projectProposal.waitForDeployment();
+
+    // Set up mock voting power
+    // const currentBlock = await ethers.provider.getBlockNumber();
+    // await floth.setPastVotes(floth.address, currentBlock, 100);
   });
 
   describe("Deployment", function () {
@@ -35,7 +49,7 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should set the correct Floth address", async function () {
-      expect(await projectProposal.getFlothAddress()).to.equal(addr1.address);
+      expect(await projectProposal.getFlothAddress()).to.equal(flothAddress);
     });
   });
 
@@ -243,12 +257,24 @@ describe("ProjectProposal Contract", function () {
     describe("Voting", function () {
       it("Should allow voting on a proposal", async function () {
         // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-        //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), 1800);
-        //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-        //   await projectProposal.takeSnapshot();
-        //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
-        //   const proposal = await projectProposal.proposals(1);
-        //   expect(proposal.votesReceived).to.equal(10);
+        await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, Math.floor(Date.now() / 1000) + 7200, {
+          value: ethers.parseUnits("10", 18),
+        });
+        await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+        await ethers.provider.send("evm_increaseTime", [7500]);
+        await ethers.provider.send("evm_mine");
+
+        //Send some floth to addr1.
+        await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
+        await floth.connect(addr1).delgate(addr1.address);
+
+        await projectProposal.takeSnapshot();
+
+        await projectProposal.connect(addr1).addVotesToProposal(1, 10);
+
+        const proposal = await projectProposal.proposals(1);
+        expect(proposal.votesReceived).to.equal(10);
       });
 
       it("Should revert if trying to vote without sufficient voting power", async function () {

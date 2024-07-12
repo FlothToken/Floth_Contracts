@@ -7,6 +7,8 @@ interface IFloth {
         uint256 timepoint
     ) external view returns (uint256);
 
+     function delegate(address delegatee) external;
+
     function balanceOf(address account) external view returns (uint256);
 
     function getGrantFundWallet() external view returns (address);
