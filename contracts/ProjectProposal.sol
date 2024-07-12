@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "hardhat/console.sol";
 import "./IFloth.sol";
 
 /**
@@ -716,6 +717,7 @@ contract ProjectProposal is AccessControl {
      */
     function isSubmissionWindowOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
+
         return
             block.timestamp < latestRound.expectedSnapshotDatetime &&
             block.timestamp >= latestRound.roundStartDatetime;
