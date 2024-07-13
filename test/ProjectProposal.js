@@ -186,6 +186,13 @@ describe("ProjectProposal Contract", function () {
       expect(round.maxFlareAmount).to.equal(ethers.parseUnits("10", 18));
     });
 
+    it("Should revert when getting round by ID that is bigger than current round", async function () {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+      await expect(projectProposal.getRoundById(3)).to.be.revertedWithCustomError(projectProposal, "RoundIdOutOfRange");
+    });
+
     it("Should allow updating round max flare amount", async function () {
       const block = await ethers.provider.getBlock("latest");
       let currentTime = block.timestamp;

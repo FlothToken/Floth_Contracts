@@ -168,6 +168,7 @@ contract ProjectProposal is AccessControl {
     error UserVoteNotFound();
     error ZeroAddress();
     error ProposalIdOutOfRange();
+    error RoundIdOutOfRange();
     error InvalidAbstainVote();
     error InvalidRoundRuntime();
     error InvalidPageNumberPageSize();
@@ -595,7 +596,7 @@ contract ProjectProposal is AccessControl {
      */
     function getRoundById(uint256 _id) public view returns (Round memory) {
         if (_id > roundId) {
-            revert ProposalIdOutOfRange();
+            revert RoundIdOutOfRange();
         }
         return rounds[_id];
     }
