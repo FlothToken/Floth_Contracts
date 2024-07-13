@@ -205,6 +205,42 @@ describe("ProjectProposal Contract", function () {
       expect(round.maxFlareAmount).to.equal(ethers.parseUnits("11", 18));
     });
 
+    it("Should revert when increasing max flare amount if value passed is 0.", async function () {
+      const block = await ethers.provider.getBlock("latest");
+      let currentTime = block.timestamp;
+
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      const isWindowOpen = await projectProposal.isSubmissionWindowOpen();
+      expect(isWindowOpen).to.equal(true);
+
+      await expect(
+        projectProposal.connect(owner).increaseRoundMaxFlare({
+          value: ethers.parseUnits("0", 18),
+        })
+      ).to.be.revertedWithCustomError(projectProposal, "InvalidAmountRequested");
+    });
+
+    it("Should revert when increasing max flare amount if submission window is closed.", async function () {
+      const block = await ethers.provider.getBlock("latest");
+      let currentTime = block.timestamp;
+
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(
+        projectProposal.connect(owner).increaseRoundMaxFlare({
+          value: ethers.parseUnits("1", 18),
+        })
+      ).to.be.revertedWithCustomError(projectProposal, "SubmissionWindowClosed");
+    });
+
     it("Should revert if non-manager tries to update round max flare amount", async function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
         value: ethers.parseUnits("10", 18),
@@ -495,6 +531,38 @@ describe("ProjectProposal Contract", function () {
       await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(projectProposal, "InvalidVotingPower");
     });
 
+    it("Should get the correct remaining voting power", async function () {
+      // Capture the initial block time
+      const block = await ethers.provider.getBlock("latest");
+      let currentTime = block.timestamp;
+
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine");
+
+      await floth.transfer(addr2.address, ethers.parseUnits("30", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      await projectProposal.takeSnapshot();
+
+      await ethers.provider.send("evm_mine");
+
+      const power = await projectProposal.getVotingPower(addr2.address);
+      console.log("Voting power = " + power.toString());
+
+      //Use 10 votes.
+      await projectProposal.connect(addr2).addVotesToProposal(2, ethers.parseUnits("10", 18));
+
+      //Remaining voting power should be 20.
+      const remainingVotingPower = await projectProposal.getRemainingVotingPower(addr2.address);
+      expect(remainingVotingPower).to.equal(ethers.parseUnits("20", 18));
+    });
+
     // it("Should retrieve proposal ID's and the number of votes for each", async function () {
     //   // Capture the initial block time
     //   const block = await ethers.provider.getBlock("latest");
@@ -583,7 +651,7 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
 
-      //Send 30 floth to addr1.
+      //Send 32 floth to addr1.
       await floth.transfer(addr1.address, ethers.parseUnits("32", 18));
       await floth.connect(addr1).delegate(addr1.address);
 
@@ -621,6 +689,7 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_mine");
 
       await projectProposal.takeSnapshot();
+
       //Addr2 votes
       await projectProposal.connect(addr2).addVotesToProposal(2, 10);
       await projectProposal.connect(owner).roundFinished();
