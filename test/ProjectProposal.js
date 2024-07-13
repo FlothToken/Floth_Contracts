@@ -228,6 +228,31 @@ describe("ProjectProposal Contract", function () {
       await expect(projectProposal.connect(addr1).takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "InvalidPermissions");
     });
 
+    it("Should revert if snapshot is taken before expectedSnapshotDatetime", async function () {
+      const block = await ethers.provider.getBlock("latest");
+      let currentTime = block.timestamp;
+
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await expect(projectProposal.connect(owner).takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "InvalidSnapshotTime");
+    });
+
+    it("Should revert if snapshot is taken when round is closed", async function () {
+      const block = await ethers.provider.getBlock("latest");
+      let currentTime = block.timestamp;
+
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await ethers.provider.send("evm_increaseTime", [8000]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(projectProposal.connect(owner).takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "RoundIsClosed");
+    });
+
     it("Should revert if snapshot is taken before snapshot time", async function () {
       //TODO: Need to work out why this is failing
       //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, {
@@ -297,6 +322,21 @@ describe("ProjectProposal Contract", function () {
 
       expect(latestRound.expectedSnapshotDatetime).to.equal(newSnapshotDatetime);
       expect(latestRound.roundRuntime).to.equal(3600);
+    });
+
+    it("Should have an extended snapshot datetime in the future", async function () {
+      const block = await ethers.provider.getBlock("latest");
+      let currentTime = block.timestamp;
+
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      const newSnapshotDatetime = currentTime - 36000;
+      await expect(projectProposal.connect(owner).extendRoundExpectedSnapshotDatetime(newSnapshotDatetime)).to.be.revertedWithCustomError(
+        projectProposal,
+        "InvalidSnapshotTime"
+      );
     });
   });
 
@@ -411,6 +451,31 @@ describe("ProjectProposal Contract", function () {
       const proposalAfter = await projectProposal.proposals(2);
       expect(proposalAfter.votesReceived).to.equal(0);
     });
+
+    // it("Should revert if a user who hasn't voted on a proposal, tries to remove their votes", async function () {
+    //   // Capture the initial block time
+    //   const block = await ethers.provider.getBlock("latest");
+    //   let currentTime = block.timestamp;
+
+    //   await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+    //     value: ethers.parseUnits("10", 18),
+    //   });
+    //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+    //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+    //   await ethers.provider.send("evm_increaseTime", [7500]);
+    //   await ethers.provider.send("evm_mine");
+
+    //   //Send some floth to addr2.
+    //   await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+    //   await floth.connect(addr2).delegate(addr2.address);
+
+    //   await projectProposal.takeSnapshot();
+
+    //   await projectProposal.connect(addr2).addVotesToProposal(2, 10);
+
+    //   await expect(projectProposal.connect(addr2).removeVotesFromProposal(3)).to.be.revertedWithCustomError(projectProposal, "UserVoteNotFound");
+    // });
 
     it("Should fail if voting power is 0", async function () {
       // Capture the initial block time
