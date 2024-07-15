@@ -610,9 +610,11 @@ contract ProjectProposal is AccessControl {
         uint256 expectedSnapshotDatetime,
         uint256 maxFlareAmount,
         uint256 votingWindowEnd,
-        uint256 abstainProposalId
+        uint256 abstainProposalId,
+        uint256 latestId,
+        uint256 snapshotBlock
     ) {
-        if (_roundId == 0) {
+        if (_roundId == 0 || _roundId > roundId) {
             _roundId = roundId;
         }
 
@@ -623,6 +625,8 @@ contract ProjectProposal is AccessControl {
         maxFlareAmount = round.maxFlareAmount;
         votingWindowEnd = round.roundStartDatetime + round.roundRuntime;
         abstainProposalId = round.abstainProposalId;
+        latestId = roundId;
+        snapshotBlock = round.snapshotBlock;
     }
 
     /**
