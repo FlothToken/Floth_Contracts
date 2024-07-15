@@ -602,6 +602,30 @@ contract ProjectProposal is AccessControl {
     }
 
     /**
+     * Get the metadata for a round.
+     * @param _roundId The ID of the round
+     */
+    function getRoundMetadata(uint256 _roundId) external view returns (
+        uint256 id,
+        uint256 expectedSnapshotDatetime,
+        uint256 maxFlareAmount,
+        uint256 votingWindowEnd,
+        uint256 abstainProposalId
+    ) {
+        if (_roundId == 0) {
+            _roundId = roundId;
+        }
+
+        Round storage round = rounds[_roundId];
+        
+        id = round.id;
+        expectedSnapshotDatetime = round.expectedSnapshotDatetime;
+        maxFlareAmount = round.maxFlareAmount;
+        votingWindowEnd = round.roundStartDatetime + round.roundRuntime;
+        abstainProposalId = round.abstainProposalId;
+    }
+
+    /**
      * Function to get the latest round
      */
     function getLatestRound() internal view returns (Round storage) {
