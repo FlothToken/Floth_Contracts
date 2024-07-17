@@ -305,14 +305,6 @@ describe("ProjectProposal Contract", function () {
       await expect(projectProposal.connect(owner).takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "RoundIsClosed");
     });
 
-    it("Should revert if snapshot is taken before snapshot time", async function () {
-      //TODO: Need to work out why this is failing
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, 1800, {
-      //     value: ethers.parseUnits("10", 18),
-      //   });
-      //   await expect(projectProposal.takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "InvalidSnapshotTime");
-    });
-
     it("Should allow killing a round", async function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
@@ -354,18 +346,6 @@ describe("ProjectProposal Contract", function () {
 
       await expect(projectProposal.connect(owner).extendRoundRuntime(1800)).to.be.revertedWithCustomError(projectProposal, "InvalidRoundRuntime");
     });
-
-    //THIS TEST IS IN ProjectProposalTest.sol
-    // it("Should get all the rounds", async function () {
-    //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 7200, {
-    //     value: ethers.parseUnits("10", 18),
-    //   });
-    //   await projectProposal.addRound(ethers.parseUnits("20", 18), 7200, currentTime + 7200, {
-    //     value: ethers.parseUnits("20", 18),
-    //   });
-    //   const rounds = await projectProposal.testGetAllRounds();
-    //   expect(rounds.length).to.equal(2);
-    // });
 
     it("Should extend the round expected snapshot time by the correct amount.", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
@@ -504,28 +484,6 @@ describe("ProjectProposal Contract", function () {
       expect(proposalAfter.votesReceived).to.equal(0);
     });
 
-    // it("Should revert if a user who hasn't voted on a proposal, tries to remove their votes", async function () {
-
-    //   await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-    //     value: ethers.parseUnits("10", 18),
-    //   });
-    //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-    //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-
-    //   await ethers.provider.send("evm_increaseTime", [7500]);
-    //   await ethers.provider.send("evm_mine");
-
-    //   //Send some floth to addr2.
-    //   await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
-    //   await floth.connect(addr2).delegate(addr2.address);
-
-    //   await projectProposal.takeSnapshot();
-
-    //   await projectProposal.connect(addr2).addVotesToProposal(2, 10);
-
-    //   await expect(projectProposal.connect(addr2).removeVotesFromProposal(3)).to.be.revertedWithCustomError(projectProposal, "UserVoteNotFound");
-    // });
-
     it("Should fail if voting power is 0", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
@@ -567,57 +525,6 @@ describe("ProjectProposal Contract", function () {
       const remainingVotingPower = await projectProposal.getRemainingVotingPower(addr2.address);
       expect(remainingVotingPower).to.equal(ethers.parseUnits("20", 18));
     });
-
-    // it("Should retrieve proposal ID's and the number of votes for each", async function () {
-    //   await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-    //     value: ethers.parseUnits("10", 18),
-    //   });
-
-    //   //Add 3 proposals
-    //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-    //   await projectProposal.connect(addr2).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-    //   await projectProposal.connect(addr2).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-
-    //   await ethers.provider.send("evm_increaseTime", [7500]);
-    //   await ethers.provider.send("evm_mine");
-
-    //   //Send some floth to addr1.
-    //   await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
-    //   await floth.connect(addr1).delegate(addr1.address);
-
-    //   //Send some floth to addr2.
-    //   await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
-    //   await floth.connect(addr2).delegate(addr2.address);
-
-    //   await projectProposal.takeSnapshot();
-
-    //   await projectProposal.connect(addr1).addVotesToProposal(2, 10);
-    //   await projectProposal.connect(addr2).addVotesToProposal(3, 20);
-
-    //   const voteRetrievals = await projectProposal.connect(owner).voteRetrieval(1, 1, 10);
-
-    //   expect(voteRetrievals.length).to.equal(2);
-    // });
-
-    // it("Should revert if trying to vote without sufficient voting power", async function () {
-    //   await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-    //     value: ethers.parseUnits("10", 18),
-    //   });
-
-    //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-
-    //   await ethers.provider.send("evm_increaseTime", [7500]);
-    //   await ethers.provider.send("evm_mine");
-
-    //   //Send some floth to addr1.
-    //   await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
-    //   await floth.connect(addr1).delegate(addr1.address);
-
-    //   await projectProposal.takeSnapshot();
-
-    //   //Adding 1000 votes when power is 10, should revert.
-    //   await expect(projectProposal.connect(addr1).addVotesToProposal(2, 1000)).to.be.revertedWithCustomError(projectProposal, "InvalidVotingPower");
-    // });
 
     it("Should revert if trying to remove votes without having voted", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
