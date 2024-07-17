@@ -145,6 +145,7 @@ describe("ProjectProposal Contract", function () {
       );
     });
 
+    //TODO: Need to discuss this with Kyle
     it("Should revert if trying to add a proposal while voting period is open", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
