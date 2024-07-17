@@ -140,6 +140,7 @@ contract ProjectProposal is AccessControl {
         uint256 amountRequested
     );
     event FundsReclaimed(uint256 proposalId, address wallet, uint256 amount);
+    event FundsNotClaimed(uint256 proposalId, address wallet);
     event expectedSnapshotDatetimeUpdated(
         uint256 roundId,
         uint256 newexpectedSnapshotDatetime
@@ -809,19 +810,7 @@ contract ProjectProposal is AccessControl {
 
                 //Check if 30 days have passed since round finished.
                 if (daysPassed > 30) {
-                    // Check if the proposal is already in proposalsNotClaimed
-                    bool alreadyInNotClaimed = false;
-                    for (uint256 j = 0; j < proposalsNotClaimed[msg.sender].length; j++) {
-                        if (proposalsNotClaimed[msg.sender][j].id == usersWinningProposals[i].id) {
-                            alreadyInNotClaimed = true;
-                            break;
-                        }
-                    }
-                    // Add to proposalsNotClaimed if not already present
-                    if (!alreadyInNotClaimed) {
-                        proposalsNotClaimed[msg.sender].push(usersWinningProposals[i]);
-                    }
-
+                    emit FundsNotClaimed(usersWinningProposals[i].id, msg.sender);
                     revert FundsClaimingPeriodExpired();
                 }
 
@@ -846,40 +835,9 @@ contract ProjectProposal is AccessControl {
     }
 
     /**
-     * Function for admin to reclaim funds for a winning proposal if the 30 day period has passed.
-     */
-    function reclaimFunds(address _user, uint256 _proposalId) external roundManagerOrAdmin {
-        Proposal[] storage unclaimedProposals = proposalsNotClaimed[_user];
-
-        for (uint256 i = 0; i < unclaimedProposals.length; i++) {
-            if (unclaimedProposals[i].id == _proposalId && !unclaimedProposals[i].fundsClaimed) {
-                uint256 amountRequested = unclaimedProposals[i].amountRequested;
-
-                // Set as claimed so it can't be reclaimed again.
-                unclaimedProposals[i].fundsClaimed = true; 
-                winningProposalByRoundId[unclaimedProposals[i].roundId].fundsClaimed = true;
-                proposals[unclaimedProposals[i].id].fundsClaimed = true;
-                
-                //Remove unclaimedProposals[i] from proposalsNotClaimed mapping
-                unclaimedProposals[i] = unclaimedProposals[unclaimedProposals.length - 1];
-                unclaimedProposals.pop();
-                
-                // Send amount to the grant wallet.
-                (bool success, ) = floth.getGrantFundWallet().call{value: amountRequested}("");
-                require(success);
-
-                emit FundsReclaimed(proposalId, floth.getGrantFundWallet(), amountRequested);
-                return;
-            }
-        }
-
-        revert FundsAlreadyClaimed();
-    }
-
-    /**
      * Function to manually check if winning proposal hasn't been claimed.
      */
-    function checkProposalUnclaimed(uint256 _roundId) external roundManagerOrAdmin {
+    function reclaimFunds(uint256 _roundId) external roundManagerOrAdmin {
         Proposal storage proposal = winningProposalByRoundId[_roundId];
         Round memory claimRound = getRoundById(_roundId);
 
@@ -894,6 +852,7 @@ contract ProjectProposal is AccessControl {
                 for (uint256 i = 0; i < userProposals.length; i++) {
                     if (userProposals[i].id == proposal.id) {
                         userProposals[i].fundsClaimed = true;
+                        proposals[userProposals[i].id].fundsClaimed = true;
                     }
                 }
                 

@@ -639,129 +639,109 @@ describe("ProjectProposal Contract", function () {
   });
 
   describe("Claiming Funds", function () {
-    //   it("Should allow the winner to claim funds", async function () {
-    //     await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-    //       value: ethers.parseUnits("10", 18),
-    //     });
-    //     //Send some floth to addr2.
-    //     await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
-    //     await floth.connect(addr2).delegate(addr2.address);
-    //     //Addr1 adds proposal
-    //     await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-    //     await ethers.provider.send("evm_increaseTime", [7500]);
-    //     await ethers.provider.send("evm_mine");
-    //     await projectProposal.takeSnapshot();
-    //     //Addr2 votes
-    //     await projectProposal.connect(addr2).addVotesToProposal(2, 10);
-    //     await projectProposal.connect(owner).roundFinished();
-    //     //Addr1 claims funds.
-    //     await projectProposal.connect(addr1).claimFunds();
-    //     const proposal = await projectProposal.proposals(2);
-    //     expect(proposal.fundsClaimed).to.be.true;
-    //   });
-    //   it("Should revert if non-winner tries to claim funds", async function () {
-    //     await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-    //       value: ethers.parseUnits("10", 18),
-    //     });
-    //     //Send some floth to addr2.
-    //     await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
-    //     await floth.connect(addr2).delegate(addr2.address);
-    //     //Addr1 adds proposal
-    //     await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-    //     await ethers.provider.send("evm_increaseTime", [7500]);
-    //     await ethers.provider.send("evm_mine");
-    //     await projectProposal.takeSnapshot();
-    //     //Addr2 votes
-    //     await projectProposal.connect(addr2).addVotesToProposal(2, 10);
-    //     await projectProposal.connect(owner).roundFinished();
-    //     //Addr2 claims funds.
-    //     await expect(projectProposal.connect(addr2).claimFunds()).to.be.revertedWithCustomError(projectProposal, "FundsClaimingPeriodExpired");
-    //   });
-    //   it("Should allow admin to reclaim after 30 days", async function () {
-    //     await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-    //       value: ethers.parseUnits("10", 18),
-    //     });
-    //     //Send some floth to addr2.
-    //     await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
-    //     await floth.connect(addr2).delegate(addr2.address);
-    //     //Addr1 adds proposal
-    //     await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-    //     await ethers.provider.send("evm_increaseTime", [7500]);
-    //     await ethers.provider.send("evm_mine");
-    //     await projectProposal.takeSnapshot();
-    //     //Addr2 votes
-    //     await projectProposal.connect(addr2).addVotesToProposal(2, 10);
-    //     await projectProposal.connect(owner).roundFinished();
-    //     //32 days later
-    //     await ethers.provider.send("evm_increaseTime", [86400 * 32]);
-    //     await ethers.provider.send("evm_mine");
-    //     await projectProposal.connect(addr1).claimFunds();
-    //     const proposalBefore = await projectProposal.proposals(2);
-    //     expect(proposalBefore.fundsClaimed).to.be.false;
-    //     await projectProposal.connect(owner).reclaimFunds(addr1.address, 2);
-    //     const proposalAfter = await projectProposal.proposals(2);
-    //     expect(proposalAfter.fundsClaimed).to.be.true;
-    //   });
-    //   // it("Should revert if trying to claim funds after the claiming period", async function () {
-    //   //   await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-    //   //     value: ethers.parseUnits("10", 18),
-    //   //   });
-    //   //   //Send some floth to addr2.
-    //   //   await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
-    //   //   await floth.connect(addr2).delegate(addr2.address);
-    //   //   //Addr1 adds proposal
-    //   //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-    //   //   await ethers.provider.send("evm_increaseTime", [7500]);
-    //   //   await ethers.provider.send("evm_mine");
-    //   //   await projectProposal.takeSnapshot();
-    //   //   //Addr2 votes
-    //   //   await projectProposal.connect(addr2).addVotesToProposal(2, 10);
-    //   //   await projectProposal.connect(owner).roundFinished();
-    //   //   //32 days later
-    //   //   await ethers.provider.send("evm_increaseTime", [86400 * 32]);
-    //   //   await ethers.provider.send("evm_mine");
-    //   //   await projectProposal.connect(addr1).claimFunds().to.be.revertedWith("FundsClaimingPeriodExpired");
-    //   // });
-    //   it("Should check if a proposal hasn't been claimed", async function () {
-    //     await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-    //       value: ethers.parseUnits("10", 18),
-    //     });
-    //     //Send some floth to addr2.
-    //     await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
-    //     await floth.connect(addr2).delegate(addr2.address);
-    //     //Addr1 adds proposal
-    //     await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-    //     await ethers.provider.send("evm_increaseTime", [7500]);
-    //     await projectProposal.takeSnapshot();
-    //     //Addr2 votes
-    //     await projectProposal.connect(addr2).addVotesToProposal(2, 10);
-    //     await projectProposal.connect(owner).roundFinished();
-    //     //32 days later
-    //     await ethers.provider.send("evm_increaseTime", [86400 * 32]);
-    //     await ethers.provider.send("evm_mine");
-    //     const proposalBefore = await projectProposal.winningProposalByRoundId(1);
-    //     expect(proposalBefore.fundsClaimed).to.be.false;
-    //     await projectProposal.connect(owner).checkProposalUnclaimed(1);
-    //     const proposalAfter = await projectProposal.winningProposalByRoundId(1);
-    //     expect(proposalAfter.fundsClaimed).to.be.true;
-    //   });
-    //   it("Should allow  if trying to claim funds after the claiming period", async function () {
-    //     // uint256 _flrAmount,
-    //     // uint256 _roundRuntime,
-    //     // uint256 _snapshotDatetime,
-    //     // uint256 _votingRuntime
-    //     // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-    //     //   await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, 1800);
-    //     //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-    //     //   await ethers.provider.send("evm_increaseTime", [3600]);
-    //     //   await ethers.provider.send("evm_mine", []);
-    //     //   await projectProposal.takeSnapshot();
-    //     //   await projectProposal.connect(addr1).addVotesToProposal(1, 10);
-    //     //   await projectProposal.roundFinished();
-    //     //   // Increase time by 31 days
-    //     //   await ethers.provider.send("evm_increaseTime", [31 * 86400]);
-    //     //   await ethers.provider.send("evm_mine", []);
-    //     //   await expect(projectProposal.claimFunds()).to.be.revertedWith("FundsClaimingPeriod");
-    //   });
+    it("Should allow the winner to claim funds", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Send some floth to addr2.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      //Addr1 adds proposal
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      await projectProposal.takeSnapshot();
+
+      //Addr2 votes
+      await projectProposal.connect(addr2).addVotesToProposal(2, 10);
+      await projectProposal.connect(owner).roundFinished();
+      //Addr1 claims funds.
+      await projectProposal.connect(addr1).claimFunds();
+      const proposal = await projectProposal.proposals(2);
+      expect(proposal.fundsClaimed).to.be.true;
+    });
+
+    it("Should revert if non-winner tries to claim funds", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Send some floth to addr2.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      //Addr1 adds proposal
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      await projectProposal.takeSnapshot();
+      //Addr2 votes
+      await projectProposal.connect(addr2).addVotesToProposal(2, 10);
+      await projectProposal.connect(owner).roundFinished();
+
+      //Addr2 claims funds.
+      await expect(projectProposal.connect(addr2).claimFunds()).to.be.revertedWithCustomError(projectProposal, "InvalidClaimer");
+    });
+
+    it("Should allow admin to reclaim after 30 days", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Send some floth to addr2.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      //Addr1 adds proposal
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      await projectProposal.takeSnapshot();
+      //Addr2 votes
+      await projectProposal.connect(addr2).addVotesToProposal(2, 10);
+      await projectProposal.connect(owner).roundFinished();
+
+      //32 days later
+      await ethers.provider.send("evm_increaseTime", [86400 * 32]);
+      await ethers.provider.send("evm_mine");
+
+      await projectProposal.connect(owner).reclaimFunds(1);
+
+      const proposalAfter = await projectProposal.proposals(2);
+      expect(proposalAfter.fundsClaimed).to.be.true;
+    });
+
+    it("Should revert if user tries to claim after 30 days.", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Send some floth to addr2.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      //Addr1 adds proposal
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+
+      await projectProposal.takeSnapshot();
+      //Addr2 votes
+      await projectProposal.connect(addr2).addVotesToProposal(2, 10);
+      await projectProposal.connect(owner).roundFinished();
+
+      //32 days later
+      await ethers.provider.send("evm_increaseTime", [86400 * 32]);
+
+      await expect(projectProposal.connect(addr1).claimFunds()).to.be.revertedWithCustomError(projectProposal, "FundsClaimingPeriodExpired");
+    });
   });
 });
