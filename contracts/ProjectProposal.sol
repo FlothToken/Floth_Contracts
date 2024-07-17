@@ -806,9 +806,23 @@ contract ProjectProposal is AccessControl {
 
                 //Check if 30 days have passed since round finished. 86400 seconds in a day.
                 uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
+
+                //Check if 30 days have passed since round finished.
                 if (daysPassed > 30) {
-                    proposalsNotClaimed[msg.sender].push(usersWinningProposals[i]); //Add unclaimed proposal to mapping.
-                    continue;
+                    // Check if the proposal is already in proposalsNotClaimed
+                    bool alreadyInNotClaimed = false;
+                    for (uint256 j = 0; j < proposalsNotClaimed[msg.sender].length; j++) {
+                        if (proposalsNotClaimed[msg.sender][j].id == usersWinningProposals[i].id) {
+                            alreadyInNotClaimed = true;
+                            break;
+                        }
+                    }
+                    // Add to proposalsNotClaimed if not already present
+                    if (!alreadyInNotClaimed) {
+                        proposalsNotClaimed[msg.sender].push(usersWinningProposals[i]);
+                    }
+
+                    revert FundsClaimingPeriodExpired();
                 }
 
                 uint256 amountRequested = usersWinningProposals[0].amountRequested;
