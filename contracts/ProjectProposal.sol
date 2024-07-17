@@ -320,10 +320,6 @@ contract ProjectProposal is AccessControl {
         uint256 _proposalId,
         uint256 _numberOfVotes
     ) external {
-        //Check if the user has voting power.
-        if (getVotingPower(msg.sender) == 0) {
-            revert InvalidVotingPower();
-        }
 
         Proposal storage proposal = proposals[_proposalId];
         Round storage currentRound = getLatestRound();
