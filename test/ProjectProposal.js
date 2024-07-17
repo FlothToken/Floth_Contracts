@@ -12,6 +12,7 @@ describe("ProjectProposal Contract", function () {
   let flothAddress;
   let addr1;
   let addr2;
+  let currentTime;
 
   const ADMIN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE"));
   const SNAPSHOTTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SNAPSHOTTER_ROLE"));
@@ -30,6 +31,9 @@ describe("ProjectProposal Contract", function () {
     const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
     projectProposal = await ProjectProposalFactory.deploy(flothAddress);
     await projectProposal.waitForDeployment();
+
+    const block = await ethers.provider.getBlock("latest");
+    currentTime = block.timestamp;
   });
 
   describe("Deployment", function () {
@@ -51,7 +55,7 @@ describe("ProjectProposal Contract", function () {
 
   describe("Proposal Management", function () {
     it("Should allow adding a new proposal", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
@@ -62,7 +66,7 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert when adding a proposal with zero amount", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       await expect(projectProposal.connect(addr1).addProposal("Test Proposal", 0)).to.be.revertedWithCustomError(
@@ -72,7 +76,7 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert when adding a proposal with amount greater than round's maxFlareAmount", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       await expect(projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("200", 18))).to.be.revertedWithCustomError(
@@ -82,7 +86,7 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow updating the proposal receiver address", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
@@ -92,9 +96,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should not allow updating the proposal receiver address if voting period is open", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -113,9 +114,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if non-proposer tries to update proposal receiver address", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -127,9 +125,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if trying to update proposal receiver address to zero address", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -151,9 +146,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should get all the proposals by address", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -164,9 +156,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if proposal ID is out of range", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -178,7 +167,7 @@ describe("ProjectProposal Contract", function () {
 
   describe("Round Management", function () {
     it("Should allow adding a new round", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       const round = await projectProposal.getRoundById(1);
@@ -186,17 +175,20 @@ describe("ProjectProposal Contract", function () {
       expect(round.maxFlareAmount).to.equal(ethers.parseUnits("10", 18));
     });
 
+    it("Should revert when adding a round with the incorrect flare amount", async function () {
+      await expect(
+        projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, { value: ethers.parseUnits("1", 18) })
+      ).to.be.revertedWithCustomError(projectProposal, "InsufficientFundsForRound");
+    });
+
     it("Should revert when getting round by ID that is bigger than current round", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       await expect(projectProposal.getRoundById(3)).to.be.revertedWithCustomError(projectProposal, "RoundIdOutOfRange");
     });
 
     it("Should allow updating round max flare amount", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -213,9 +205,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert when increasing max flare amount if value passed is 0.", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -231,9 +220,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert when increasing max flare amount if submission window is closed.", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -249,7 +235,7 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if non-manager tries to update round max flare amount", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       await expect(
@@ -260,21 +246,18 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow taking a snapshot", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime, { value: ethers.parseUnits("10", 18) });
       await projectProposal.takeSnapshot();
       const round = await projectProposal.getRoundById(1);
       expect(round.snapshotBlock).to.be.gt(0);
     });
 
     it("Should revert if non-manager tries to take a snapshot", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000), { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime, { value: ethers.parseUnits("10", 18) });
       await expect(projectProposal.connect(addr1).takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "InvalidPermissions");
     });
 
     it("Should revert if snapshot is taken before expectedSnapshotDatetime", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -283,9 +266,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if snapshot is taken when round is closed", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -298,14 +278,14 @@ describe("ProjectProposal Contract", function () {
 
     it("Should revert if snapshot is taken before snapshot time", async function () {
       //TODO: Need to work out why this is failing
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, 1800, {
+      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, 1800, {
       //     value: ethers.parseUnits("10", 18),
       //   });
       //   await expect(projectProposal.takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "InvalidSnapshotTime");
     });
 
     it("Should allow killing a round", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 7200, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
       await projectProposal.killRound(1);
@@ -314,14 +294,14 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if non-manager tries to kill a round", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 3600, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
       await expect(projectProposal.connect(addr1).killRound(1)).to.be.revertedWithCustomError(projectProposal, "InvalidPermissions");
     });
 
     it("Should extend the round runtime by the correct amount.", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 7200, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
 
@@ -331,7 +311,7 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert during extend round runtime if the runtime is less than the current runtime.", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, Math.floor(Date.now() / 1000) + 7200, {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
 
@@ -340,10 +320,10 @@ describe("ProjectProposal Contract", function () {
 
     //THIS TEST IS IN ProjectProposalTest.sol
     // it("Should get all the rounds", async function () {
-    //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, Math.floor(Date.now() / 1000) + 7200, {
+    //   await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 7200, {
     //     value: ethers.parseUnits("10", 18),
     //   });
-    //   await projectProposal.addRound(ethers.parseUnits("20", 18), 7200, Math.floor(Date.now() / 1000) + 7200, {
+    //   await projectProposal.addRound(ethers.parseUnits("20", 18), 7200, currentTime + 7200, {
     //     value: ethers.parseUnits("20", 18),
     //   });
     //   const rounds = await projectProposal.testGetAllRounds();
@@ -351,9 +331,6 @@ describe("ProjectProposal Contract", function () {
     // });
 
     it("Should extend the round expected snapshot time by the correct amount.", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -368,9 +345,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should have an extended snapshot datetime in the future", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -385,9 +359,6 @@ describe("ProjectProposal Contract", function () {
 
   describe("Voting", function () {
     it("Should allow voting on a proposal", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -409,9 +380,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow voting on an abstain proposal", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -434,9 +402,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow voting on an abstain proposal after already voting on another proposal", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -466,10 +431,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should remove votes from a proposal", async function () {
-      // Capture the initial block time
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -496,9 +457,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     // it("Should revert if a user who hasn't voted on a proposal, tries to remove their votes", async function () {
-    //   // Capture the initial block time
-    //   const block = await ethers.provider.getBlock("latest");
-    //   let currentTime = block.timestamp;
 
     //   await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
     //     value: ethers.parseUnits("10", 18),
@@ -521,10 +479,6 @@ describe("ProjectProposal Contract", function () {
     // });
 
     it("Should fail if voting power is 0", async function () {
-      // Capture the initial block time
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -539,10 +493,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should get the correct remaining voting power", async function () {
-      // Capture the initial block time
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -571,10 +521,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     // it("Should retrieve proposal ID's and the number of votes for each", async function () {
-    //   // Capture the initial block time
-    //   const block = await ethers.provider.getBlock("latest");
-    //   let currentTime = block.timestamp;
-
     //   await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
     //     value: ethers.parseUnits("10", 18),
     //   });
@@ -606,9 +552,6 @@ describe("ProjectProposal Contract", function () {
     // });
 
     // it("Should revert if trying to vote without sufficient voting power", async function () {
-    //   const block = await ethers.provider.getBlock("latest");
-    //   let currentTime = block.timestamp;
-
     //   await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
     //     value: ethers.parseUnits("10", 18),
     //   });
@@ -629,9 +572,6 @@ describe("ProjectProposal Contract", function () {
     // });
 
     it("Should revert if trying to remove votes without having voted", async function () {
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -642,10 +582,6 @@ describe("ProjectProposal Contract", function () {
 
     it("Should get total votes for a round", async function () {
       const totalVotes = 32;
-
-      // Capture the initial block time
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
 
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
@@ -677,10 +613,6 @@ describe("ProjectProposal Contract", function () {
 
   describe("Claiming Funds", function () {
     it("Should allow the winner to claim funds", async function () {
-      // Capture the initial block time
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -707,10 +639,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should revert if non-winner tries to claim funds", async function () {
-      // Capture the initial block time
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -735,10 +663,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow admin to reclaim after 30 days", async function () {
-      // Capture the initial block time
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -773,10 +697,6 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should check if a proposal hasn't been claimed", async function () {
-      // Capture the initial block time
-      const block = await ethers.provider.getBlock("latest");
-      let currentTime = block.timestamp;
-
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -815,7 +735,7 @@ describe("ProjectProposal Contract", function () {
       // uint256 _snapshotDatetime,
       // uint256 _votingRuntime
       // TODO: NEED FLOTH CONTRACT FOR THIS TO WORK
-      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, Math.floor(Date.now() / 1000) + 3600, 1800);
+      //   await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, 1800);
       //   await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
       //   await ethers.provider.send("evm_increaseTime", [3600]);
       //   await ethers.provider.send("evm_mine", []);
