@@ -735,7 +735,7 @@ describe("ProjectProposal Contract", function () {
 
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
 
-      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_increaseTime", [7300]);
       await ethers.provider.send("evm_mine");
 
       await floth.transfer(addr2.address, ethers.parseUnits("30", 18));
