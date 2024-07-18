@@ -399,9 +399,6 @@ contract ProjectProposal is AccessControl {
         }
 
         Votes[] storage votesByUser = votedOnProposals[msg.sender][currentRound.id];
-        if(votesByUser.length == 0){
-            revert UserVoteNotFound();
-        }
 
         for (uint256 i = 0; i < votesByUser.length; i++) {
             if(_proposalId == votesByUser[i].proposalId){
