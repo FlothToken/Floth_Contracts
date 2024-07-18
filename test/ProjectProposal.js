@@ -498,7 +498,6 @@ describe("ProjectProposal Contract", function () {
       await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(projectProposal, "InvalidVotingPower");
     });
 
-    //TODO: Not sure why this one isn't receiving the voting power.
     it("Should revert if user doesn't have enough voting power", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
@@ -713,5 +712,48 @@ describe("ProjectProposal Contract", function () {
     it("Should revert if getting round metadata for a non-existent round", async function () {
       await expect(projectProposal.getRoundMetadata(1)).to.be.revertedWithCustomError(projectProposal, "RoundIdOutOfRange");
     });
+
+    it("Should be able to get all rounds", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      const rounds = await projectProposal.getAllRounds();
+      expect(rounds.length).to.equal(1);
+    });
+
+    it("Should be able to get all rounds when none exist", async function () {
+      const rounds = await projectProposal.getAllRounds();
+      expect(rounds.length).to.equal(0);
+    });
+
+    it("Should be able to get voting power for an address", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine");
+
+      await floth.transfer(addr2.address, ethers.parseUnits("30", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      await projectProposal.takeSnapshot();
+
+      const power = await projectProposal.getVotingPower(addr2.address);
+      expect(power).to.equal(ethers.parseUnits("30", 18));
+    });
+
+    "Should return zero voting power if snapshot has not been taken",
+      async function () {
+        await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+          value: ethers.parseUnits("10", 18),
+        });
+
+        const power = await projectProposal.getVotingPower(addr2.address);
+        expect(power).to.equal(0);
+      };
   });
 });
