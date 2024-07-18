@@ -639,7 +639,7 @@ contract ProjectProposal is AccessControl {
     /**
      * Function to get all rounds
      */
-    function getAllRounds() internal view returns (Round[] memory) {
+    function getAllRounds() external view returns (Round[] memory) {
         uint256 count = roundIds.length;
         Round[] memory allRounds = new Round[](count);
         for (uint256 i = 0; i < count; i++) {
