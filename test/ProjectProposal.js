@@ -508,10 +508,11 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_mine");
 
       await floth.transfer(addr1.address, ethers.parseUnits("5", 18));
+      await floth.connect(addr1).delegate(addr1.address);
 
       await projectProposal.takeSnapshot();
 
-      await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(
+      await expect(projectProposal.connect(addr1).addVotesToProposal(2, ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
         projectProposal,
         "InsufficientVotingPower"
       );
