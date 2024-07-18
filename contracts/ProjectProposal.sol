@@ -615,7 +615,7 @@ contract ProjectProposal is AccessControl {
         uint256 snapshotBlock
     ) {
         if (_roundId == 0 || _roundId > roundId) {
-            _roundId = roundId;
+            revert RoundIdOutOfRange();
         }
 
         Round storage round = rounds[_roundId];
