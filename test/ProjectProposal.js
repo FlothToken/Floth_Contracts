@@ -692,4 +692,26 @@ describe("ProjectProposal Contract", function () {
       await expect(projectProposal.connect(addr1).claimFunds()).to.be.revertedWithCustomError(projectProposal, "FundsClaimingPeriodExpired");
     });
   });
+
+  describe("Getters", function () {
+    it("Should be able to get the round metadata", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      const { id, expectedSnapshotDatetime, maxFlareAmount, votingWindowEnd, abstainProposalId, latestId, snapshotBlock } =
+        await projectProposal.getRoundMetadata(1);
+      expect(id).to.equal(1);
+      expect(expectedSnapshotDatetime).to.equal(currentTime + 7200);
+      expect(maxFlareAmount).to.equal(ethers.parseUnits("10", 18));
+      expect(votingWindowEnd).to.be.closeTo(currentTime + 8000, 1);
+      expect(abstainProposalId).to.equal(1);
+      expect(latestId).to.equal(1);
+      expect(snapshotBlock).to.equal(0);
+    });
+
+    it("Should revert if getting round metadata for a non-existent round", async function () {
+      await expect(projectProposal.getRoundMetadata(1)).to.be.revertedWithCustomError(projectProposal, "RoundIdOutOfRange");
+    });
+  });
 });
