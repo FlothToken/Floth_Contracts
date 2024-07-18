@@ -484,7 +484,7 @@ describe("ProjectProposal Contract", function () {
       expect(proposalAfter.votesReceived).to.equal(0);
     });
 
-    it("Should fail if voting power is 0", async function () {
+    it("Should revert if voting power is 0", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -496,6 +496,26 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.takeSnapshot();
 
       await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(projectProposal, "InvalidVotingPower");
+    });
+
+    //TODO: Not sure why this one isn't receiving the voting power.
+    it("Should revert if user doesn't have enough voting power", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      await floth.transfer(addr1.address, ethers.parseUnits("5", 18));
+
+      await projectProposal.takeSnapshot();
+
+      await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(
+        projectProposal,
+        "InsufficientVotingPower"
+      );
     });
 
     it("Should get the correct remaining voting power", async function () {
