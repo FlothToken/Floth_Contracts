@@ -156,6 +156,7 @@ contract ProjectProposal is AccessControl {
     error VotingPeriodOpen();
     error InvalidAmountRequested();
     error InvalidVotingPower();
+    error InsufficientVotingPower();
     error InsufficientBalance();
     error InsufficientFundsForRound();
     error FundsAlreadyClaimed();
@@ -355,6 +356,8 @@ contract ProjectProposal is AccessControl {
         
         } else {
 
+            console.log("Current voting power: %d", currentVotingPower);
+
             //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
             if (currentVotingPower == 0) {
                 revert InvalidVotingPower();
@@ -362,7 +365,7 @@ contract ProjectProposal is AccessControl {
             
             //If the user doesn't have enough voting power, stop them from voting.
             if (currentVotingPower < _numberOfVotes) {
-                revert InvalidVotingPower();
+                revert InsufficientVotingPower();
             }
 
             //Vote is for non-abstain proposal.
