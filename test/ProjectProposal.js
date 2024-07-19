@@ -347,6 +347,19 @@ describe("ProjectProposal Contract", function () {
       await expect(projectProposal.connect(owner).extendRoundRuntime(1800)).to.be.revertedWithCustomError(projectProposal, "InvalidRoundRuntime");
     });
 
+    it("Should revert during extend round runtime if the round is closed.", async function () {
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(owner).killRound(1);
+
+      await ethers.provider.send("evm_increaseTime", [9000]);
+      await ethers.provider.send("evm_mine");
+
+      await expect(projectProposal.connect(owner).extendRoundRuntime(8000)).to.be.revertedWithCustomError(projectProposal, "RoundIsClosed");
+    });
+
     it("Should extend the round expected snapshot time by the correct amount.", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
@@ -546,6 +559,25 @@ describe("ProjectProposal Contract", function () {
       expect(remainingVotingPower).to.equal(ethers.parseUnits("20", 18));
     });
 
+    it("Should return 0 if getVotingPower is called but a snapshot hasn't been taken", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine");
+
+      await floth.transfer(addr2.address, ethers.parseUnits("30", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      await ethers.provider.send("evm_mine");
+
+      const power = await projectProposal.getVotingPower(addr2.address);
+      expect(power).to.equal(0);
+    });
+
     it("Should revert if trying to remove votes without having voted", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
@@ -583,6 +615,36 @@ describe("ProjectProposal Contract", function () {
       const actualVotes = await projectProposal.getTotalVotesForRound(1);
 
       expect(actualVotes).to.equal(totalVotes);
+    });
+
+    it("Should update a users has-voted status to false.", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      //Send some floth to addr1.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      await projectProposal.takeSnapshot();
+
+      await projectProposal.connect(addr2).addVotesToProposal(2, 10);
+      // await projectProposal.connect(addr2).addVotesToProposal(3, 10); IF YOU COMMENT THIS IN, THE TEST FAILS, WHICH IS CORRECT.
+
+      const hasVotedBefore = await projectProposal.hasVotedByRound(addr2.address, 1);
+
+      expect(hasVotedBefore).to.equal(true);
+
+      await projectProposal.connect(addr2).removeVotesFromProposal(2);
+
+      const hasVotedAfter = await projectProposal.hasVotedByRound(addr2.address, 1);
+
+      expect(hasVotedAfter).to.equal(false);
     });
   });
 

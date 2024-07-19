@@ -414,7 +414,7 @@ contract ProjectProposal is AccessControl {
                 // Remove the struct.
                 votesByUser.pop();
 
-                if(votesByUser.length == 1){
+                if(votesByUser.length == 0){
                     hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
                 }
 
