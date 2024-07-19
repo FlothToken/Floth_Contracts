@@ -386,6 +386,18 @@ describe("ProjectProposal Contract", function () {
       );
     });
 
+    it("Should have an extended snapshot datetime in the future - alt version", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      const newSnapshotDatetime = currentTime + 360000;
+      await expect(projectProposal.connect(owner).extendRoundExpectedSnapshotDatetime(newSnapshotDatetime)).to.be.revertedWithCustomError(
+        projectProposal,
+        "InvalidSnapshotTime"
+      );
+    });
+
     it("Should revert if non-manager tries to extend round expected snapshot time", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
@@ -395,6 +407,28 @@ describe("ProjectProposal Contract", function () {
         projectProposal,
         "InvalidPermissions"
       );
+    });
+
+    it("Should revert if round is finished and there are no proposals", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await expect(projectProposal.connect(owner).roundFinished()).to.be.revertedWithCustomError(projectProposal, "NoProposalsInRound");
+    });
+
+    it("Should revert if roundFinished is called and the round isn't over.", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Add a proposal.
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [40000]);
+      await ethers.provider.send("evm_mine");
+
+      await expect(projectProposal.connect(owner).roundFinished()).to.be.revertedWithCustomError(projectProposal, "RoundIsOpen");
     });
   });
 

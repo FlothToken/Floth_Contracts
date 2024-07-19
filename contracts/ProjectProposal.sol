@@ -756,7 +756,8 @@ contract ProjectProposal is AccessControl {
         Round storage latestRound = getLatestRound();
 
         //TODO: What happens to the funds in this case? We want to be able to get them out!
-        if (latestRound.proposalIds.length == 0) {
+        //Length is 1 as the abstain proposal is always in the round.
+        if (latestRound.proposalIds.length == 1) {
             revert NoProposalsInRound();
         }
 
