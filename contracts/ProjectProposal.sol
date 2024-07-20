@@ -213,11 +213,6 @@ contract ProjectProposal is AccessControl {
             revert SubmissionWindowClosed();
         }
 
-        //If within a voting period, revert.
-        if (isVotingPeriodOpen()) {
-            revert VotingPeriodOpen();
-        }
-
         if (
             latestRound.maxFlareAmount < _amountRequested ||
             _amountRequested == 0
@@ -727,13 +722,19 @@ contract ProjectProposal is AccessControl {
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         
-        //If snapshot hasn't been taken yet.
-        // TODO: SPEAK TO KYLE do we want to use snapshotDatetime or expectedSnapshotDatetime?
+        //TODO check if we are happy with this solution.
         if(latestRound.snapshotDatetime == 0){
-            return (block.timestamp >= latestRound.expectedSnapshotDatetime && block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime);
-        }else{
-            return (block.timestamp >= latestRound.expectedSnapshotDatetime && block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime);
+            return false;
         }
+
+        // Check if the current time is within the voting period
+        if (block.timestamp >= latestRound.snapshotDatetime) {
+            if (block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
 
