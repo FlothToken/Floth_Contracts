@@ -135,6 +135,26 @@ describe("ProjectProposal Contract", function () {
       );
     });
 
+    it("Should continue with updating proposal receiver address when voting period is open", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7200]);
+      await ethers.provider.send("evm_mine");
+
+      //Take snapshot
+      await projectProposal.takeSnapshot();
+
+      //Increase EVM time
+      await ethers.provider.send("evm_increaseTime", [10000]);
+      await ethers.provider.send("evm_mine");
+
+      await expect(projectProposal.connect(addr1).setProposalReceiverAddress(2, addr1.address)).to.not.be.reverted;
+    });
+
     it("Should revert if trying to add a proposal outside submission window", async function () {
       // Simulate passing of submission window
       await ethers.provider.send("evm_increaseTime", [3600]);
@@ -808,6 +828,10 @@ describe("ProjectProposal Contract", function () {
 
     it("Should revert if getting round metadata for a non-existent round", async function () {
       await expect(projectProposal.getRoundMetadata(1)).to.be.revertedWithCustomError(projectProposal, "RoundIdOutOfRange");
+    });
+
+    it("Should revert if roundID is 0", async function () {
+      await expect(projectProposal.getRoundMetadata(0)).to.be.revertedWithCustomError(projectProposal, "RoundIdOutOfRange");
     });
 
     it("Should be able to get all rounds", async function () {
