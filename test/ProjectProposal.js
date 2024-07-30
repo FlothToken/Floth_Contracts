@@ -671,6 +671,95 @@ describe("ProjectProposal Contract", function () {
       expect(actualVotes).to.equal(totalVotes);
     });
 
+    it("Should retrieve proposal ID's and the number of votes for each", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Add 2 proposals
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr2).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      //Send some floth to addr1.
+      await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr1).delegate(addr1.address);
+
+      //Send some floth to addr2.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      await projectProposal.takeSnapshot();
+
+      //ID 1 is the abstain proposal.
+      await projectProposal.connect(addr1).addVotesToProposal(2, 10);
+      await projectProposal.connect(addr2).addVotesToProposal(3, 20);
+
+      const voteRetrievals = await projectProposal.connect(owner).voteRetrieval(1, 1, 10);
+
+      expect(voteRetrievals.length).to.equal(3);
+    });
+
+    it("Should revert if page size is 0 during vote retrieval", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Add 2 proposals
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr2).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      //Send some floth to addr1.
+      await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr1).delegate(addr1.address);
+
+      //Send some floth to addr2.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      await projectProposal.takeSnapshot();
+
+      //ID 1 is the abstain proposal.
+      await projectProposal.connect(addr1).addVotesToProposal(2, 10);
+      await projectProposal.connect(addr2).addVotesToProposal(3, 20);
+
+      await expect(projectProposal.connect(owner).voteRetrieval(1, 1, 0)).to.be.revertedWithCustomError(projectProposal, "InvalidPageNumberPageSize");
+    });
+
+    it("Should revert if page number is 0 during vote retrieval", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Add 2 proposals
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr2).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      //Send some floth to addr1.
+      await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr1).delegate(addr1.address);
+
+      //Send some floth to addr2.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      await projectProposal.takeSnapshot();
+
+      //ID 1 is the abstain proposal.
+      await projectProposal.connect(addr1).addVotesToProposal(2, 10);
+      await projectProposal.connect(addr2).addVotesToProposal(3, 20);
+
+      await expect(projectProposal.connect(owner).voteRetrieval(1, 0, 4)).to.be.revertedWithCustomError(projectProposal, "InvalidPageNumberPageSize");
+    });
+
     it("Should update a users has-voted status to false.", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
@@ -720,7 +809,7 @@ describe("ProjectProposal Contract", function () {
 
       await projectProposal.takeSnapshot();
 
-      //Addr2 votes
+      //Addr2 votes (ID 1 is the abstain proposal)
       await projectProposal.connect(addr2).addVotesToProposal(2, 10);
       await projectProposal.connect(owner).roundFinished();
       //Addr1 claims funds.
@@ -902,7 +991,6 @@ describe("ProjectProposal Contract", function () {
       expect(rounds.length).to.equal(0);
     });
 
-    //TODO fix.
     it("Should be able to get voting power for an address", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
@@ -917,6 +1005,9 @@ describe("ProjectProposal Contract", function () {
       await floth.connect(addr2).delegate(addr2.address);
 
       await projectProposal.takeSnapshot();
+
+      await ethers.provider.send("evm_increaseTime", [100]);
+      await ethers.provider.send("evm_mine");
 
       const power = await projectProposal.getVotingPower(addr2.address);
       expect(power).to.equal(ethers.parseUnits("30", 18));

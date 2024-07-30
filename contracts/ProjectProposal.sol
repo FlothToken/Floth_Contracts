@@ -668,16 +668,21 @@ contract ProjectProposal is AccessControl {
         uint256 _pageNumber,
         uint256 _pageSize
     ) external view returns (Votes[] memory) {
-        uint256 startIndex = (_pageNumber - 1) * _pageSize;
-        uint256 endIndex = startIndex + _pageSize;
-
-        if(_pageNumber == 0 || _pageSize == 0){
+        if(_pageNumber == 0){
             revert InvalidPageNumberPageSize();
         }
 
-        if (endIndex > rounds[_roundId].proposalIds.length) {
+        uint256 startIndex = (_pageNumber - 1) * _pageSize;
+        uint256 endIndex = startIndex + _pageSize;
+
+        if(_pageSize == 0){
+            revert InvalidPageNumberPageSize();
+        }
+
+        if(rounds[_roundId].proposalIds.length <= (endIndex-1)){
             endIndex = rounds[_roundId].proposalIds.length;
         }
+
         uint256 resultSize = endIndex - startIndex;
         Votes[] memory voteRetrievals = new Votes[](resultSize);
         for (uint256 i = 0; i < resultSize; i++) {
@@ -712,7 +717,7 @@ contract ProjectProposal is AccessControl {
         if(latestRound.snapshotBlock == 0){
             return 0;
         }
-        uint256 snapshotBlock = getLatestRound().snapshotBlock;
+        uint256 snapshotBlock = latestRound.snapshotBlock;
         return floth.getPastVotes(_address, snapshotBlock);
     }
 
