@@ -94,6 +94,14 @@ contract FlothPass is
         flothContract = IFloth(0xa2EA5Cb0614f6428421a39ec09B013cC3336EFBe);
     }
 
+    /**
+     * @dev Constructor prevents the contract from being initialized again
+     */
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Mint Functions
     ///////////////////////////////////////////////////////////////////////////
