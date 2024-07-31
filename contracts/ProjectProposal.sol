@@ -213,11 +213,6 @@ contract ProjectProposal is AccessControl {
             revert SubmissionWindowClosed();
         }
 
-        //If within a voting period, revert.
-        if (isVotingPeriodOpen()) {
-            revert VotingPeriodOpen();
-        }
-
         if (
             latestRound.maxFlareAmount < _amountRequested ||
             _amountRequested == 0
@@ -399,9 +394,6 @@ contract ProjectProposal is AccessControl {
         }
 
         Votes[] storage votesByUser = votedOnProposals[msg.sender][currentRound.id];
-        if(votesByUser.length == 0){
-            revert UserVoteNotFound();
-        }
 
         for (uint256 i = 0; i < votesByUser.length; i++) {
             if(_proposalId == votesByUser[i].proposalId){
@@ -417,7 +409,7 @@ contract ProjectProposal is AccessControl {
                 // Remove the struct.
                 votesByUser.pop();
 
-                if(votesByUser.length == 1){
+                if(votesByUser.length == 0){
                     hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
                 }
 
@@ -676,16 +668,21 @@ contract ProjectProposal is AccessControl {
         uint256 _pageNumber,
         uint256 _pageSize
     ) external view returns (Votes[] memory) {
-        uint256 startIndex = (_pageNumber - 1) * _pageSize;
-        uint256 endIndex = startIndex + _pageSize;
-
-        if(_pageNumber == 0 || _pageSize == 0){
+        if(_pageNumber == 0){
             revert InvalidPageNumberPageSize();
         }
 
-        if (endIndex > rounds[_roundId].proposalIds.length) {
+        uint256 startIndex = (_pageNumber - 1) * _pageSize;
+        uint256 endIndex = startIndex + _pageSize;
+
+        if(_pageSize == 0){
+            revert InvalidPageNumberPageSize();
+        }
+
+        if(rounds[_roundId].proposalIds.length <= (endIndex-1)){
             endIndex = rounds[_roundId].proposalIds.length;
         }
+
         uint256 resultSize = endIndex - startIndex;
         Votes[] memory voteRetrievals = new Votes[](resultSize);
         for (uint256 i = 0; i < resultSize; i++) {
@@ -720,7 +717,7 @@ contract ProjectProposal is AccessControl {
         if(latestRound.snapshotBlock == 0){
             return 0;
         }
-        uint256 snapshotBlock = getLatestRound().snapshotBlock;
+        uint256 snapshotBlock = latestRound.snapshotBlock;
         return floth.getPastVotes(_address, snapshotBlock);
     }
 
@@ -730,13 +727,19 @@ contract ProjectProposal is AccessControl {
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         
-        //If snapshot hasn't been taken yet.
-        // TODO: SPEAK TO KYLE do we want to use snapshotDatetime or expectedSnapshotDatetime?
+        //TODO check if we are happy with this solution.
         if(latestRound.snapshotDatetime == 0){
-            return (block.timestamp >= latestRound.expectedSnapshotDatetime && block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime);
-        }else{
-            return (block.timestamp >= latestRound.expectedSnapshotDatetime && block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime);
+            return false;
         }
+
+        // Check if the current time is within the voting period
+        if (block.timestamp >= latestRound.snapshotDatetime) {
+            if (block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
 
@@ -759,7 +762,8 @@ contract ProjectProposal is AccessControl {
         Round storage latestRound = getLatestRound();
 
         //TODO: What happens to the funds in this case? We want to be able to get them out!
-        if (latestRound.proposalIds.length == 0) {
+        //Length is 1 as the abstain proposal is always in the round.
+        if (latestRound.proposalIds.length == 1) {
             revert NoProposalsInRound();
         }
 
