@@ -35,6 +35,12 @@ contract FlothPass is
     //Floth Initial Price
     uint256 public price; // 1000 FLOTH
 
+    //Price increment
+    uint256 public priceIncrement;
+
+    //Mints since last increment
+    uint16 public mintsSinceLastIncrement;
+
     //Max supply
     uint16 public maxSupply;
 
@@ -82,6 +88,7 @@ contract FlothPass is
         _currentBaseURI = "";
         maxSupply = 333;
         price = 1000 ether;
+        priceIncrement = 50 ether;
         flothVault = 0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739;
         withdrawAddress = payable(0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739);
         flothContract = IFloth(0xa2EA5Cb0614f6428421a39ec09B013cC3336EFBe);
@@ -100,26 +107,45 @@ contract FlothPass is
      * @param _quantity the number of floth pass to mint
      */
     function mint(uint16 _quantity) external {
-        if (!saleActive){
+        if (!saleActive) {
             revert SaleInactive();
         }
 
-        uint256 totalPrice = price * _quantity;
-
-        if (flothContract.balanceOf(msg.sender) < totalPrice){
-            revert InsufficientFunds();
-        }
-
+        uint256 totalMinted = _totalMinted();
 
         // Check total minted against max supply
-        if (_totalMinted() + _quantity > maxSupply){
+        if (totalMinted + _quantity > maxSupply) {
             revert ExceedsMaxSupply();
         }
 
+        uint256 currentPrice = price;
+        uint256 totalPrice = 0;
 
+        // Calculate the total price considering the price increments every 10 mints
+        // @dev Note i = 1 not i = 0
+        for (uint16 i = 1; i <= _quantity; i++) {
+            totalPrice += currentPrice;
+            if ((totalMinted + i) % 10 == 0) {
+                currentPrice += priceIncrement;
+            }
+        }
+
+        // Check if the caller has enough FLOTH to cover the cost
+        if (flothContract.balanceOf(msg.sender) < totalPrice) {
+            revert InsufficientFunds();
+        }
+
+        // Transfer the total price from the caller to the flothVault
         flothContract.transferFrom(msg.sender, flothVault, totalPrice);
+
+        // Mint the requested quantity to the caller
         _safeMint(msg.sender, _quantity);
+
+        // Update the number of mints since the last price increment
+        mintsSinceLastIncrement = (uint16(totalMinted) + _quantity) % 10;
+        price = currentPrice; // Update the price to the new current price
     }
+
 
     ///////////////////////////////////////////////////////////////////////////
     // Withdraw Functions
