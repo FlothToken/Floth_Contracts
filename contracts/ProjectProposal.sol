@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "hardhat/console.sol";
 import "./IFloth.sol";
 
@@ -9,21 +9,29 @@ import "./IFloth.sol";
  * @title ProjectProposal contract for the Floth protocol
  * @author Ethereal Labs
  */
-contract ProjectProposal is AccessControl {
+contract ProjectProposal is AccessControlUpgradeable {
     // Define roles for the contract
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant SNAPSHOTTER_ROLE = keccak256("SNAPSHOTTER_ROLE");
-    bytes32 public constant ROUND_MANAGER_ROLE =
-        keccak256("ROUND_MANAGER_ROLE");
+    bytes32 public constant ROUND_MANAGER_ROLE = keccak256("ROUND_MANAGER_ROLE");
 
     // Define the Floth interface
     IFloth internal floth;
 
+    // Gap for upgradeability
+    uint256[50] private __gap;
+
+    function initialize(address _flothAddress) public initializer {
+        __AccessControl_init();
+        __ProjectProposal_init(_flothAddress);
+    }
+
     /**
-     * Constructor for the ProjectProposal contract
+     * Initializer for the ProjectProposal contract
      * @param _flothAddress The address of the Floth contract
      */
-    constructor(address _flothAddress) {
+
+    function __ProjectProposal_init(address _flothAddress) internal initializer {
         if (_flothAddress == address(0)) {
             revert ZeroAddress();
         }
@@ -33,6 +41,14 @@ contract ProjectProposal is AccessControl {
         _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // TODO Change address when we deploy
         _grantRole(ADMIN_ROLE, msg.sender); // TODO Change address when we deploy
+    }
+
+    /**
+     * @dev Constructor prevents the contract from being initialized again
+     */
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     // Proposal struct to store proposal data
@@ -68,10 +84,10 @@ contract ProjectProposal is AccessControl {
     }
 
     //Tracks ID number for each proposal.
-    uint256 public proposalId = 0;
+    uint256 public proposalId;
 
     //Tracks ID number for each round.
-    uint256 public roundId = 0;
+    uint256 public roundId;
 
     //Maps IDs to a proposal.
     mapping(uint256 => Proposal) public proposals;
