@@ -9,14 +9,14 @@ pragma solidity ^0.8.11;
 import "./IFloth.sol";
 import "erc721a-upgradeable/contracts/ERC721AUpgradeable.sol";
 import "erc721a-upgradeable/contracts/extensions/ERC721AQueryableUpgradeable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 contract FlothPass is
     ERC721AUpgradeable,
     ERC721AQueryableUpgradeable,
     AccessControlUpgradeable,
-    ReentrancyGuard
+    ReentrancyGuardUpgradeable
 {
     //Setup variables arranged for optimised storage slots
 
