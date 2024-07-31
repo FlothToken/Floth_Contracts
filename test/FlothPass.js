@@ -61,19 +61,26 @@ describe("FlothPass Contract", function () {
     });
   });
 
-  describe("Setters", function () {
+  describe("Setters and getters", function () {
+    //   expect(await flothPass.numberMinted(addr1)).to.equal(0);
+
+    //   await flothPass.connect(owner).setSaleActive(true);
+
+    //   //Send some floth to addr1.
+    //   await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
+    //   await floth.connect(addr1).delegate(addr1.address);
+
+    //   await flothPass.connect(addr1).mint(1);
+
+    //   expect(await flothPass.numberMinted(addr1)).to.equal(1);
+    // });
+
     it("Should allow admins to set the flothContract address", async function () {
       const newFlothAddress = "0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739";
 
       await flothPass.connect(owner).setFlothContract(newFlothAddress);
 
       expect(await flothPass.flothContract()).to.equal(newFlothAddress);
-    });
-
-    it("Should allow admins to set the setBaseUri", async function () {
-      await flothPass.connect(owner).setBaseUri("https://api.flothpass.com/");
-
-      expect(await flothPass._currentBaseURI()).to.equal("https://api.flothpass.com/");
     });
 
     it("Should not allow non-admins to set the flothContract address", async function () {
@@ -88,6 +95,81 @@ describe("FlothPass Contract", function () {
 
     it("Should revert if the floth contract is set to a zero address", async function () {
       await expect(flothPass.connect(owner).setFlothContract(zeroAddress)).to.be.revertedWithCustomError(flothPass, "CannotDeployAsZeroAddress");
+    });
+
+    it("Should allow admins to set the setBaseUri", async function () {
+      await flothPass.connect(owner).setBaseUri("https://api.flothpass.com/");
+
+      expect(await flothPass._currentBaseURI()).to.equal("https://api.flothpass.com/");
+    });
+
+    it("Should not allow non-admins to set the symbol", async function () {
+      await expect(flothPass.connect(addr1).setBaseUri("test")).to.be.revertedWith(
+        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+      );
+    });
+
+    it("Should allow admins to set the name", async function () {
+      await flothPass.connect(owner).setName("Floth Pass");
+
+      expect(await flothPass.name()).to.equal("Floth Pass");
+    });
+
+    it("Should allow admins to set the symbol", async function () {
+      await flothPass.connect(owner).setSymbol("0xCrockPASS");
+
+      expect(await flothPass.symbol()).to.equal("0xCrockPASS");
+    });
+
+    it("Should not allow non-admins to set the symbol", async function () {
+      await expect(flothPass.connect(addr1).setSymbol("0xCrock")).to.be.revertedWith(
+        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+      );
+    });
+
+    it("Should allow admins to set the maxSupply", async function () {
+      await flothPass.connect(owner).setMaxSupply(666);
+
+      expect(await flothPass.maxSupply()).to.equal(666);
+    });
+
+    it("Should allow admins to set the mintPrice", async function () {
+      await flothPass.connect(owner).setMintPrice(ethers.parseUnits("500", 18));
+
+      expect(await flothPass.price()).to.equal(ethers.parseUnits("500", 18));
+    });
+
+    it("Should not allow non-admins to set the mint price", async function () {
+      await expect(flothPass.connect(addr1).setMintPrice(600)).to.be.revertedWith(
+        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+      );
+    });
+
+    it("Should allow admins to set the withdrawAddress", async function () {
+      const newWithdrawAddress = "0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739";
+      await flothPass.connect(owner).setWithdrawAddress(newWithdrawAddress);
+
+      expect(await flothPass.withdrawAddress()).to.equal(newWithdrawAddress);
+    });
+
+    it("Should not allow non-admins to set the withdrawAddress", async function () {
+      const newWithdrawAddress = "0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739";
+
+      await expect(flothPass.connect(addr1).setWithdrawAddress(newWithdrawAddress)).to.be.revertedWith(
+        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+      );
+    });
+
+    it("Should allow admins to set the saleActive", async function () {
+      await flothPass.connect(owner).setSaleActive(true);
+
+      expect(await flothPass.saleActive()).to.be.true;
+    });
+
+    it("Should not allow non-admins to set the saleActive", async function () {
+      await expect(flothPass.connect(addr1).setSaleActive(true)).to.be.revertedWith(
+        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+      );
     });
   });
 });
