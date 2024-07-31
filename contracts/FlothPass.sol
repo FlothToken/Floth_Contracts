@@ -99,17 +99,23 @@ contract FlothPass is
      * Requires the total minted plus the quantity to be less than the max supply.
      * @param _quantity the number of floth pass to mint
      */
-    function mint(uint8 _quantity) external {
-        if (!saleActive) revert SaleInactive();
+    function mint(uint16 _quantity) external {
+        if (!saleActive){
+            revert SaleInactive();
+        }
 
         uint256 totalPrice = price * _quantity;
 
-        if (flothContract.balanceOf(msg.sender) < totalPrice)
+        if (flothContract.balanceOf(msg.sender) < totalPrice){
             revert InsufficientFunds();
+        }
+
 
         // Check total minted against max supply
-        if (_totalMinted() + _quantity > maxSupply)
+        if (_totalMinted() + _quantity > maxSupply){
             revert ExceedsMaxSupply();
+        }
+
 
         flothContract.transferFrom(msg.sender, flothVault, totalPrice);
         _safeMint(msg.sender, _quantity);
@@ -161,7 +167,9 @@ contract FlothPass is
      */
     function _withdraw(address _address, uint256 _amount) internal {
         (bool success, ) = _address.call{value: _amount}("");
-        if (!success) revert TransferFailed();
+        if (!success){
+            revert TransferFailed();
+        }
     }
 
     /**
@@ -176,14 +184,7 @@ contract FlothPass is
      * @dev Function to obtain the uri/json file of a particular token id.
      * @param _tokenId the token id to get the uri for
      */
-    function tokenURI(
-        uint256 _tokenId
-    )
-        public
-        view
-        virtual
-        override(ERC721AUpgradeable, IERC721AUpgradeable)
-        returns (string memory)
+    function tokenURI(uint256 _tokenId) public view virtual override(ERC721AUpgradeable, IERC721AUpgradeable)   returns (string memory)
     {
         return super.tokenURI(_tokenId);
     }
@@ -199,21 +200,11 @@ contract FlothPass is
      * @dev Used to identify the interfaces supported by this contract.
      * @param interfaceId the interface id to check for support
      */
-    function supportsInterface(
-        bytes4 interfaceId
-    )
-        public
-        view
-        override(
-            ERC721AUpgradeable,
-            IERC721AUpgradeable,
-            AccessControlUpgradeable
-        )
-        returns (bool)
+    function supportsInterface(bytes4 interfaceId) public view override
+    (ERC721AUpgradeable, IERC721AUpgradeable, AccessControlUpgradeable) returns (bool)
     {
-        return
-            ERC721AUpgradeable.supportsInterface(interfaceId) ||
-            AccessControlUpgradeable.supportsInterface(interfaceId);
+        return ERC721AUpgradeable.supportsInterface(interfaceId) || 
+               AccessControlUpgradeable.supportsInterface(interfaceId);
     }
 
     ///////////////////////////////////////////////////////////////////////////
