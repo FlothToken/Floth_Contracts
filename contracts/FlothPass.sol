@@ -47,6 +47,9 @@ contract FlothPass is
     //Public sale active flag
     bool public saleActive;
 
+    // Gap for upgradeability
+    uint256[50] private __gap;
+
     /**
      * @dev To reduce smart contract size & gas usages, we are using custom errors rather than using require.
      */
@@ -57,6 +60,7 @@ contract FlothPass is
     error ExceedsMaxSupply();
     error TransferFailed();
     error CannotMintToZeroAddress();
+    error CannotDeployAsZeroAddress();
 
     //Roles
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -311,6 +315,10 @@ contract FlothPass is
     function setFlothContract(
         address _flothContractAddress
     ) external onlyRole(ADMIN_ROLE) {
+        if(_flothContractAddress == address(0)){
+            revert CannotDeployAsZeroAddress();
+        }
+
         flothContract = IFloth(_flothContractAddress);
     }
 
