@@ -9,14 +9,14 @@ pragma solidity ^0.8.11;
 import "./IFloth.sol";
 import "erc721a-upgradeable/contracts/ERC721AUpgradeable.sol";
 import "erc721a-upgradeable/contracts/extensions/ERC721AQueryableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 contract FlothPass is
     ERC721AUpgradeable,
     ERC721AQueryableUpgradeable,
     AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuard
 {
     //Setup variables arranged for optimised storage slots
 
@@ -25,6 +25,9 @@ contract FlothPass is
 
     //Payable withdraw address
     address payable public withdrawAddress;
+
+    //Floth vault address
+    address public flothVault;
 
     //The collection base URI
     string public _currentBaseURI;
@@ -65,7 +68,6 @@ contract FlothPass is
         __ERC721A_init("Floth Pass", "FPASS");
         __ERC721AQueryable_init();
         __AccessControl_init();
-        __ReentrancyGuard_init();
         __FlothPass_init();
 
         _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
@@ -80,6 +82,7 @@ contract FlothPass is
         _currentBaseURI = "";
         maxSupply = 333;
         price = 1000 ether;
+        flothVault = 0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739;
         withdrawAddress = payable(0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739);
         flothContract = IFloth(0xa2EA5Cb0614f6428421a39ec09B013cC3336EFBe);
     }
@@ -108,7 +111,7 @@ contract FlothPass is
         if (_totalMinted() + _quantity > maxSupply)
             revert ExceedsMaxSupply();
 
-        flothContract.burn(msg.sender, totalPrice);
+        flothContract.transferFrom(msg.sender, flothVault, totalPrice);
         _safeMint(msg.sender, _quantity);
     }
 
