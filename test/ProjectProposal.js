@@ -29,7 +29,7 @@ describe("ProjectProposal Contract", function () {
     flothAddress = await floth.getAddress();
 
     const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
-    projectProposal = await ProjectProposalFactory.deploy(flothAddress);
+    projectProposal = await upgrades.deployProxy(ProjectProposalFactory, [flothAddress], { kind: "transparent" });
     await projectProposal.waitForDeployment();
 
     const block = await ethers.provider.getBlock("latest");
@@ -40,7 +40,10 @@ describe("ProjectProposal Contract", function () {
     it("Should revert when deployed with zero address", async function () {
       const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
 
-      await expect(ProjectProposalFactory.deploy(zeroAddress)).to.be.revertedWithCustomError(projectProposal, "ZeroAddress");
+      await expect(upgrades.deployProxy(ProjectProposalFactory, [zeroAddress], { kind: "transparent" })).to.be.revertedWithCustomError(
+        ProjectProposalFactory,
+        "ZeroAddress"
+      );
     });
 
     it("Should set the correct roles", async function () {
