@@ -2,14 +2,12 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 
 describe("FlothPass Contract", function () {
-  let Floth, floth, FlothPass, flothPass, owner, addr1, addr2, dexAddress;
+  let Floth, floth, FlothPass, flothPass, owner, addr1, addr2, dexAddress, flothAddress;
 
   const ADMIN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE"));
   const WITHDRAW_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WITHDRAW_ROLE"));
 
   const zeroAddress = "0x0000000000000000000000000000000000000000";
-
-  const flothContractAddress = "0xa2EA5Cb0614f6428421a39ec09B013cC3336EFBe";
 
   beforeEach(async function () {
     // Get contract factories and signers
@@ -20,9 +18,11 @@ describe("FlothPass Contract", function () {
     floth = await Floth.deploy([dexAddress.address], "Floth Token", "FLOTH");
     await floth.waitForDeployment();
 
+    flothAddress = await floth.getAddress();
+
     // Deploy FlothPass contract using deployProxy
     FlothPass = await ethers.getContractFactory("FlothPass");
-    flothPass = await upgrades.deployProxy(FlothPass, [], { kind: "transparent" });
+    flothPass = await upgrades.deployProxy(FlothPass, [flothAddress], { kind: "transparent" });
     await flothPass.waitForDeployment();
   });
 
@@ -37,7 +37,7 @@ describe("FlothPass Contract", function () {
     });
 
     it("Should initialize the flothContract correctly", async function () {
-      expect(await flothPass.flothContract()).to.equal(flothContractAddress);
+      expect(await flothPass.flothContract()).to.equal(flothAddress);
     });
 
     it("Should initialize the flothVault correctly", async function () {
@@ -62,18 +62,28 @@ describe("FlothPass Contract", function () {
   });
 
   describe("Setters and getters", function () {
-    //   expect(await flothPass.numberMinted(addr1)).to.equal(0);
+    it("Should be able to get the number of minted passes for an address", async function () {
+      // Initially, the number of minted passes should be 0
+      expect(await flothPass.numberMinted(addr1.address)).to.equal(0);
 
-    //   await flothPass.connect(owner).setSaleActive(true);
+      // Activate the sale
+      await flothPass.setSaleActive(true);
 
-    //   //Send some floth to addr1.
-    //   await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
-    //   await floth.connect(addr1).delegate(addr1.address);
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
 
-    //   await flothPass.connect(addr1).mint(1);
+      // Check the balance of addr1
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("1000", 18));
 
-    //   expect(await flothPass.numberMinted(addr1)).to.equal(1);
-    // });
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      // Mint a pass from addr1
+      await flothPass.connect(addr1).mint(1);
+
+      // Check the number of minted passes for addr1
+      expect(await flothPass.numberMinted(addr1.address)).to.equal(1);
+    });
 
     it("Should allow admins to set the flothContract address", async function () {
       const newFlothAddress = "0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739";
@@ -89,8 +99,6 @@ describe("FlothPass Contract", function () {
       await expect(flothPass.connect(addr1).setFlothContract(newFlothAddress)).to.be.revertedWith(
         "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
       );
-
-      expect(await flothPass.flothContract()).to.equal(flothContractAddress);
     });
 
     it("Should revert if the floth contract is set to a zero address", async function () {
