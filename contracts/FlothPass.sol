@@ -74,11 +74,11 @@ contract FlothPass is
      * Initialize function for proxy.
      * Calls the internal initialize function.
      */
-    function initialize() public initializerERC721A initializer {
+    function initialize(address flothContractAddress) public initializerERC721A initializer {
         __ERC721A_init("Floth Pass", "FPASS");
         __ERC721AQueryable_init();
         __AccessControl_init();
-        __FlothPass_init();
+        __FlothPass_init(flothContractAddress);
 
         _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
         _setRoleAdmin(WITHDRAW_ROLE, ADMIN_ROLE);
@@ -88,14 +88,14 @@ contract FlothPass is
     /**
      * Initialize function which sets the defaults for state variables
      */
-    function __FlothPass_init() internal initializer {
+    function __FlothPass_init(address flothContractAddress) internal initializer {
         _currentBaseURI = "";
         maxSupply = 333;
         price = 1000 ether;
         priceIncrement = 50 ether;
         flothVault = 0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739;
         withdrawAddress = payable(0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739);
-        flothContract = IFloth(0xa2EA5Cb0614f6428421a39ec09B013cC3336EFBe);
+        flothContract = IFloth(flothContractAddress);
     }
 
     /**
@@ -155,6 +155,7 @@ contract FlothPass is
 
         // Update the number of mints since the last price increment
         mintsSinceLastIncrement = (uint16(totalMinted) + _quantity) % 10;
+
         price = currentPrice; // Update the price to the new current price
     }
 
