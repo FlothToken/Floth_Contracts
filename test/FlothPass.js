@@ -61,6 +61,114 @@ describe("FlothPass Contract", function () {
     });
   });
 
+  describe("Minting", function () {
+    it("Should allow a user to mint an NFT.", async function () {
+      // Activate the sale
+      await flothPass.setSaleActive(true);
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("1000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      await flothPass.connect(addr1).mint(1);
+
+      expect(await flothPass.numberMinted(addr1.address)).to.equal(1);
+    });
+
+    it("Should revert if the sale is inactive whilst minting.", async function () {
+      //Did not call setSaleActive(true) before minting.
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("1000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      await expect(flothPass.connect(addr1).mint(1)).to.be.revertedWithCustomError(flothPass, "SaleInactive");
+    });
+
+    it("Should revert if the totalMinted + quantity exceeds the max supply", async function () {
+      //setSaleActive(true)
+      await flothPass.setSaleActive(true);
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("1000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      //Mint 334 NFTs.
+      await flothPass.connect(addr1).mint(1);
+      await expect(flothPass.connect(addr1).mint(333)).to.be.revertedWithCustomError(flothPass, "ExceedsMaxSupply");
+    });
+
+    it("Should update the price after every 10 NFTs sold", async function () {
+      //setSaleActive(true)
+      await flothPass.setSaleActive(true);
+
+      //Initial price to equal 1000
+      expect(await flothPass.price()).to.equal(ethers.parseUnits("1000", 18));
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("10000000000", 18));
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("10000000000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("10000000000", 18));
+
+      //Mint 9 NFT
+      await flothPass.connect(addr1).mint(9);
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("9999991000", 18));
+
+      //expect price to still equal 1000
+      expect(await flothPass.price()).to.equal(ethers.parseUnits("1000", 18));
+
+      //Mint 10th NFT
+      await flothPass.connect(addr1).mint(1);
+
+      //expect price to still equal 1050
+      expect(await flothPass.price()).to.equal(ethers.parseUnits("1050", 18));
+
+      //Check balance decreased by 1000
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("9999990000", 18));
+
+      //Mint 11th NFT
+      await flothPass.connect(addr1).mint(1);
+
+      //Check balance decreased by 1050
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("9999988950", 18));
+    });
+
+    it("Should revert if user tries to mint without enough funds", async function () {
+      //setSaleActive(true)
+      await flothPass.setSaleActive(true);
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("1000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      //Mint 334 NFTs.
+      await flothPass.connect(addr1).mint(1);
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(0);
+      await expect(flothPass.connect(addr1).mint(1)).to.be.revertedWithCustomError(flothPass, "InsufficientFunds");
+    });
+  });
+
   describe("Setters and getters", function () {
     it("Should be able to get the number of minted passes for an address", async function () {
       // Initially, the number of minted passes should be 0
