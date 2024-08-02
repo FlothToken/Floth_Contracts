@@ -79,6 +79,21 @@ describe("FlothPass Contract", function () {
       expect(await flothPass.numberMinted(addr1.address)).to.equal(1);
     });
 
+    it("Should update the vault funds when minting", async function () {
+      await flothPass.setSaleActive(true);
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      const balanceBefore = await floth.balanceOf(flothPass.flothVault());
+
+      await flothPass.connect(addr1).mint(1);
+      expect(await floth.balanceOf(flothPass.flothVault())).to.equal(ethers.parseUnits("1000", 18));
+    });
+
     it("Should revert if the sale is inactive whilst minting.", async function () {
       //Did not call setSaleActive(true) before minting.
 
@@ -166,6 +181,49 @@ describe("FlothPass Contract", function () {
 
       expect(await floth.balanceOf(addr1.address)).to.equal(0);
       await expect(flothPass.connect(addr1).mint(1)).to.be.revertedWithCustomError(flothPass, "InsufficientFunds");
+    });
+  });
+
+  describe("Withdrawing", function () {
+    it("Should allow withdrawal of funds from the FLOTH contract to the withdrawl address", async function () {
+      const flothPassAddress = await flothPass.getAddress();
+
+      // Transfer some Floth tokens to floth contract
+      await floth.transfer(flothPassAddress, ethers.parseUnits("1000", 18));
+
+      const balanceBefore = await floth.balanceOf(flothPassAddress);
+      expect(balanceBefore).to.equal(ethers.parseUnits("1000", 18));
+
+      await flothPass.connect(owner).withdrawFLOTH(0, true);
+
+      const balanceAfter = await floth.balanceOf(flothPassAddress);
+      expect(balanceAfter).to.equal(0);
+
+      //Check withdrawAddress balance
+      expect(await floth.balanceOf(flothPass.withdrawAddress())).to.equal(ethers.parseUnits("1000", 18));
+    });
+
+    it("Should revert when withdrawing FLOTH if insufficient role", async function () {
+      const flothPassAddress = await flothPass.getAddress();
+
+      // Transfer some Floth tokens to floth contract
+      await floth.transfer(flothPassAddress, ethers.parseUnits("1000", 18));
+
+      //Try withdraw with addr1
+      await expect(flothPass.connect(addr1).withdrawFLOTH(0, true)).to.be.revertedWithCustomError(flothPass, "InsufficientRole");
+    });
+
+    it("Should revert if insufficient funds in contract when withdrawing FLOTH", async function () {
+      const flothPassAddress = await flothPass.getAddress();
+
+      // Transfer some Floth tokens to floth contract
+      await floth.transfer(flothPassAddress, ethers.parseUnits("1000", 18));
+
+      //Try withdraw with addr1
+      await expect(flothPass.connect(owner).withdrawFLOTH(ethers.parseUnits("10000", 18), false)).to.be.revertedWithCustomError(
+        flothPass,
+        "InsufficientFundsInContract"
+      );
     });
   });
 
