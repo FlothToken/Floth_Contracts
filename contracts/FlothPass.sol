@@ -80,9 +80,11 @@ contract FlothPass is
         __AccessControl_init();
         __FlothPass_init(flothContractAddress);
 
-        _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
+
+        _grantRole(ADMIN_ROLE, msg.sender);
         _setRoleAdmin(WITHDRAW_ROLE, ADMIN_ROLE);
         _grantRole(ADMIN_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /**
