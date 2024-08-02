@@ -19,9 +19,6 @@ contract Floth is ERC20Votes, Ownable {
     // Store DEX addresses to calculate if buy/sell/transfer.
     mapping(address => bool) public dexAddresses;
 
-    mapping(address => mapping(uint256 => uint256)) private pastVotes;
-
-
     // FLOTH protocol wallets.
     address public grantFundWallet = 0x315c76C23e8815Fe0dFd8DD626782C49647924Ba; // TODO Update to actual wallet.
     address public lpFundWallet = 0x86d9c457969bd9Bb102D0876D959601aF681882D; // TODO Update to actual wallet.
@@ -189,9 +186,5 @@ contract Floth is ERC20Votes, Ownable {
 
         uint256 totalPayable = _amount - taxAmount; // Final tax amount is deducted.
         super._transfer(_sender, _recipient, totalPayable);
-    }
-
-     function setPastVotes(address account, uint256 blockNumber, uint256 votes) external {
-        pastVotes[account][blockNumber] = votes;
     }
 }
