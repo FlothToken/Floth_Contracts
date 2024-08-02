@@ -214,6 +214,38 @@ contract FlothPass is
     }
 
     /**
+     * @dev Withdraws the FLOTH balance of the contract to the withdraw address if it exists.
+     * If it does not exist, it withdraws to the caller.
+     * Checks if caller has withdraw role or admin role.
+     * Checks if withdraw address is valid.
+     * @param _amount the amount to withdraw
+     * @param _withdrawAll if true, withdraws the entire balance of the contract
+     */
+    function withdrawFLOTH(uint256 _amount, bool _withdrawAll) external nonReentrant {
+        if (
+            !hasRole(WITHDRAW_ROLE, msg.sender) &&
+            !hasRole(ADMIN_ROLE, msg.sender)
+        ) {
+            revert InsufficientRole();
+        }
+
+        uint256 amountToWithdraw = _withdrawAll
+            ? flothContract.balanceOf(address(this))
+            : _amount;
+
+        // If _withdrawAll is false, then check if there are enough funds in the contract
+        if (!_withdrawAll && amountToWithdraw > flothContract.balanceOf(address(this))) {
+            revert InsufficientFundsInContract();
+        }
+
+        address recipient = withdrawAddress != address(0)
+            ? withdrawAddress
+            : msg.sender;
+
+        flothContract.transfer(recipient, amountToWithdraw);
+    }
+
+    /**
      * @dev Gets the number of floth passes minted for an owner.
      * @param _owner the owner of the floth passes to get the number minted for
      */

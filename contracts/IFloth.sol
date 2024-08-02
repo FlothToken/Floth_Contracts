@@ -13,6 +13,8 @@ interface IFloth {
 
     function getGrantFundWallet() external view returns (address);
 
+    function transfer(address recipient, uint256 amount) external returns (bool);
+
     function transferFrom(
         address sender,
         address recipient,
