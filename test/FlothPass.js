@@ -62,7 +62,7 @@ describe("FlothPass Contract", function () {
   });
 
   describe("Minting", function () {
-    it("Should allow a user to mint an NFT.", async function () {
+    it("Should allow a user to mint an NFT", async function () {
       // Activate the sale
       await flothPass.setSaleActive(true);
 
@@ -76,7 +76,7 @@ describe("FlothPass Contract", function () {
 
       await flothPass.connect(addr1).mint(1);
 
-      expect(await flothPass.numberMinted(addr1.address)).to.equal(1);
+      expect(await flothPass.getNumberMinted()).to.equal(1);
     });
 
     it("Should update the vault funds when minting", async function () {
@@ -230,7 +230,7 @@ describe("FlothPass Contract", function () {
   describe("Setters and getters", function () {
     it("Should be able to get the number of minted passes for an address", async function () {
       // Initially, the number of minted passes should be 0
-      expect(await flothPass.numberMinted(addr1.address)).to.equal(0);
+      expect(await flothPass.balanceOf(addr1.address)).to.equal(0);
 
       // Activate the sale
       await flothPass.setSaleActive(true);
@@ -248,7 +248,7 @@ describe("FlothPass Contract", function () {
       await flothPass.connect(addr1).mint(1);
 
       // Check the number of minted passes for addr1
-      expect(await flothPass.numberMinted(addr1.address)).to.equal(1);
+      expect(await flothPass.balanceOf(addr1.address)).to.equal(1);
     });
 
     it("Should allow admins to set the flothContract address", async function () {
@@ -268,7 +268,7 @@ describe("FlothPass Contract", function () {
     });
 
     it("Should revert if the floth contract is set to a zero address", async function () {
-      await expect(flothPass.connect(owner).setFlothContract(zeroAddress)).to.be.revertedWithCustomError(flothPass, "CannotDeployAsZeroAddress");
+      await expect(flothPass.connect(owner).setFlothContract(zeroAddress)).to.be.revertedWithCustomError(flothPass, "ZeroAddress");
     });
 
     it("Should allow admins to set the setBaseUri", async function () {

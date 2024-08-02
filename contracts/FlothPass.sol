@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Enumer
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721VotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "hardhat/console.sol";
 
 /**
  * @title FlothPass contract for minting Floth Pass NFTs.
@@ -48,12 +49,16 @@ contract FlothPass is
     // Whether the sale is active.
     bool public saleActive;
 
-    // Gap for upgradeability
-    uint256[50] private __gap;
+    // Custom name and symbol storage
+    string private _name;
+    string private _symbol;
 
     // Roles
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
+
+    // Gap for upgradeability
+    uint256[50] private __gap;
 
     // Events
     error SaleInactive();
@@ -77,6 +82,10 @@ contract FlothPass is
         __AccessControl_init();
         __ReentrancyGuard_init();
         __FlothPass_init(flothContractAddress);
+
+        _name = "Floth Pass";
+        _symbol = "FPASS";
+
 
         _grantRole(ADMIN_ROLE, msg.sender);
         _setRoleAdmin(WITHDRAW_ROLE, ADMIN_ROLE);
@@ -145,8 +154,7 @@ contract FlothPass is
 
         // Mint the quantity of tokens to the caller
         for (uint16 i = 0; i < _quantity; i++) {
-            _safeMint(msg.sender, numberMinted + i);
-            numberMinted += 1;
+            _safeMint(msg.sender, numberMinted += 1);
         }
 
         mintsSinceLastIncrement = (numberMinted + _quantity) % 10;
@@ -256,12 +264,12 @@ contract FlothPass is
         maxSupply = _newMaxSupply;
     }
 
-    /**
+   /**
      * @dev Setter for the contract symbol
      * @param _newSymbol the new symbol for the contract
      */
     function setSymbol(string calldata _newSymbol) external onlyRole(ADMIN_ROLE) {
-        _setSymbol(_newSymbol);
+        _symbol = _newSymbol;
     }
 
     /**
@@ -269,7 +277,7 @@ contract FlothPass is
      * @param _newName the new name for the contract
      */
     function setName(string calldata _newName) external onlyRole(ADMIN_ROLE) {
-        _setName(_newName);
+        _name = _newName;
     }
 
     /**
@@ -310,26 +318,21 @@ contract FlothPass is
         return _currentBaseURI;
     }
 
+
     /**
-     * @dev Internal function to set the symbol
-     * @param newSymbol the new symbol
+     * @dev Getter for the contract symbol
+     * @return the symbol of the contract
      */
-    function _setSymbol(string memory newSymbol) internal {
-        bytes32 position = keccak256("eip1967.proxy.symbol");
-        assembly {
-            sstore(position, newSymbol)
-        }
+    function symbol() public view override returns (string memory) {
+        return _symbol;
     }
 
     /**
-     * @dev Internal function to set the name
-     * @param newName the new name
+     * @dev Getter for the contract name
+     * @return the name of the contract
      */
-    function _setName(string memory newName) internal {
-        bytes32 position = keccak256("eip1967.proxy.name");
-        assembly {
-            sstore(position, newName)
-        }
+    function name() public view override returns (string memory) {
+        return _name;
     }
 
     /**
