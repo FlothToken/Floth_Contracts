@@ -185,7 +185,67 @@ describe("FlothPass Contract", function () {
   });
 
   describe("Withdrawing", function () {
-    it("Should allow withdrawal of funds from the FLOTH contract to the withdrawl address", async function () {
+    it("Should allow withdrawal of Flare funds from the FlothPASS contract to the withdrawl address", async function () {
+      const flothPassAddress = await flothPass.getAddress();
+
+      const [sender] = await ethers.getSigners();
+      const tx = await sender.sendTransaction({
+        to: flothPassAddress,
+        value: ethers.parseUnits("1000", 18), // Sending 1 Ether
+      });
+      await tx.wait();
+
+      const balanceBefore = await ethers.provider.getBalance(flothPassAddress);
+      expect(balanceBefore).to.equal(ethers.parseUnits("1000", 18));
+
+      //Check withdrawAddress balance before
+      expect(await ethers.provider.getBalance(flothPass.withdrawAddress())).to.equal(0);
+
+      await flothPass.connect(owner).withdraw(ethers.parseUnits("1000", 18), false);
+
+      const balanceAfter = await ethers.provider.getBalance(flothPassAddress);
+      expect(balanceAfter).to.equal(0);
+
+      //Check withdrawAddress balance after
+      expect(await ethers.provider.getBalance(flothPass.withdrawAddress())).to.equal(ethers.parseUnits("1000", 18));
+    });
+
+    it("Should revert when withdrawing flare with insufficient funds in contract", async function () {
+      const flothPassAddress = await flothPass.getAddress();
+
+      const [sender] = await ethers.getSigners();
+      const tx = await sender.sendTransaction({
+        to: flothPassAddress,
+        value: ethers.parseUnits("1000", 18), // Sending 1 Ether
+      });
+      await tx.wait();
+
+      await expect(flothPass.connect(owner).withdraw(ethers.parseUnits("10000", 18), false)).to.be.revertedWithCustomError(
+        flothPass,
+        "InsufficientFundsInContract"
+      );
+    });
+
+    it("should call the fallback function", async function () {
+      const flothPassAddress = await flothPass.getAddress();
+      const [sender] = await ethers.getSigners();
+
+      const tx = await sender.sendTransaction({
+        to: flothPassAddress,
+        data: "0x12345678", // Random data to trigger fallback
+        value: ethers.parseUnits("1000", 18), // Sending 1 Ether
+      });
+      await tx.wait();
+
+      // Check that the fallback function was called by listening to the event
+      await expect(tx).to.emit(flothPass, "FallbackCalled").withArgs(sender.address, ethers.parseUnits("1000", 18), "0x12345678");
+    });
+
+    it("Should revert when withdrawing flare with insufficient role", async function () {
+      await expect(flothPass.connect(addr1).withdraw(0, true)).to.be.revertedWithCustomError(flothPass, "InsufficientRole");
+    });
+
+    it("Should allow withdrawal of Floth funds from the FlothPASS contract to the withdrawl address", async function () {
       const flothPassAddress = await flothPass.getAddress();
 
       // Transfer some Floth tokens to floth contract
@@ -344,6 +404,55 @@ describe("FlothPass Contract", function () {
       await expect(flothPass.connect(addr1).setSaleActive(true)).to.be.revertedWith(
         "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
       );
+    });
+
+    it("should return the correct token URI", async function () {
+      const baseTokenURI = "https://example.com/token/";
+
+      //Activate the sale
+      await flothPass.setSaleActive(true);
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
+
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      await flothPass.connect(addr1).mint(1);
+
+      expect(await flothPass.getNumberMinted()).to.equal(1);
+
+      // Set the base URI
+      await flothPass.setBaseUri(baseTokenURI);
+
+      // Get the token URI
+      const tokenURI = await flothPass.tokenURI(1);
+      expect(tokenURI).to.equal(`${baseTokenURI}1`);
+    });
+
+    it("should return true for supported interfaces", async function () {
+      // ERC721 interface ID
+      const ERC721_INTERFACE_ID = "0x80ac58cd";
+      // ERC721Enumerable interface ID
+      const ERC721_ENUMERABLE_INTERFACE_ID = "0x780e9d63";
+      // AccessControl interface ID
+      const ACCESS_CONTROL_INTERFACE_ID = "0x7965db0b";
+
+      // Check if the contract supports ERC721 interface
+      expect(await flothPass.supportsInterface(ERC721_INTERFACE_ID)).to.equal(true);
+
+      // Check if the contract supports ERC721Enumerable interface
+      expect(await flothPass.supportsInterface(ERC721_ENUMERABLE_INTERFACE_ID)).to.equal(true);
+
+      // Check if the contract supports AccessControl interface
+      expect(await flothPass.supportsInterface(ACCESS_CONTROL_INTERFACE_ID)).to.equal(true);
+    });
+
+    it("should return false for unsupported interfaces", async function () {
+      // Random interface ID that is not supported
+      const UNSUPPORTED_INTERFACE_ID = "0xffffffff";
+
+      // Check if the contract supports the unsupported interface
+      expect(await flothPass.supportsInterface(UNSUPPORTED_INTERFACE_ID)).to.equal(false);
     });
   });
 });

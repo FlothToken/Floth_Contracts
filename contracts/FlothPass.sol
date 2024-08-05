@@ -60,7 +60,16 @@ contract FlothPass is
     // Gap for upgradeability
     uint256[50] private __gap;
 
+    // Function to receive Ether. msg.data must be empty.
+    receive() external payable {}
+
+    // Fallback function is called when msg.data is not empty.
+    fallback() external payable {
+        emit FallbackCalled(msg.sender, msg.value, msg.data);
+    }
+
     // Events
+    event FallbackCalled(address sender, uint256 value, bytes data);
     error SaleInactive();
     error InsufficientFunds();
     error InsufficientFundsInContract();
