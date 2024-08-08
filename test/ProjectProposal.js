@@ -107,6 +107,18 @@ describe("ProjectProposal Contract", function () {
       expect(proposal.receiver).to.equal(addr2.address);
     });
 
+    it("Should allow updating the nftMultiplier", async function () {
+      await projectProposal.connect(owner).setNftMultiplier(10);
+      const nftMultiplier = await projectProposal.nftMultiplier();
+      expect(nftMultiplier).to.equal(10);
+    });
+
+    it("Should shouldn't allow non admins to update the nftMultiplier", async function () {
+      await expect(projectProposal.connect(addr1).setNftMultiplier(10)).to.be.revertedWith(
+        "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
+      );
+    });
+
     it("Should not allow updating the proposal receiver address if voting period is open", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
@@ -1103,14 +1115,22 @@ describe("ProjectProposal Contract", function () {
       expect(power).to.equal(1 * 200);
     });
 
-    "Should return zero voting power if snapshot has not been taken",
-      async function () {
-        await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-          value: ethers.parseUnits("10", 18),
-        });
+    it("Should return zero Floth voting power if snapshot has not been taken", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
 
-        const power = await projectProposal.getFlothVotingPower(addr2.address);
-        expect(power).to.equal(0);
-      };
+      const power = await projectProposal.getFlothVotingPower(addr2.address);
+      expect(power).to.equal(0);
+    });
+
+    it("Should return zero total voting power if snapshot has not been taken", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      const power = await projectProposal.getTotalVotingPower(addr2.address);
+      expect(power).to.equal(0);
+    });
   });
 });

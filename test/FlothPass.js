@@ -323,7 +323,7 @@ describe("FlothPass Contract", function () {
       const newFlothAddress = "0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739";
 
       await expect(flothPass.connect(addr1).setFlothContract(newFlothAddress)).to.be.revertedWith(
-        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+        "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
       );
     });
 
@@ -339,7 +339,7 @@ describe("FlothPass Contract", function () {
 
     it("Should not allow non-admins to set the symbol", async function () {
       await expect(flothPass.connect(addr1).setBaseUri("test")).to.be.revertedWith(
-        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+        "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
       );
     });
 
@@ -357,7 +357,7 @@ describe("FlothPass Contract", function () {
 
     it("Should not allow non-admins to set the symbol", async function () {
       await expect(flothPass.connect(addr1).setSymbol("0xCrock")).to.be.revertedWith(
-        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+        "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
       );
     });
 
@@ -375,7 +375,7 @@ describe("FlothPass Contract", function () {
 
     it("Should not allow non-admins to set the mint price", async function () {
       await expect(flothPass.connect(addr1).setMintPrice(600)).to.be.revertedWith(
-        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+        "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
       );
     });
 
@@ -390,7 +390,7 @@ describe("FlothPass Contract", function () {
       const newWithdrawAddress = "0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739";
 
       await expect(flothPass.connect(addr1).setWithdrawAddress(newWithdrawAddress)).to.be.revertedWith(
-        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+        "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
       );
     });
 
@@ -402,7 +402,7 @@ describe("FlothPass Contract", function () {
 
     it("Should not allow non-admins to set the saleActive", async function () {
       await expect(flothPass.connect(addr1).setSaleActive(true)).to.be.revertedWith(
-        "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+        "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
       );
     });
 
