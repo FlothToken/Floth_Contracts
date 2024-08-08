@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "hardhat/console.sol";
 import "./IFloth.sol";
+import "./IFlothPass.sol";
 
 /**
  * @title ProjectProposal contract for the Floth protocol
@@ -18,24 +19,29 @@ contract ProjectProposal is AccessControlUpgradeable {
     // Define the Floth interface
     IFloth internal floth;
 
+    // Define the FlothPass interface
+    IFlothPass internal flothPass;
+
     // Gap for upgradeability
     uint256[50] private __gap;
 
-    function initialize(address _flothAddress) public initializer {
+    function initialize(address _flothAddress, address _flothPassAddress) public initializer {
         __AccessControl_init();
-        __ProjectProposal_init(_flothAddress);
+        __ProjectProposal_init(_flothAddress, _flothPassAddress);
     }
 
     /**
      * Initializer for the ProjectProposal contract
      * @param _flothAddress The address of the Floth contract
+     * @param _flothPassAddress The address of the FlothPass contract
      */
 
-    function __ProjectProposal_init(address _flothAddress) internal initializer {
+    function __ProjectProposal_init(address _flothAddress, address _flothPassAddress) internal initializer {
         if (_flothAddress == address(0)) {
             revert ZeroAddress();
         }
         floth = IFloth(_flothAddress);
+        flothPass = IFlothPass(_flothPassAddress);
 
         _setRoleAdmin(SNAPSHOTTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
@@ -83,6 +89,9 @@ contract ProjectProposal is AccessControlUpgradeable {
         uint256 voteCount;
     }
 
+    //The multiplier constant for holding a FlothPass.
+    uint256 public nftMultiplier = 200;
+
     //Tracks ID number for each proposal.
     uint256 public proposalId;
 
@@ -121,6 +130,9 @@ contract ProjectProposal is AccessControlUpgradeable {
 
     // Tracks the proposals that an address has voted on.
     mapping(address => mapping(uint256 => Votes[])) public votedOnProposals; // (address => (roundId => Votes[]))
+
+    // Tracks the FlothPass voting power at a snapshot block.
+    mapping(uint256 => mapping(address => uint256)) public flothPassesOwned; // (snapshotBlock => (FlothPass Owner => number of FlothPass' owned))
 
     //Keeps track of all round IDs.
     uint256[] roundIds;
@@ -341,7 +353,7 @@ contract ProjectProposal is AccessControlUpgradeable {
 
         //If they haven't voted yet, set votingPowerByRound, else retrieve current voting power.
         if(!hasVoted){
-            currentVotingPower = getVotingPower(msg.sender);
+            currentVotingPower = getVotingPower(msg.sender) + (flothPassesOwned[currentRound.snapshotBlock][msg.sender] * nftMultiplier);
             votingPowerByRound[msg.sender][currentRound.id] = currentVotingPower;
         }else{
             currentVotingPower = votingPowerByRound[msg.sender][currentRound.id];
@@ -360,7 +372,7 @@ contract ProjectProposal is AccessControlUpgradeable {
                 }
             }
 
-            uint256 votingPower = getVotingPower(msg.sender); //Voting power re-retrieved as may be reduced if previously voted.
+            uint256 votingPower = getVotingPower(msg.sender) + (flothPassesOwned[currentRound.snapshotBlock][msg.sender] * nftMultiplier); //Voting power re-retrieved as may be reduced if previously voted.
             proposal.votesReceived += votingPower; //Give all voting power to abstain proposal.
             votingPowerByRound[msg.sender][currentRound.id] = 0; //All voting power is removed.
             hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
@@ -579,9 +591,22 @@ contract ProjectProposal is AccessControlUpgradeable {
         if(round.snapshotBlock == 0){
             round.snapshotBlock = block.number;
             round.snapshotDatetime = block.timestamp; //Set the actual snapshot time.
+            _getFlothPassesOwned(round.snapshotBlock);
         }
 
         emit SnapshotTaken(round.id, round.snapshotBlock);
+    }
+
+    function _getFlothPassesOwned(uint256 _snapshotBlock) internal {
+        uint256 numberMinted = flothPass.getNumberMinted();
+
+        //Starts at 1 as the first FlothPass minted is 1 not 0.
+        for (uint256 i = 1; i <= numberMinted; i++) {
+            address owner = flothPass.ownerOf(i);
+
+            //Update the mapping with the number of FlothPass' owned by an address.
+            flothPassesOwned[_snapshotBlock][owner]++;
+        }
     }
 
     /**
