@@ -614,7 +614,7 @@ describe("ProjectProposal Contract", function () {
 
       await ethers.provider.send("evm_mine");
 
-      const power = await projectProposal.getVotingPower(addr2.address);
+      const power = await projectProposal.getFlothVotingPower(addr2.address);
       console.log("Voting power = " + power.toString());
 
       //Use 10 votes.
@@ -625,7 +625,7 @@ describe("ProjectProposal Contract", function () {
       expect(remainingVotingPower).to.equal(ethers.parseUnits("20", 18));
     });
 
-    it("Should return 0 if getVotingPower is called but a snapshot hasn't been taken", async function () {
+    it("Should return 0 if getFlothVotingPower is called but a snapshot hasn't been taken", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
@@ -640,8 +640,49 @@ describe("ProjectProposal Contract", function () {
 
       await ethers.provider.send("evm_mine");
 
-      const power = await projectProposal.getVotingPower(addr2.address);
+      const power = await projectProposal.getFlothVotingPower(addr2.address);
       expect(power).to.equal(0);
+    });
+
+    it("Should correctly account for a users FLOTH and FlothPass in the voting power.", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine");
+
+      // Transfer 4000 Floth tokens to addr1.
+      await floth.transfer(addr1.address, ethers.parseUnits("4000", 18));
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("4000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("2000", 18));
+
+      //Activate sale.
+      await flothPass.connect(owner).setSaleActive(true);
+
+      //Mint 2 FlothPass token for addr1. (Spent 2000 Floth).
+      await flothPass.connect(addr1).mint(2);
+
+      await projectProposal.takeSnapshot();
+
+      await ethers.provider.send("evm_mine");
+
+      //Check total voting power.
+      const totalPower = await projectProposal.getTotalVotingPower(addr1.address);
+
+      const flothPassVotingPower = (await projectProposal.nftMultiplier()) * (await flothPass.balanceOf(addr1.address));
+
+      //Expect flothPassVotingPower = 400;
+      expect(flothPassVotingPower).to.equal(400);
+
+      const flothVotingPower = await projectProposal.getFlothVotingPower(addr1.address);
+
+      expect(totalPower).to.equal(flothPassVotingPower + flothVotingPower);
     });
 
     it("Should revert if trying to remove votes without having voted", async function () {
@@ -1003,7 +1044,7 @@ describe("ProjectProposal Contract", function () {
       expect(rounds.length).to.equal(0);
     });
 
-    it("Should be able to get voting power for an address", async function () {
+    it("Should be able to get Floth voting power for an address", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -1021,8 +1062,45 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_increaseTime", [100]);
       await ethers.provider.send("evm_mine");
 
-      const power = await projectProposal.getVotingPower(addr2.address);
+      const power = await projectProposal.getFlothVotingPower(addr2.address);
       expect(power).to.equal(ethers.parseUnits("30", 18));
+    });
+
+    it("Should be able to get FlothPass voting power for an address", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      // Transfer 4000 Floth tokens to addr1.
+      await floth.transfer(addr1.address, ethers.parseUnits("4000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      //Activate sale.
+      await flothPass.connect(owner).setSaleActive(true);
+
+      //Mint 2 FlothPass token for addr1.
+      await flothPass.connect(addr1).mint(1);
+
+      await ethers.provider.send("evm_increaseTime", [7300]);
+      await ethers.provider.send("evm_mine");
+
+      await projectProposal.takeSnapshot();
+
+      await ethers.provider.send("evm_increaseTime", [100]);
+      await ethers.provider.send("evm_mine");
+
+      const round = await projectProposal.getRoundById(1);
+      const snapshotBlock = round.snapshotBlock;
+
+      console.log("Snapshot block = " + snapshotBlock);
+
+      const power = (await projectProposal.flothPassesOwned(snapshotBlock, addr1.address)) * (await projectProposal.nftMultiplier());
+
+      console.log("Power = " + power);
+
+      expect(power).to.equal(1 * 200);
     });
 
     "Should return zero voting power if snapshot has not been taken",
@@ -1031,7 +1109,7 @@ describe("ProjectProposal Contract", function () {
           value: ethers.parseUnits("10", 18),
         });
 
-        const power = await projectProposal.getVotingPower(addr2.address);
+        const power = await projectProposal.getFlothVotingPower(addr2.address);
         expect(power).to.equal(0);
       };
   });

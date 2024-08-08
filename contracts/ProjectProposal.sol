@@ -363,7 +363,7 @@ contract ProjectProposal is AccessControlUpgradeable {
 
         //If they haven't voted yet, set votingPowerByRound, else retrieve current voting power.
         if(!hasVoted){
-            currentVotingPower = getVotingPower(msg.sender) + (flothPassesOwned[currentRound.snapshotBlock][msg.sender] * nftMultiplier);
+            currentVotingPower = getFlothVotingPower(msg.sender) + (flothPassesOwned[currentRound.snapshotBlock][msg.sender] * nftMultiplier);
             votingPowerByRound[msg.sender][currentRound.id] = currentVotingPower;
         }else{
             currentVotingPower = votingPowerByRound[msg.sender][currentRound.id];
@@ -382,7 +382,7 @@ contract ProjectProposal is AccessControlUpgradeable {
                 }
             }
 
-            uint256 votingPower = getVotingPower(msg.sender) + (flothPassesOwned[currentRound.snapshotBlock][msg.sender] * nftMultiplier); //Voting power re-retrieved as may be reduced if previously voted.
+            uint256 votingPower = getFlothVotingPower(msg.sender) + (flothPassesOwned[currentRound.snapshotBlock][msg.sender] * nftMultiplier); //Voting power re-retrieved as may be reduced if previously voted.
             proposal.votesReceived += votingPower; //Give all voting power to abstain proposal.
             votingPowerByRound[msg.sender][currentRound.id] = 0; //All voting power is removed.
             hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
@@ -759,16 +759,38 @@ contract ProjectProposal is AccessControlUpgradeable {
     }
 
     /**
-     * Get voting power for a wallet
+     * Get total voting power for holding Floth and FlothPass.
      * @param _address the address to get voting power
      */
-    function getVotingPower(address _address) public view returns (uint256) {
+    function getTotalVotingPower(address _address) public view returns (uint256) {
         Round memory latestRound = getLatestRound();
 
         if(latestRound.snapshotBlock == 0){
             return 0;
         }
         uint256 snapshotBlock = latestRound.snapshotBlock;
+
+        //Get voting power for holding Floth.
+        uint256 flothVotingPower = floth.getPastVotes(_address, snapshotBlock);
+
+        //Get voting power for holding FlothPass.
+        uint256 nftVotingPower = flothPassesOwned[snapshotBlock][_address] * nftMultiplier;
+
+        return flothVotingPower + nftVotingPower;
+    }
+
+    /**
+     * Get voting power for holding Floth.
+     * @param _address the address to get voting power
+     */
+    function getFlothVotingPower(address _address) public view returns (uint256) {
+        Round memory latestRound = getLatestRound();
+
+        if(latestRound.snapshotBlock == 0){
+            return 0;
+        }
+        uint256 snapshotBlock = latestRound.snapshotBlock;
+
         return floth.getPastVotes(_address, snapshotBlock);
     }
 
