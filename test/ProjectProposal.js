@@ -8,8 +8,10 @@ describe("ProjectProposal Contract", function () {
   let projectProposal;
   let owner;
   let floth;
+  let flothPass;
   let dexAddress;
   let flothAddress;
+  let flothPassAddress;
   let addr1;
   let addr2;
   let currentTime;
@@ -28,8 +30,15 @@ describe("ProjectProposal Contract", function () {
 
     flothAddress = await floth.getAddress();
 
+    // Deploy FlothPass contract using deployProxy
+    FlothPass = await ethers.getContractFactory("FlothPass");
+    flothPass = await upgrades.deployProxy(FlothPass, [flothAddress], { kind: "transparent" });
+    await flothPass.waitForDeployment();
+
+    flothPassAddress = await flothPass.getAddress();
+
     const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
-    projectProposal = await upgrades.deployProxy(ProjectProposalFactory, [flothAddress], { kind: "transparent" });
+    projectProposal = await upgrades.deployProxy(ProjectProposalFactory, [flothAddress, flothPassAddress], { kind: "transparent" });
     await projectProposal.waitForDeployment();
 
     const block = await ethers.provider.getBlock("latest");
@@ -40,7 +49,7 @@ describe("ProjectProposal Contract", function () {
     it("Should revert when deployed with zero address", async function () {
       const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
 
-      await expect(upgrades.deployProxy(ProjectProposalFactory, [zeroAddress], { kind: "transparent" })).to.be.revertedWithCustomError(
+      await expect(upgrades.deployProxy(ProjectProposalFactory, [zeroAddress, zeroAddress], { kind: "transparent" })).to.be.revertedWithCustomError(
         ProjectProposalFactory,
         "ZeroAddress"
       );

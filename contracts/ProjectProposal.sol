@@ -22,6 +22,9 @@ contract ProjectProposal is AccessControlUpgradeable {
     // Define the FlothPass interface
     IFlothPass internal flothPass;
 
+    //The multiplier constant for holding a FlothPass.
+    uint256 public nftMultiplier;
+
     // Gap for upgradeability
     uint256[50] private __gap;
 
@@ -37,11 +40,13 @@ contract ProjectProposal is AccessControlUpgradeable {
      */
 
     function __ProjectProposal_init(address _flothAddress, address _flothPassAddress) internal initializer {
-        if (_flothAddress == address(0)) {
+        if (_flothAddress == address(0) || _flothPassAddress == address(0)) {
             revert ZeroAddress();
         }
         floth = IFloth(_flothAddress);
         flothPass = IFlothPass(_flothPassAddress);
+
+        nftMultiplier = 200;
 
         _setRoleAdmin(SNAPSHOTTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
@@ -88,9 +93,6 @@ contract ProjectProposal is AccessControlUpgradeable {
         uint256 proposalId;
         uint256 voteCount;
     }
-
-    //The multiplier constant for holding a FlothPass.
-    uint256 public nftMultiplier = 200;
 
     //Tracks ID number for each proposal.
     uint256 public proposalId;
@@ -266,6 +268,14 @@ contract ProjectProposal is AccessControlUpgradeable {
             _title,
             _amountRequested
         );
+    }
+
+    /**
+     * Function to set how much multiplier to use for a FlothPass' voting power.
+     * @param _nftMultiplier The multiplier for the NFT voting power.
+     */
+    function setNftMultiplier(uint256 _nftMultiplier) external onlyRole(ADMIN_ROLE) {
+        nftMultiplier = _nftMultiplier;
     }
 
     /**
