@@ -363,7 +363,7 @@ contract ProjectProposal is AccessControlUpgradeable {
 
         //If they haven't voted yet, set votingPowerByRound, else retrieve current voting power.
         if(!hasVoted){
-            currentVotingPower = getFlothVotingPower(msg.sender) + (flothPassesOwned[currentRound.snapshotBlock][msg.sender] * nftMultiplier);
+            currentVotingPower = getFlothVotingPower(msg.sender) + getFlothPassVotingPower(msg.sender);
             votingPowerByRound[msg.sender][currentRound.id] = currentVotingPower;
         }else{
             currentVotingPower = votingPowerByRound[msg.sender][currentRound.id];
@@ -382,7 +382,9 @@ contract ProjectProposal is AccessControlUpgradeable {
                 }
             }
 
-            uint256 votingPower = getFlothVotingPower(msg.sender) + (flothPassesOwned[currentRound.snapshotBlock][msg.sender] * nftMultiplier); //Voting power re-retrieved as may be reduced if previously voted.
+             //Voting power re-retrieved as may be reduced if previously voted.
+            uint256 votingPower = getFlothVotingPower(msg.sender) + getFlothPassVotingPower(msg.sender);
+            
             proposal.votesReceived += votingPower; //Give all voting power to abstain proposal.
             votingPowerByRound[msg.sender][currentRound.id] = 0; //All voting power is removed.
             hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
@@ -780,7 +782,7 @@ contract ProjectProposal is AccessControlUpgradeable {
     }
 
     /**
-     * Get voting power for holding Floth.
+     * Get voting power for holding Floth token.
      * @param _address the address to get voting power
      */
     function getFlothVotingPower(address _address) public view returns (uint256) {
@@ -792,6 +794,21 @@ contract ProjectProposal is AccessControlUpgradeable {
         uint256 snapshotBlock = latestRound.snapshotBlock;
 
         return floth.getPastVotes(_address, snapshotBlock);
+    }
+
+    /**
+     * Get voting power for holding FlothPass token.
+     * @param _address the address to get voting power
+     */
+    function getFlothPassVotingPower(address _address) public view returns (uint256) {
+        Round memory latestRound = getLatestRound();
+
+        if(latestRound.snapshotBlock == 0){
+            return 0;
+        }
+        uint256 snapshotBlock = latestRound.snapshotBlock;
+
+        return flothPass.getPastVotes(_address, snapshotBlock) * nftMultiplier;
     }
 
     /**
