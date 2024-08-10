@@ -7,4 +7,9 @@ interface IFlothPass {
     function getNumberMinted() external view returns (uint16);
 
     function ownerOf(uint256 tokenId) external view returns (address);
+
+    function getPastVotes(
+        address account,
+        uint256 timepoint
+    ) external view returns (uint256);
 }
