@@ -37,6 +37,9 @@ contract FlothPass is
     // Price increment for every 10 tokens minted.
     uint256 public priceIncrement;
 
+    // Mapping from address to list of owned token IDs
+    mapping(address => uint256[]) private _ownedTokens;
+
     // Number of tokens minted.
     uint16 public numberMinted;
 
@@ -164,6 +167,7 @@ contract FlothPass is
         // Mint the quantity of tokens to the caller
         for (uint16 i = 0; i < _quantity; i++) {
             _safeMint(msg.sender, numberMinted += 1);
+            _addTokenToOwnerMapping(msg.sender, numberMinted);
         }
 
         mintsSinceLastIncrement = (numberMinted + _quantity) % 10;
@@ -247,6 +251,15 @@ contract FlothPass is
      */
     function getNumberMinted() external view returns (uint16) {
         return numberMinted;
+    }
+
+    /**
+     * @dev Getter the owned tokens of an address
+     * @param owner the address to get the owned tokens for
+     * @return the owned tokens of the address
+     */
+    function tokensOfOwner(address owner) public view returns (uint256[] memory) {
+        return _ownedTokens[owner];
     }
 
     /**
@@ -347,13 +360,30 @@ contract FlothPass is
     /**
      * @dev Internal override for the before token transfer function
      * This is to ensure that all logic is called before a token is transferred
+     * Updates the owner mappings for the token
      * @param from the address to transfer from
      * @param to the address to transfer to
      * @param tokenId the token id
      * @param batchSize the batch size
      */
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
+    // Override _beforeTokenTransfer to track token ownership
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 batchSize
+    ) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
+
+        if (from != address(0)) {
+            // Remove the token from the previous owner's list
+            _removeTokenFromOwnerMapping(from, tokenId);
+        }
+
+        if (to != address(0)) {
+            // Add the token to the new owner's list
+            _addTokenToOwnerMapping(to, tokenId);
+        }
     }
 
     /**
@@ -366,5 +396,38 @@ contract FlothPass is
      */
     function _afterTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override(ERC721Upgradeable, ERC721VotesUpgradeable) {
         super._afterTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    /**
+     * @dev Adds a token to the owner's list
+     * @param to the address to add the token to
+     * @param tokenId the token id to add
+     */
+    function _addTokenToOwnerMapping(address to, uint256 tokenId) private {
+        _ownedTokens[to].push(tokenId);
+    }
+
+    /**
+     * @dev Removes a token from the owner's list
+     * @param from the address to remove the token from
+     * @param tokenId the token id to remove
+     */
+    function _removeTokenFromOwnerMapping(address from, uint256 tokenId) private {
+        uint256 lastTokenIndex = _ownedTokens[from].length - 1;
+        uint256 tokenIndex;
+
+        // Find the index of the token to be removed
+        for (uint256 i = 0; i < _ownedTokens[from].length; i++) {
+            if (_ownedTokens[from][i] == tokenId) {
+                tokenIndex = i;
+                break;
+            }
+        }
+
+        // Move the last token to the slot of the one being removed
+        _ownedTokens[from][tokenIndex] = _ownedTokens[from][lastTokenIndex];
+
+        // Remove the last element
+        _ownedTokens[from].pop();
     }
 }
