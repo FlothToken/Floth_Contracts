@@ -674,6 +674,9 @@ describe("ProjectProposal Contract", function () {
       // Approve the FlothPass contract to spend Floth tokens from addr1
       await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("2000", 18));
 
+      //Delegate addr1 to itself.
+      await flothPass.connect(addr1).delegate(addr1.address);
+
       //Activate sale.
       await flothPass.connect(owner).setSaleActive(true);
 
@@ -687,7 +690,7 @@ describe("ProjectProposal Contract", function () {
       //Check total voting power.
       const totalPower = await projectProposal.getTotalVotingPower(addr1.address);
 
-      const flothPassVotingPower = (await projectProposal.nftMultiplier()) * (await flothPass.balanceOf(addr1.address));
+      const flothPassVotingPower = await projectProposal.getFlothPassVotingPower(addr1.address);
 
       //Expect flothPassVotingPower = 400;
       expect(flothPassVotingPower).to.equal(400);
@@ -704,6 +707,89 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
 
       await expect(projectProposal.connect(addr1).removeVotesFromProposal(2)).to.be.revertedWithCustomError(projectProposal, "UserVoteNotFound");
+    });
+
+    it("Should get the correct FlothPass voting power", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine");
+
+      // Transfer 4000 Floth tokens to addr1.
+      await floth.transfer(addr1.address, ethers.parseUnits("4000", 18));
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("4000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("2000", 18));
+
+      //Activate sale.
+      await flothPass.connect(owner).setSaleActive(true);
+
+      //Delegate addr1 to itself.
+      await flothPass.connect(addr1).delegate(addr1.address);
+
+      //Mint 2 FlothPass token for addr1. (Spent 2000 Floth).
+      await flothPass.connect(addr1).mint(2);
+
+      await projectProposal.takeSnapshot();
+
+      await ethers.provider.send("evm_mine");
+
+      //Check flothpass voting power.
+      const flothPassVotingPower = await projectProposal.getFlothPassVotingPower(addr1.address);
+
+      //Expect flothPassVotingPower = 400;
+      expect(flothPassVotingPower).to.equal(400);
+    });
+
+    it("Should still have the voting power after a snapshot even when the nft has been sold", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine");
+
+      // Transfer 4000 Floth tokens to addr1.
+      await floth.transfer(addr1.address, ethers.parseUnits("4000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("2000", 18));
+
+      //Activate sale.
+      await flothPass.connect(owner).setSaleActive(true);
+
+      //Delegate addr1 to itself.
+      await flothPass.connect(addr1).delegate(addr1.address);
+
+      //Mint 2 FlothPass token for addr1. (Spent 2000 Floth).
+      await flothPass.connect(addr1).mint(2);
+
+      await projectProposal.takeSnapshot();
+
+      await ethers.provider.send("evm_mine");
+
+      //Check flothpass voting power.
+      const flothPassVotingPower = await projectProposal.getFlothPassVotingPower(addr1.address);
+
+      //Expect flothPassVotingPower = 400 (2 FlothPass tokens * 200 nftmultiplier)
+      expect(flothPassVotingPower).to.equal(400);
+
+      //Sell the NFT.
+      await flothPass.connect(addr1).transferFrom(addr1.address, addr2.address, 1);
+
+      //Check flothpass voting power still the same.
+      const flothPassVotingPowerAfterSale = await projectProposal.getFlothPassVotingPower(addr1.address);
+
+      //Expect flothPassVotingPower = 400;
+      expect(flothPassVotingPowerAfterSale).to.equal(400);
     });
 
     it("Should get total votes for a round", async function () {
