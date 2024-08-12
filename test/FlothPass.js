@@ -184,6 +184,67 @@ describe("FlothPass Contract", function () {
     });
   });
 
+  describe("Transfers", function () {
+    it("Should allow a user to transfer an NFT", async function () {
+      // Activate the sale
+      await flothPass.setSaleActive(true);
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("1000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      await flothPass.connect(addr1).mint(1);
+
+      // Transfer the NFT to addr2
+      await flothPass.connect(addr1).transferFrom(addr1.address, addr2.address, 1);
+
+      expect(await flothPass.balanceOf(addr1.address)).to.equal(0);
+      expect(await flothPass.balanceOf(addr2.address)).to.equal(1);
+    });
+
+    it("Should remove the ownership of an NFT from a user when transferred", async function () {
+      // Activate the sale
+      await flothPass.setSaleActive(true);
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
+
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("1000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      await flothPass.connect(addr1).mint(1);
+
+      // Check if addr1 owns the NFT
+      expect(await flothPass.ownerOf(1)).to.equal(addr1.address);
+      expect(await flothPass.balanceOf(addr1.address)).to.equal(1);
+      const ownedByAddr1 = await flothPass.tokensOfOwner(addr1.address);
+      expect(ownedByAddr1.length).to.equal(1);
+      expect(ownedByAddr1[0]).to.equal(1);
+      const ownedByAddr2 = await flothPass.tokensOfOwner(addr2.address);
+      expect(ownedByAddr2.length).to.equal(0);
+
+      // Transfer the NFT to addr2
+      await flothPass.connect(addr1).transferFrom(addr1.address, addr2.address, 1);
+
+      // Check if addr1 no longer owns the NFT
+      expect(await flothPass.balanceOf(addr1.address)).to.equal(0);
+      const newOwnedByAddr1 = await flothPass.tokensOfOwner(addr1.address);
+      expect(newOwnedByAddr1.length).to.equal(0);
+
+      //Check if addr2 now owns the NFT
+      expect(await flothPass.balanceOf(addr2.address)).to.equal(1);
+      const newOwnedByAddr2 = await flothPass.tokensOfOwner(addr2.address);
+      expect(newOwnedByAddr2.length).to.equal(1);
+      expect(newOwnedByAddr2[0]).to.equal(1);
+    });
+  });
+
   describe("Withdrawing", function () {
     it("Should allow withdrawal of Flare funds from the FlothPASS contract to the withdrawl address", async function () {
       const flothPassAddress = await flothPass.getAddress();
@@ -288,6 +349,36 @@ describe("FlothPass Contract", function () {
   });
 
   describe("Setters and getters", function () {
+    // get tokensOfOwner
+    it("Should be able to get the tokens of an owner", async function () {
+      // Initially, the number of minted passes should be 0
+      expect(await flothPass.balanceOf(addr1.address)).to.equal(0);
+
+      // Activate the sale
+      await flothPass.setSaleActive(true);
+
+      // Transfer some Floth tokens to addr1
+      await floth.transfer(addr1.address, ethers.parseUnits("1000", 18));
+
+      // Check the balance of addr1
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("1000", 18));
+
+      // Approve the FlothPass contract to spend Floth tokens from addr1
+      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("1000", 18));
+
+      // Mint a pass from addr1
+      await flothPass.connect(addr1).mint(1);
+
+      // Check the number of minted passes for addr1
+      expect(await flothPass.balanceOf(addr1.address)).to.equal(1);
+
+      // Check the tokens of addr1
+      const ownedTokens = await flothPass.tokensOfOwner(addr1.address);
+
+      expect(ownedTokens.length).to.equal(1);
+      // expect(ownedTokens[0]).to.equal(1);
+    });
+
     it("Should be able to get the number of minted passes for an address", async function () {
       // Initially, the number of minted passes should be 0
       expect(await flothPass.balanceOf(addr1.address)).to.equal(0);
@@ -392,6 +483,10 @@ describe("FlothPass Contract", function () {
       await expect(flothPass.connect(addr1).setWithdrawAddress(newWithdrawAddress)).to.be.revertedWith(
         "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
       );
+    });
+
+    it("Should revert if the withdraw address is set to a zero address", async function () {
+      await expect(flothPass.connect(owner).setWithdrawAddress(zeroAddress)).to.be.revertedWithCustomError(flothPass, "ZeroAddress");
     });
 
     it("Should allow admins to set the saleActive", async function () {

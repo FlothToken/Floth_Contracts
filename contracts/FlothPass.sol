@@ -167,7 +167,6 @@ contract FlothPass is
         // Mint the quantity of tokens to the caller
         for (uint16 i = 0; i < _quantity; i++) {
             _safeMint(msg.sender, numberMinted += 1);
-            _addTokenToOwnerMapping(msg.sender, numberMinted);
         }
 
         mintsSinceLastIncrement = (numberMinted + _quantity) % 10;
