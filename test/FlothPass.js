@@ -550,4 +550,13 @@ describe("FlothPass Contract", function () {
       expect(await flothPass.supportsInterface(UNSUPPORTED_INTERFACE_ID)).to.equal(false);
     });
   });
+
+  describe("Upgrades", function () {
+    it("Should be able to upgrade the contract", async function () {
+      const FlothPassV2 = await ethers.getContractFactory("FlothPassUpgrade");
+      const flothPassV2 = await upgrades.upgradeProxy(await flothPass.getAddress(), FlothPassV2);
+
+      expect(await flothPassV2.isContractUpgraded()).to.equal("Contract is upgraded");
+    });
+  });
 });

@@ -1219,4 +1219,13 @@ describe("ProjectProposal Contract", function () {
       expect(power).to.equal(0);
     });
   });
+
+  describe("Upgrades", function () {
+    it("Should be able to upgrade the contract", async function () {
+      const ProjectProposalV2 = await ethers.getContractFactory("ProjectProposalUpgrade");
+      const projectProposalV2 = await upgrades.upgradeProxy(await projectProposal.getAddress(), ProjectProposalV2);
+
+      expect(await projectProposalV2.isContractUpgraded()).to.equal("Contract is upgraded");
+    });
+  });
 });
