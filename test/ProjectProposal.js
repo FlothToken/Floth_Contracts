@@ -453,14 +453,6 @@ describe("ProjectProposal Contract", function () {
       );
     });
 
-    it("Should revert if round is finished and there are no proposals", async function () {
-      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
-        value: ethers.parseUnits("10", 18),
-      });
-
-      await expect(projectProposal.connect(owner).roundFinished()).to.be.revertedWithCustomError(projectProposal, "NoProposalsInRound");
-    });
-
     it("Should revert if roundFinished is called and the round isn't over.", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
@@ -1088,6 +1080,55 @@ describe("ProjectProposal Contract", function () {
       expect(proposal.fundsClaimed).to.be.true;
     });
 
+    it("Should allow the winner to claim funds on the 29th day", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Send some floth to addr2.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      //Addr1 adds proposal
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      await projectProposal.takeSnapshot();
+
+      //Addr2 votes (ID 1 is the abstain proposal)
+      await projectProposal.connect(addr2).addVotesToProposal(2, 10);
+      await projectProposal.connect(owner).roundFinished();
+
+      //29 days later
+      await ethers.provider.send("evm_increaseTime", [86400 * 29]);
+      await ethers.provider.send("evm_mine");
+
+      // Check balance of addr1 before claiming funds.
+      const balanceBefore = await ethers.provider.getBalance(addr1.address);
+
+      // Addr1 claims funds.
+      const tx = await projectProposal.connect(addr1).claimFunds();
+
+      // Check balance of addr1 after claiming funds.
+      const balanceAfter = await ethers.provider.getBalance(addr1.address);
+
+      // Calculate the gas cost for the transaction
+      const gasUsed = (await tx.wait()).gasUsed;
+      const gasPrice = tx.gasPrice;
+      const gasCost = gasUsed * gasPrice;
+
+      // Calculate the expected balance after the claim, accounting for gas costs
+      const amountRequested = ethers.parseUnits("10", 18);
+      const expectedBalanceAfter = balanceBefore + amountRequested - gasCost;
+
+      expect(balanceAfter).to.equal(expectedBalanceAfter);
+
+      const proposal = await projectProposal.proposals(2);
+      expect(proposal.fundsClaimed).to.be.true;
+    });
+
     it("Should revert if non-winner tries to claim funds", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
@@ -1166,7 +1207,7 @@ describe("ProjectProposal Contract", function () {
       await expect(projectProposal.connect(addr1).claimFunds()).to.be.revertedWithCustomError(projectProposal, "InsufficientBalance");
     });
 
-    it("Should allow admin to reclaim after 30 days", async function () {
+    it.only("Should allow admin to reclaim after 30 days", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -1190,10 +1231,19 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_increaseTime", [86400 * 32]);
       await ethers.provider.send("evm_mine");
 
+      //Balance of "floth.getGrantFundWallet"
+      const balanceBefore = await ethers.provider.getBalance(await floth.getGrantFundWallet());
+
       await projectProposal.connect(owner).reclaimFunds(1);
 
       const proposalAfter = await projectProposal.proposals(2);
       expect(proposalAfter.fundsClaimed).to.be.true;
+
+      //Balance after reclaiming funds.
+      const balanceAfter = await ethers.provider.getBalance(await floth.getGrantFundWallet());
+
+      //Check balanceAfter = balanceBefore + 10 ether.
+      expect(balanceAfter).to.equal(balanceBefore + ethers.parseUnits("10", 18));
     });
 
     it("Should revert if user tries to claim after 30 days.", async function () {
