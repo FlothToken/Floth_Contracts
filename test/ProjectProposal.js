@@ -1129,7 +1129,7 @@ describe("ProjectProposal Contract", function () {
       expect(proposal.fundsClaimed).to.be.true;
     });
 
-    it.only("Should send funds to the grant wallet if abstain wins a round", async function () {
+    it("Should send funds to the grant wallet if abstain wins a round", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });

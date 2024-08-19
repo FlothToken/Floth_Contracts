@@ -238,6 +238,17 @@ describe("Floth Contract", function () {
       expect(await floth.dexAddresses(addr1.address)).to.equal(false);
     });
 
+    it("Should revert when adding dex addresses if address is 0 address", async function () {
+      await expect(floth.addDexAddress(zeroAddress)).to.be.revertedWithCustomError(Floth, "ZeroAddress");
+    });
+
+    it("Should revert when removing dex addresses if address is 0 address", async function () {
+      await floth.addDexAddress(addr1.address);
+      expect(await floth.dexAddresses(addr1.address)).to.equal(true);
+
+      await expect(floth.removeDexAddress(zeroAddress)).to.be.revertedWithCustomError(Floth, "ZeroAddress");
+    });
+
     it("Should allow owner to set grant fund wallet", async function () {
       await floth.setGrantFundWallet(addr1.address);
       expect(await floth.grantFundWallet()).to.equal(addr1.address);
