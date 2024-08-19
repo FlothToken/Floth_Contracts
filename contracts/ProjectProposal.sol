@@ -185,6 +185,7 @@ contract ProjectProposal is AccessControlUpgradeable {
     error InvalidPermissions();
     error SubmissionWindowClosed();
     error VotingPeriodOpen();
+    error VotingPeriodClosed();
     error InvalidAmountRequested();
     error InvalidVotingPower();
     error InsufficientVotingPower();
@@ -355,6 +356,10 @@ contract ProjectProposal is AccessControlUpgradeable {
         uint256 _proposalId,
         uint256 _numberOfVotes
     ) external {
+
+        if(!isVotingPeriodOpen()){
+            revert VotingPeriodClosed();
+        }
 
         Proposal storage proposal = proposals[_proposalId];
         Round storage currentRound = getLatestRound();

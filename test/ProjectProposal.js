@@ -1046,6 +1046,19 @@ describe("ProjectProposal Contract", function () {
 
       expect(hasVotedAfter).to.equal(false);
     });
+
+    it("Should revert if user votes on a proposal when voting period is not open", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      //Send some floth to addr1.
+      await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr1).delegate(addr1.address);
+
+      await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(projectProposal, "VotingPeriodClosed");
+    });
   });
 
   describe("Claiming Funds", function () {
