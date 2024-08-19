@@ -1129,6 +1129,44 @@ describe("ProjectProposal Contract", function () {
       expect(proposal.fundsClaimed).to.be.true;
     });
 
+    it.only("Should send funds to the grant wallet if abstain wins a round", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //Send some floth to addr2.
+      await floth.transfer(addr2.address, ethers.parseUnits("20", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      //Send some floth to addr2.
+      await floth.transfer(addr1.address, ethers.parseUnits("20", 18));
+      await floth.connect(addr1).delegate(addr1.address);
+
+      //Addr1 adds proposal
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      await projectProposal.takeSnapshot();
+
+      //Vote for abstain.
+      await projectProposal.connect(addr2).addVotesToProposal(1, 10);
+      await projectProposal.connect(addr1).addVotesToProposal(2, 9);
+
+      //Check balance of grant wallet.
+      const balanceBefore = await ethers.provider.getBalance(await floth.getGrantFundWallet());
+
+      //Round finished.
+      await projectProposal.connect(owner).roundFinished();
+
+      //Check balance of grant wallet after round finished.
+      const balanceAfter = await ethers.provider.getBalance(await floth.getGrantFundWallet());
+
+      //Verify that the grant wallet received the funds.
+      expect(balanceAfter).to.equal(balanceBefore + ethers.parseUnits("10", 18));
+    });
+
     it("Should revert if non-winner tries to claim funds", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
@@ -1207,7 +1245,7 @@ describe("ProjectProposal Contract", function () {
       await expect(projectProposal.connect(addr1).claimFunds()).to.be.revertedWithCustomError(projectProposal, "InsufficientBalance");
     });
 
-    it.only("Should allow admin to reclaim after 30 days", async function () {
+    it("Should allow admin to reclaim after 30 days", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });

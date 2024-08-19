@@ -879,6 +879,19 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
         winningProposals[mostVotedProposal.receiver].push(mostVotedProposal);
         winningProposalByRoundId[latestRound.id] = mostVotedProposal;
         hasWinningProposal[mostVotedProposal.receiver] = true;
+
+        //Check if the winning proposal is the abstain proposal.
+        if (mostVotedProposal.id == latestRound.abstainProposalId) {
+            //Set as claimed so winner cannot reclaim for the proposal.
+            mostVotedProposal.fundsClaimed = true; 
+            winningProposalByRoundId[mostVotedProposal.roundId].fundsClaimed = true;
+            proposals[mostVotedProposal.id].fundsClaimed = true;
+
+            //Send funds back to grant fund wallet.
+            (bool success, ) = floth.getGrantFundWallet().call{value: latestRound.maxFlareAmount}("");
+            require(success);
+        }
+
         emit RoundCompleted(latestRound.id, mostVotedProposal.id);
     }
 
