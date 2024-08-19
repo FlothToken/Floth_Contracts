@@ -600,6 +600,44 @@ describe("ProjectProposal Contract", function () {
       expect(proposalAfter.votesReceived).to.equal(0);
     });
 
+    it("Should remove all votes from all proposals for a user", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+      await projectProposal.connect(addr1).addProposal("Test Proposal 2", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal("Test Proposal 3", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal("Test Proposal 4", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      //Send some floth to addr1.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      await projectProposal.takeSnapshot();
+
+      await projectProposal.connect(addr2).addVotesToProposal(2, 10);
+      await projectProposal.connect(addr2).addVotesToProposal(3, 20);
+      await projectProposal.connect(addr2).addVotesToProposal(4, 25);
+
+      const proposal2Before = await projectProposal.proposals(2);
+      expect(proposal2Before.votesReceived).to.equal(10);
+      const proposal3Before = await projectProposal.proposals(3);
+      expect(proposal3Before.votesReceived).to.equal(20);
+      const proposal4Before = await projectProposal.proposals(4);
+      expect(proposal4Before.votesReceived).to.equal(25);
+
+      await projectProposal.connect(addr2).removeAllVotesFromAllProposals();
+
+      const proposal2After = await projectProposal.proposals(2);
+      expect(proposal2After.votesReceived).to.equal(0);
+      const proposal3After = await projectProposal.proposals(3);
+      expect(proposal3After.votesReceived).to.equal(0);
+      const proposal4After = await projectProposal.proposals(4);
+      expect(proposal4After.votesReceived).to.equal(0);
+    });
+
     it("Should revert if voting power is 0", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),

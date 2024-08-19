@@ -163,6 +163,7 @@ contract ProjectProposal is AccessControlUpgradeable {
         address wallet,
         uint256 numberofVotes
     );
+    event AllVotesRemoved(address wallet);
     event SnapshotTaken(uint256 roundId, uint256 snapshotBlock);
     event FundsClaimed(
         uint256 proposalId,
@@ -456,6 +457,38 @@ contract ProjectProposal is AccessControlUpgradeable {
                 emit VotesRemoved(_proposalId, msg.sender, votesToRemove);
                 break; //Don't need to continue looping through the struct array.
             }
+        }
+    }
+
+    /**
+     * Function for a user to remove all their votes from all proposals that they have voted on.
+     */
+    function removeAllVotesFromAllProposals() external {
+        Round storage currentRound = getLatestRound();
+
+        //Check if the user hasn't voted.
+        if (!hasVotedByRound[msg.sender][currentRound.id]) {
+            revert UserVoteNotFound();
+        }
+
+        Votes[] storage votesByUser = votedOnProposals[msg.sender][currentRound.id];
+
+        for (uint256 i = 0; i < votesByUser.length; i++) {
+            uint256 votesToRemove = votesByUser[i].voteCount;
+
+            Proposal storage proposal = proposals[votesByUser[i].proposalId];
+
+            proposal.votesReceived -= votesToRemove; //Remove votes given to proposal.
+            votingPowerByRound[msg.sender][currentRound.id] += votesToRemove; //Give voting power back to user.
+        }
+
+        // Clear the votes array in one step to avoid issues with iteration
+        delete votedOnProposals[msg.sender][currentRound.id];
+
+        if(votesByUser.length == 0){
+            hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
+
+            emit AllVotesRemoved(msg.sender);
         }
     }
 
