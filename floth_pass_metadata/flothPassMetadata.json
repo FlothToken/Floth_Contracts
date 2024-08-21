@@ -1,0 +1,16 @@
+{
+  "name": "FLOTH Pass #1",
+  "description": "The FLOTH Pass grants owners extra voting power for proposals in the FLOTH ecosystem and much more!",
+  "image": "",
+  "attributes": [
+    {
+      "trait_type": "Voting Boost",
+      "value": 1000
+    },
+    {
+      "display_type": "boost_number",
+      "trait_type": "Voting Boost",
+      "value": 1000
+    }
+  ]
+}
