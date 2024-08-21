@@ -189,26 +189,43 @@ describe("ProjectProposal Contract", function () {
       );
     });
 
-    //TODO: Need to discuss this with Kyle
-    // it("Should revert if trying to add a proposal while voting period is open", async function () {
-    //   await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
-    //     value: ethers.parseUnits("10", 18),
-    //   });
+    it("Should revert if trying to add a proposal while voting period is open", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
 
-    //   //_roundRuntime = 7200
-    //   //expectedSnapshotDatetime = currentTime + 3600
+      //_roundRuntime = 7200
+      //expectedSnapshotDatetime = currentTime + 3600
 
-    //   await ethers.provider.send("evm_increaseTime", [4000]);
-    //   await ethers.provider.send("evm_mine", []);
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine", []);
 
-    //   await expect(projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
-    //     projectProposal,
-    //     "VotingPeriodOpen"
-    //   );
+      //Take snapshot
+      await projectProposal.takeSnapshot();
 
-    //   // if(latestRound.snapshotDatetime == 0){
-    //   //   return (block.timestamp >= latestRound.expectedSnapshotDatetime && block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime);
-    // });
+      await expect(projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
+        projectProposal,
+        "SubmissionWindowClosed"
+      );
+    });
+
+    it("Should revert if trying to add a proposal while during the 'idle' period", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //_roundRuntime = 7200
+      //expectedSnapshotDatetime = currentTime + 3600
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine", []);
+
+      //No snapshot taken after expected snapshot time.
+      await expect(projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
+        projectProposal,
+        "SubmissionWindowClosed"
+      );
+    });
 
     it("Should get all the proposals by address", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
@@ -683,6 +700,22 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.takeSnapshot();
 
       await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(projectProposal, "InvalidVotingPower");
+    });
+
+    it("Should revert if trying to vote while during the 'idle' period", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      //_roundRuntime = 7200
+      //expectedSnapshotDatetime = currentTime + 3600
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine", []);
+
+      //No snapshot taken after expected snapshot time.
+
+      await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(projectProposal, "VotingPeriodBeginsSoon");
     });
 
     it("Should revert if user doesn't have enough voting power", async function () {

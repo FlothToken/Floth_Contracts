@@ -186,6 +186,7 @@ contract ProjectProposal is AccessControlUpgradeable {
     error SubmissionWindowClosed();
     error VotingPeriodOpen();
     error VotingPeriodClosed();
+    error VotingPeriodBeginsSoon();
     error InvalidAmountRequested();
     error InvalidVotingPower();
     error InsufficientVotingPower();
@@ -358,7 +359,13 @@ contract ProjectProposal is AccessControlUpgradeable {
     ) external {
 
         if(!isVotingPeriodOpen()){
-            revert VotingPeriodClosed();
+            Round storage getRound = getLatestRound();
+
+            if(block.timestamp > getRound.expectedSnapshotDatetime && getRound.snapshotDatetime == 0){
+                revert VotingPeriodBeginsSoon();
+            }else{
+                revert VotingPeriodClosed();
+            }
         }
 
         Proposal storage proposal = proposals[_proposalId];
@@ -487,7 +494,7 @@ contract ProjectProposal is AccessControlUpgradeable {
             votingPowerByRound[msg.sender][currentRound.id] += votesToRemove; //Give voting power back to user.
         }
 
-        // Clear the votes array in one step to avoid issues with iteration
+        // Clear the votes mapping.
         delete votedOnProposals[msg.sender][currentRound.id];
 
         if(votesByUser.length == 0){
@@ -855,7 +862,6 @@ contract ProjectProposal is AccessControlUpgradeable {
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         
-        //TODO check if we are happy with this solution.
         if(latestRound.snapshotDatetime == 0){
             return false;
         }
@@ -876,12 +882,12 @@ contract ProjectProposal is AccessControlUpgradeable {
      */
     function isSubmissionWindowOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
-
+       
         return
             block.timestamp < latestRound.expectedSnapshotDatetime &&
             block.timestamp >= latestRound.roundStartDatetime;
     }
-
+    
     //
     /**
      * Function to finish a round
