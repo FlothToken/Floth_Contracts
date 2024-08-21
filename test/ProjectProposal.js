@@ -876,6 +876,21 @@ describe("ProjectProposal Contract", function () {
       expect(flothPassVotingPower).to.equal(400);
     });
 
+    it("Should return 0 if getting the FlothPass voting power before a snapshot", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
+        value: ethers.parseUnits("10", 18),
+      });
+
+      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [4000]);
+      await ethers.provider.send("evm_mine");
+
+      //Skip taking a snapshot.
+
+      expect(await projectProposal.getFlothPassVotingPower(addr1.address)).to.equal(0);
+    });
+
     it("Should allow voting partial FlothPass voting power to a proposal", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
