@@ -20,9 +20,6 @@ contract FlothPass is
     // Address to withdraw funds to.
     address payable public withdrawAddress;
 
-    // Address to send minted FLOTH to.
-    address public flothVault;
-
     // Base URI for token metadata.
     string public _currentBaseURI;
 
@@ -80,15 +77,14 @@ contract FlothPass is
      *
      * @dev Initialize function for proxy.
      * Calls the internal initialize function.
-     * @param flothContractAddress Address of the Floth contract.
      */
-    function initialize(address flothContractAddress) public initializer {
+    function initialize() public initializer {
         __ERC721_init("Floth Pass", "FPASS");
         __ERC721Enumerable_init();
         __ERC721Votes_init();
         __AccessControl_init();
         __ReentrancyGuard_init();
-        __FlothPass_init(flothContractAddress);
+        __FlothPass_init();
 
         _name = "Floth Pass";
         _symbol = "FPASS";
@@ -101,14 +97,12 @@ contract FlothPass is
 
     /**
      * @dev Initialize function which sets the defaults for state variables
-     * @param flothContractAddress Address of the Floth contract.
      */
-    function __FlothPass_init(address flothContractAddress) internal initializer {
+    function __FlothPass_init() internal initializer {
         _currentBaseURI = "";
         maxSupply = 333;
         price = 1000 ether;
         priceIncrement = 50 ether;
-        flothVault = 0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739;
         withdrawAddress = payable(0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739);
     }
 
@@ -247,6 +241,14 @@ contract FlothPass is
      */
     function setMintPrice(uint256 _newPrice) external onlyRole(ADMIN_ROLE) {
         price = _newPrice;
+    }
+
+    /**
+     * @dev Setter for the price increment
+     * @param _newPriceIncrement the new price increment
+     */
+    function setPriceIncrement(uint256 _newPriceIncrement) external onlyRole(ADMIN_ROLE) {
+        priceIncrement = _newPriceIncrement;
     }
 
     /**
