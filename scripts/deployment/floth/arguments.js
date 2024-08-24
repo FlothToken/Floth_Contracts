@@ -1,0 +1,1 @@
+module.exports = [["0x315c76C23e8815Fe0dFd8DD626782C49647924Ba"], "FLOTH", "FLOTH"];
