@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./IFloth.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721VotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
@@ -18,9 +17,6 @@ contract FlothPass is
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable
 {
-    // Floth contract interface.
-    IFloth public flothContract;
-
     // Address to withdraw funds to.
     address payable public withdrawAddress;
 
@@ -114,7 +110,6 @@ contract FlothPass is
         priceIncrement = 50 ether;
         flothVault = 0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739;
         withdrawAddress = payable(0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739);
-        flothContract = IFloth(flothContractAddress);
     }
 
     /**
@@ -133,7 +128,7 @@ contract FlothPass is
      * Requires the total minted plus the quantity to be less than the max supply.
      * @param _quantity the number of floth pass to mint
      */
-    function mint(uint16 _quantity) external {
+    function mint(uint16 _quantity) external payable nonReentrant {
         if (!saleActive) {
             revert SaleInactive();
         }
@@ -155,13 +150,10 @@ contract FlothPass is
             }
         }
 
-        // Check if the caller has enough FLOTH to cover the cost
-        if (flothContract.balanceOf(msg.sender) < totalPrice) {
+        // Check if the caller sent enough Flare to cover the cost
+        if (msg.value < totalPrice) {
             revert InsufficientFunds();
         }
-
-        // Transfer the total price from the caller to the flothVault
-        flothContract.transferFrom(msg.sender, flothVault, totalPrice);
 
         // Mint the quantity of tokens to the caller
         for (uint16 i = 0; i < _quantity; i++) {
@@ -204,25 +196,6 @@ contract FlothPass is
         if (!success) {
             revert TransferFailed();
         }
-    }
-
-    /**
-     * @dev Withdraw FLOTH function to withdraw FLOTH from the contract.
-     * @param _amount the amount to withdraw
-     * @param _withdrawAll whether to withdraw all the funds
-     */
-    function withdrawFLOTH(uint256 _amount, bool _withdrawAll) external nonReentrant {
-        if (!hasRole(WITHDRAW_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender)) {
-            revert InsufficientRole();
-        }
-
-        uint256 amountToWithdraw = _withdrawAll ? flothContract.balanceOf(address(this)) : _amount;
-        if (!_withdrawAll && amountToWithdraw > flothContract.balanceOf(address(this))) {
-            revert InsufficientFundsInContract();
-        }
-
-        address recipient = withdrawAddress != address(0) ? withdrawAddress : msg.sender;
-        flothContract.transfer(recipient, amountToWithdraw);
     }
 
     /**
@@ -309,17 +282,6 @@ contract FlothPass is
             revert ZeroAddress();
         }
         withdrawAddress = _withdrawAddress;
-    }
-
-    /**
-     * @dev Setter for the floth contract address
-     * @param _flothContractAddress the new floth contract address
-     */
-    function setFlothContract(address _flothContractAddress) external onlyRole(ADMIN_ROLE) {
-        if(_flothContractAddress == address(0)){
-            revert ZeroAddress();
-        }
-        flothContract = IFloth(_flothContractAddress);
     }
 
     /**
