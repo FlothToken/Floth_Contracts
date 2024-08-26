@@ -32,7 +32,7 @@ describe("ProjectProposal Contract", function () {
 
     // Deploy FlothPass contract using deployProxy
     FlothPass = await ethers.getContractFactory("FlothPass");
-    flothPass = await upgrades.deployProxy(FlothPass, [flothAddress], { kind: "transparent" });
+    flothPass = await upgrades.deployProxy(FlothPass, { kind: "transparent" });
     await flothPass.waitForDeployment();
 
     flothPassAddress = await flothPass.getAddress();
@@ -1514,6 +1514,39 @@ describe("ProjectProposal Contract", function () {
       const power = await projectProposal.getTotalVotingPower(addr2.address);
       expect(power).to.equal(0);
     });
+
+    // it.only("Should get unclaimed winning proposals by round id", async function () {
+    // await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+    //   value: ethers.parseUnits("10", 18),
+    // });
+    // await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+
+    // await ethers.provider.send("evm_increaseTime", [7200]);
+    // await ethers.provider.send("evm_mine");
+
+    //Send some floth to addr1.
+    // await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
+    // await floth.connect(addr1).delegate(addr1.address);
+
+    // await projectProposal.takeSnapshot();
+
+    // await projectProposal.connect(addr1).addVotesToProposal(2, 10);
+
+    // const proposal = await projectProposal.proposals(2);
+    // expect(proposal.votesReceived).to.equal(10);
+
+    // await projectProposal.connect(owner).roundFinished();
+
+    // //Add 31 days to the current time.
+    // await ethers.provider.send("evm_increaseTime", [86400 * 31]);
+    // await ethers.provider.send("evm_mine");
+
+    // const winningRoundIdsUnclaimed = [1];
+
+    // const getWinningRoundIds = await projectProposal.connect(owner).getUnclaimedWinningRoundIds();
+
+    // expect(getWinningRoundIds).to.deep.equal(winningRoundIdsUnclaimed);
+    // });
   });
 
   describe("Upgrades", function () {
