@@ -34,7 +34,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
     }
 
     /**
-     * Initializer for the ProjectProposal contract
+     * Initializer for the ProjectProposalUpgrade contract
      * @param _flothAddress The address of the Floth contract
      * @param _flothPassAddress The address of the FlothPass contract
      */
@@ -112,9 +112,6 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
     //Maps winning roundID to winning proposals.
     mapping(uint256 => Proposal) public winningProposalByRoundId;
 
-    //Tracks proposals not been claimed after the 30 days claiming period.
-    mapping(address => Proposal[]) public proposalsNotClaimed;
-
     //Maps IDs to a round.
     mapping(uint256 => Round) public rounds;
 
@@ -140,7 +137,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
     uint256[] roundIds;
 
     /**
-     * Events for the ProjectProposal contract
+     * Events for the ProjectProposalUpgrade contract
      */
     event ProposalAdded(
         address creator,
@@ -163,6 +160,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
         address wallet,
         uint256 numberofVotes
     );
+    event AllVotesRemoved(address wallet);
     event SnapshotTaken(uint256 roundId, uint256 snapshotBlock);
     event FundsClaimed(
         uint256 proposalId,
@@ -179,12 +177,13 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
     event RoundMaxFlareSet(uint256 newMaxFlare);
 
     /**
-     * Error messages for the ProjectProposal contract
+     * Error messages for the ProjectProposalUpgrade contract
      */
     error InvalidPermissions();
     error SubmissionWindowClosed();
     error VotingPeriodOpen();
     error VotingPeriodClosed();
+    error VotingPeriodBeginsSoon();
     error InvalidAmountRequested();
     error InvalidVotingPower();
     error InsufficientVotingPower();
@@ -206,7 +205,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
     error InvalidRoundRuntime();
     error InvalidPageNumberPageSize();
 
-    //Modifiers for the ProjectProposal contract
+    //Modifiers for the ProjectProposalUpgrade contract
     modifier roundManagerOrAdmin() {
         if (
             !hasRole(ROUND_MANAGER_ROLE, msg.sender) && // Check if user does not have ROUND_MANAGER_ROLE
@@ -357,7 +356,13 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
     ) external {
 
         if(!isVotingPeriodOpen()){
-            revert VotingPeriodClosed();
+            Round storage getRound = getLatestRound();
+
+            if(block.timestamp > getRound.expectedSnapshotDatetime && getRound.snapshotDatetime == 0){
+                revert VotingPeriodBeginsSoon();
+            }else{
+                revert VotingPeriodClosed();
+            }
         }
 
         Proposal storage proposal = proposals[_proposalId];
@@ -461,6 +466,38 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
                 emit VotesRemoved(_proposalId, msg.sender, votesToRemove);
                 break; //Don't need to continue looping through the struct array.
             }
+        }
+    }
+
+    /**
+     * Function for a user to remove all their votes from all proposals that they have voted on.
+     */
+    function removeAllVotesFromAllProposals() external {
+        Round storage currentRound = getLatestRound();
+
+        //Check if the user hasn't voted.
+        if (!hasVotedByRound[msg.sender][currentRound.id]) {
+            revert UserVoteNotFound();
+        }
+
+        Votes[] storage votesByUser = votedOnProposals[msg.sender][currentRound.id];
+
+        for (uint256 i = 0; i < votesByUser.length; i++) {
+            uint256 votesToRemove = votesByUser[i].voteCount;
+
+            Proposal storage proposal = proposals[votesByUser[i].proposalId];
+
+            proposal.votesReceived -= votesToRemove; //Remove votes given to proposal.
+            votingPowerByRound[msg.sender][currentRound.id] += votesToRemove; //Give voting power back to user.
+        }
+
+        // Clear the votes mapping.
+        delete votedOnProposals[msg.sender][currentRound.id];
+
+        if(votesByUser.length == 0){
+            hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
+
+            emit AllVotesRemoved(msg.sender);
         }
     }
 
@@ -822,7 +859,6 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
         
-        //TODO check if we are happy with this solution.
         if(latestRound.snapshotDatetime == 0){
             return false;
         }
@@ -843,12 +879,12 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
      */
     function isSubmissionWindowOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
-
+       
         return
             block.timestamp < latestRound.expectedSnapshotDatetime &&
             block.timestamp >= latestRound.roundStartDatetime;
     }
-
+    
     //
     /**
      * Function to finish a round
@@ -896,6 +932,8 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
     }
 
     /**
+     * @dev Currently if a user has a winning proposal in multiple 
+     * rounds they have to claim one at once.
      * Function to claim funds for a winning proposal
      */
     function claimFunds() external {
@@ -916,7 +954,9 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
                 //Check if 30 days have passed since round finished.
                 if (daysPassed > 30) {
                     emit FundsNotClaimed(usersWinningProposals[i].id, msg.sender);
-                    revert FundsClaimingPeriodExpired();
+                    if(usersWinningProposals.length == 1){
+                        revert FundsClaimingPeriodExpired();
+                    }
                 }
 
                 uint256 amountRequested = usersWinningProposals[0].amountRequested;
@@ -969,6 +1009,49 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
             }
         }
     }
+
+    /**
+     * Function to get all winning proposals by roundID that have 
+     * passed the claiming period and haven't been claimed.
+     */
+    function getUnclaimedWinningRoundIds() view external roundManagerOrAdmin returns (uint256[] memory) {
+        // Get the count of unclaimed proposals
+        uint256 count = 0;
+        for (uint256 i = 1; i <= roundIds.length; i++) {
+            Proposal storage proposal = winningProposalByRoundId[i];
+            Round memory claimRound = getRoundById(i);
+
+            if (!proposal.fundsClaimed) {
+                uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
+                if (daysPassed > 30) {
+                    count++;
+                }
+            }
+        }
+
+        // Initialize the memory array with the correct count
+        uint256[] memory unclaimedWinningRoundIds = new uint256[](count);
+        uint256 index = 0; // Index for the memory array
+
+        // Populate the memory array with unclaimed round IDs
+        for (uint256 i = 1; i <= roundIds.length; i++) {
+            Proposal storage proposal = winningProposalByRoundId[i];
+            Round memory claimRound = getRoundById(i); // Define claimRound here as well
+
+            if (!proposal.fundsClaimed) {
+                uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
+
+                if (daysPassed > 30) {
+                    unclaimedWinningRoundIds[index] = i;
+                    index++; // Move to the next position.
+                }
+            }
+        }
+
+        return unclaimedWinningRoundIds;
+    }
+
+    
 
     /**
      * Function to get the address of the Floth contract

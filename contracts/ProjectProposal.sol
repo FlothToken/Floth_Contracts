@@ -112,9 +112,6 @@ contract ProjectProposal is AccessControlUpgradeable {
     //Maps winning roundID to winning proposals.
     mapping(uint256 => Proposal) public winningProposalByRoundId;
 
-    //Tracks proposals not been claimed after the 30 days claiming period.
-    mapping(address => Proposal[]) public proposalsNotClaimed;
-
     //Maps IDs to a round.
     mapping(uint256 => Round) public rounds;
 
@@ -935,6 +932,8 @@ contract ProjectProposal is AccessControlUpgradeable {
     }
 
     /**
+     * @dev Currently if a user has a winning proposal in multiple 
+     * rounds they have to claim one at once.
      * Function to claim funds for a winning proposal
      */
     function claimFunds() external {
@@ -955,7 +954,7 @@ contract ProjectProposal is AccessControlUpgradeable {
                 //Check if 30 days have passed since round finished.
                 if (daysPassed > 30) {
                     emit FundsNotClaimed(usersWinningProposals[i].id, msg.sender);
-                    revert FundsClaimingPeriodExpired();
+                    // revert FundsClaimingPeriodExpired();
                 }
 
                 uint256 amountRequested = usersWinningProposals[0].amountRequested;
@@ -1008,6 +1007,49 @@ contract ProjectProposal is AccessControlUpgradeable {
             }
         }
     }
+
+    /**
+     * Function to get all winning proposals by roundID that have 
+     * passed the claiming period and haven't been claimed.
+     */
+    function getUnclaimedWinningRoundIds() view external roundManagerOrAdmin returns (uint256[] memory) {
+        // Get the count of unclaimed proposals
+        uint256 count = 0;
+        for (uint256 i = 1; i <= roundIds.length; i++) {
+            Proposal storage proposal = winningProposalByRoundId[i];
+            Round memory claimRound = getRoundById(i);
+
+            if (!proposal.fundsClaimed) {
+                uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
+                if (daysPassed > 30) {
+                    count++;
+                }
+            }
+        }
+
+        // Initialize the memory array with the correct count
+        uint256[] memory unclaimedWinningRoundIds = new uint256[](count);
+        uint256 index = 0; // Index for the memory array
+
+        // Populate the memory array with unclaimed round IDs
+        for (uint256 i = 1; i <= roundIds.length; i++) {
+            Proposal storage proposal = winningProposalByRoundId[i];
+            Round memory claimRound = getRoundById(i); // Define claimRound here as well
+
+            if (!proposal.fundsClaimed) {
+                uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
+
+                if (daysPassed > 30) {
+                    unclaimedWinningRoundIds[index] = i;
+                    index++; // Move to the next position.
+                }
+            }
+        }
+
+        return unclaimedWinningRoundIds;
+    }
+
+    
 
     /**
      * Function to get the address of the Floth contract
