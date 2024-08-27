@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "hardhat/console.sol";
 import "./IFloth.sol";
 import "./IFlothPass.sol";
@@ -10,7 +11,7 @@ import "./IFlothPass.sol";
  * @title ProjectProposalUpgrade contract for the Floth protocol
  * @author Ethereal Labs
  */
-contract ProjectProposalUpgrade is AccessControlUpgradeable {
+contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     // Define roles for the contract
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant SNAPSHOTTER_ROLE = keccak256("SNAPSHOTTER_ROLE");
@@ -936,7 +937,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
      * rounds they have to claim one at once.
      * Function to claim funds for a winning proposal
      */
-    function claimFunds() external {
+    function claimFunds(uint256 _roundId) external nonReentrant {
 
         if (!hasWinningProposal[msg.sender]) {
             revert InvalidClaimer();
@@ -945,8 +946,8 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
         Proposal[] storage usersWinningProposals = winningProposals[msg.sender];
 
         for (uint256 i = 0; i < usersWinningProposals.length; i++) {
-            if(!usersWinningProposals[i].fundsClaimed){
-                Round storage claimRound = rounds[usersWinningProposals[i].roundId];
+            if(!usersWinningProposals[i].fundsClaimed && usersWinningProposals[i].roundId == _roundId){
+                Round storage claimRound = rounds[_roundId];
 
                 //Check if 30 days have passed since round finished. 86400 seconds in a day.
                 uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
@@ -954,12 +955,10 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
                 //Check if 30 days have passed since round finished.
                 if (daysPassed > 30) {
                     emit FundsNotClaimed(usersWinningProposals[i].id, msg.sender);
-                    if(usersWinningProposals.length == 1){
-                        revert FundsClaimingPeriodExpired();
-                    }
+                    revert FundsClaimingPeriodExpired();
                 }
 
-                uint256 amountRequested = usersWinningProposals[0].amountRequested;
+                uint256 amountRequested = usersWinningProposals[i].amountRequested;
                 if (address(this).balance < amountRequested) {
                     revert InsufficientBalance();
                 }
@@ -1050,8 +1049,6 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable {
 
         return unclaimedWinningRoundIds;
     }
-
-    
 
     /**
      * Function to get the address of the Floth contract
