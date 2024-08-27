@@ -46,10 +46,18 @@ describe("ProjectProposal Contract", function () {
   });
 
   describe("Deployment", function () {
+    it("Should revert when Floth address is deployed with zero address", async function () {
+      const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
+
+      await expect(
+        upgrades.deployProxy(ProjectProposalFactory, [zeroAddress, flothPassAddress], { kind: "transparent" })
+      ).to.be.revertedWithCustomError(ProjectProposalFactory, "ZeroAddress");
+    });
+
     it("Should revert when deployed with zero address", async function () {
       const ProjectProposalFactory = await ethers.getContractFactory("ProjectProposal");
 
-      await expect(upgrades.deployProxy(ProjectProposalFactory, [zeroAddress, zeroAddress], { kind: "transparent" })).to.be.revertedWithCustomError(
+      await expect(upgrades.deployProxy(ProjectProposalFactory, [flothAddress, zeroAddress], { kind: "transparent" })).to.be.revertedWithCustomError(
         ProjectProposalFactory,
         "ZeroAddress"
       );
@@ -645,6 +653,29 @@ describe("ProjectProposal Contract", function () {
       expect(proposal3After.votesReceived).to.equal(0);
       const proposal4After = await projectProposal.proposals(4);
       expect(proposal4After.votesReceived).to.equal(0);
+    });
+
+    it("Should revert with UserVoteNotFound if a user tries to remove their votes when they haven't voted", async function () {
+      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
+        value: ethers.parseUnits("10", 18),
+      });
+      await projectProposal.connect(addr1).addProposal("Test Proposal 2", ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      //Send some floth to addr1.
+      await floth.transfer(addr2.address, ethers.parseUnits("10", 18));
+      await floth.connect(addr2).delegate(addr2.address);
+
+      await projectProposal.takeSnapshot();
+
+      await projectProposal.connect(addr2).addVotesToProposal(2, 10);
+
+      await expect(projectProposal.connect(addr1).removeAllVotesFromAllProposals()).to.be.revertedWithCustomError(
+        projectProposal,
+        "UserVoteNotFound"
+      );
     });
 
     it("Should give the user their voting power back after all votes from all proposals have been removed", async function () {
