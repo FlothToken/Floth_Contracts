@@ -28,6 +28,7 @@
     "hardhat": "^2.22.3"
   },
   "dependencies": {
+    "@flarenetwork/flare-periphery-contracts": "^0.1.16",
     "@openzeppelin/contracts": "^4.9.3",
     "@openzeppelin/contracts-upgradeable": "^4.9.6",
     "@openzeppelin/hardhat-upgrades": "^3.2.1"

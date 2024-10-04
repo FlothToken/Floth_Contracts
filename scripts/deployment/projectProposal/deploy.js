@@ -10,10 +10,12 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying contracts with the account:", deployer.address);
 
-  const flothAddress = "0xd6a024303Ad266a34Aab8ca74F40d4E361ACb797"; // Replace with the correct address
+  const flothAddress = "0x908Ab5ef6F6eDC00E4898d3077D4743Ee8b80B95"; // Replace with the correct address
+
+  const flothPassAddress = "0x18aC23e0E646bdd7881813BDBEC31324B3bA5667"; // Replace with the correct address
 
   const ProjectProposal = await ethers.getContractFactory("ProjectProposal");
-  const projectProposal = await ProjectProposal.deploy(flothAddress);
+  const projectProposal = await upgrades.deployProxy(ProjectProposal, [flothAddress, flothPassAddress], { initializer: "initialize" });
 
   await projectProposal.waitForDeployment();
 

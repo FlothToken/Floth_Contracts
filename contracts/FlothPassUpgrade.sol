@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Enumer
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721VotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "./FtsoV2Consumer.sol";
 
 /**
  * @title FlothPass contract for minting Floth Pass NFTs.
@@ -23,11 +24,11 @@ contract FlothPassUpgrade is
     // Base URI for token metadata.
     string public _currentBaseURI;
 
-    // Price to mint a single token.
-    uint256 public price;
+    // Initial price in USD.
+    uint256 public usdStartPrice;
 
-    // Price increment for every 10 tokens minted.
-    uint256 public priceIncrement;
+    //Price increment variable in USD.
+    uint256 public usdPriceIncrement;
 
     // Mapping from address to list of owned token IDs
     mapping(address => uint256[]) private _ownedTokens;
@@ -51,6 +52,9 @@ contract FlothPassUpgrade is
     // Roles
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
+
+    // Reference to FtsoV2Consumer contract
+    FtsoV2Consumer public ftsoV2Consumer;
 
     // Gap for upgradeability
     uint256[50] private __gap;
@@ -78,8 +82,8 @@ contract FlothPassUpgrade is
      * @dev Initialize function for proxy.
      * Calls the internal initialize function.
      */
-    function initialize() public initializer {
-        __ERC721_init("Floth Pass", "FPASS");
+
+    function initialize(address _ftsoV2ConsumerAddress) public initializer {        __ERC721_init("Floth Pass", "FPASS");
         __ERC721Enumerable_init();
         __ERC721Votes_init();
         __AccessControl_init();
@@ -93,6 +97,9 @@ contract FlothPassUpgrade is
         _grantRole(ADMIN_ROLE, msg.sender);
         _setRoleAdmin(WITHDRAW_ROLE, ADMIN_ROLE);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+
+        // Set reference to the deployed FtsoV2Consumer contract
+        ftsoV2Consumer = FtsoV2Consumer(_ftsoV2ConsumerAddress);
     }
 
     /**
@@ -100,9 +107,9 @@ contract FlothPassUpgrade is
      */
     function __FlothPass_init() internal initializer {
         _currentBaseURI = "";
-        maxSupply = 333;
-        price = 1000 ether;
-        priceIncrement = 50 ether;
+        maxSupply = 1000; //NFT supply = 1000.
+        usdStartPrice = 50; //Price starts at $50.
+        usdPriceIncrement = 50; //Increment price every 50 NFTs sold.
         withdrawAddress = payable(0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739);
     }
 
@@ -112,6 +119,20 @@ contract FlothPassUpgrade is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
+    }
+
+    /**
+     * @dev Calculate current NFT price in FLR based on the dynamic FLR/USD price
+     * @return Current NFT price in FLR
+     */
+    function getCurrentPriceInFlr() public payable returns (uint256) {
+        // Calculate the base USD price (starting price + increments)
+        uint256 usdPrice = usdStartPrice + ((numberMinted / 50) * usdPriceIncrement);
+
+        // Use FtsoV2Consumer's dynamic price function
+        uint256 flrPrice = ftsoV2Consumer.getDynamicPrice{value: msg.value}(usdPrice);
+
+        return flrPrice;
     }
 
     /**
@@ -132,16 +153,12 @@ contract FlothPassUpgrade is
             revert ExceedsMaxSupply();
         }
 
-        uint256 currentPrice = price;
         uint256 totalPrice = 0;
 
         // Calculate the total price considering the price increments every 10 mints
         // @dev Note i = 1 not i = 0
         for (uint16 i = 1; i <= _quantity; i++) {
-            totalPrice += currentPrice;
-            if ((numberMinted + i) % 10 == 0) {
-                currentPrice += priceIncrement;
-            }
+            totalPrice += getCurrentPriceInFlr();
         }
 
         // Check if the caller sent enough Flare to cover the cost
@@ -149,15 +166,10 @@ contract FlothPassUpgrade is
             revert InsufficientFunds();
         }
 
-        // Mint the quantity of tokens to the caller
+        // Mint the quantity of tokens to the caller and increase the number minted by 1.
         for (uint16 i = 0; i < _quantity; i++) {
             _safeMint(msg.sender, numberMinted += 1);
         }
-
-        mintsSinceLastIncrement = (numberMinted + _quantity) % 10;
-
-        // Update the price to the new current price
-        price = currentPrice;
     }
     
     /**
@@ -239,8 +251,16 @@ contract FlothPassUpgrade is
      * @dev Setter for the price to mint a token
      * @param _newPrice the new price to mint a token
      */
-    function setMintPrice(uint256 _newPrice) external onlyRole(ADMIN_ROLE) {
-        price = _newPrice;
+    // function setMintPrice(uint256 _newPrice) external onlyRole(ADMIN_ROLE) {
+    //     usd = _newPrice;
+    // }
+
+    /**
+     * @dev Setter for the price increment
+     * @param _newPriceIncrement the new price increment
+     */
+    function setPriceIncrement(uint256 _newPriceIncrement) external onlyRole(ADMIN_ROLE) {
+        usdPriceIncrement = _newPriceIncrement;
     }
 
     /**

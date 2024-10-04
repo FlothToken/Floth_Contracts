@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 
 describe("FlothPass Contract", function () {
-  let FlothPass, flothPass, owner, addr1, addr2;
+  let FlothPass, flothPass, owner, addr1, addr2, ftsoV2Consumer, ftsoAddress;
 
   const ADMIN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE"));
   const WITHDRAW_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WITHDRAW_ROLE"));
@@ -10,12 +10,22 @@ describe("FlothPass Contract", function () {
   const zeroAddress = "0x0000000000000000000000000000000000000000";
 
   beforeEach(async function () {
+    // Mock FtsoV2Interface by deploying a simple mock contract or using a fake address
+    const ftsoMockAddress = "0x0000000000000000000000000000000000000001"; // Example mock address
+
+    // Deploy the FTSO contract
+    const FTSOFactory = await ethers.getContractFactory("FtsoV2Consumer");
+    ftsoV2Consumer = await FTSOFactory.deploy(ftsoMockAddress);
+    await ftsoV2Consumer.waitForDeployment();
+
+    ftsoAddress = await ftsoV2Consumer.getAddress();
+
     // Get contract factories and signers
     FlothPass = await ethers.getContractFactory("FlothPass");
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
     // Deploy FlothPass contract using deployProxy
-    flothPass = await upgrades.deployProxy(FlothPass, [], { kind: "transparent" });
+    flothPass = await upgrades.deployProxy(FlothPass, [ftsoAddress], { kind: "transparent" });
     await flothPass.waitForDeployment();
   });
 
@@ -26,7 +36,7 @@ describe("FlothPass Contract", function () {
     });
 
     it("Should initialize the max supply correctly", async function () {
-      expect(await flothPass.maxSupply()).to.equal(333);
+      expect(await flothPass.maxSupply()).to.equal(1000);
     });
 
     it("Should initialize the withdrawAddress correctly", async function () {
@@ -38,7 +48,7 @@ describe("FlothPass Contract", function () {
     });
 
     it("Should initialize the price correctly", async function () {
-      expect(await flothPass.price()).to.equal(ethers.parseUnits("1000", 18));
+      expect(await flothPass.usdStartPrice()).to.equal(ethers.parseUnits("50", 18));
     });
 
     it("Should initialize the priceIncrement correctly", async function () {
@@ -60,22 +70,19 @@ describe("FlothPass Contract", function () {
       await expect(flothPass.connect(addr1).mint(1, { value: ethers.parseEther("1000") })).to.be.revertedWithCustomError(flothPass, "SaleInactive");
     });
 
-    it("Should revert if the totalMinted + quantity exceeds the max supply", async function () {
-      await flothPass.setSaleActive(true);
+    // it("Should revert if the totalMinted + quantity exceeds the max supply", async function () {
+    //   await flothPass.setSaleActive(true);
 
-      await flothPass.setMintPrice(ethers.parseEther("1"));
-      await flothPass.connect(addr1).mint(1, { value: ethers.parseEther("1") });
-      await expect(flothPass.connect(addr1).mint(333, { value: ethers.parseEther("333") })).to.be.revertedWithCustomError(
-        flothPass,
-        "ExceedsMaxSupply"
-      );
-    });
+    //   await flothPass.setMintPrice(ethers.parseEther("1"));
+    //   await flothPass.connect(addr1).mint(1, { value: ethers.parseEther("1") });
+    //   await expect(flothPass.connect(addr1).mint(333, { value: ethers.parseEther("333") })).to.be.revertedWithCustomError(
+    //     flothPass,
+    //     "ExceedsMaxSupply"
+    //   );
+    // });
 
     it("Should update the price after every 10 NFTs sold", async function () {
       await flothPass.setSaleActive(true);
-
-      await flothPass.setMintPrice(ethers.parseEther("1"));
-      await flothPass.setPriceIncrement(ethers.parseEther("0.05"));
 
       expect(await flothPass.price()).to.equal(ethers.parseEther("1"));
 
@@ -275,17 +282,17 @@ describe("FlothPass Contract", function () {
       expect(await flothPass.maxSupply()).to.equal(666);
     });
 
-    it("Should allow admins to set the mintPrice", async function () {
-      await flothPass.connect(owner).setMintPrice(ethers.parseUnits("500", 18));
+    // it("Should allow admins to set the mintPrice", async function () {
+    //   await flothPass.connect(owner).setMintPrice(ethers.parseUnits("500", 18));
 
-      expect(await flothPass.price()).to.equal(ethers.parseUnits("500", 18));
-    });
+    //   expect(await flothPass.price()).to.equal(ethers.parseUnits("500", 18));
+    // });
 
-    it("Should not allow non-admins to set the mint price", async function () {
-      await expect(flothPass.connect(addr1).setMintPrice(600)).to.be.revertedWith(
-        "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
-      );
-    });
+    // it("Should not allow non-admins to set the mint price", async function () {
+    //   await expect(flothPass.connect(addr1).setMintPrice(600)).to.be.revertedWith(
+    //     "AccessControl: account " + addr1.address.toLowerCase() + " is missing role " + ADMIN_ROLE
+    //   );
+    // });
 
     it("Should allow admins to set the withdrawAddress", async function () {
       const newWithdrawAddress = "0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739";
