@@ -109,8 +109,8 @@ contract FlothPass is
     function __FlothPass_init() internal initializer {
         _currentBaseURI = "";
         maxSupply = 1000; //NFT supply = 1000.
-        usdStartPrice = 50; //Price starts at $50.
-        usdPriceIncrement = 50; //Increment price every 50 NFTs sold.
+        usdStartPrice = 50 ether; //Price starts at $50.
+        usdPriceIncrement = 50 ether; //Increment price every 50 NFTs sold.
         withdrawAddress = payable(0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739);
     }
 

@@ -51,8 +51,8 @@ describe("FlothPass Contract", function () {
       expect(await flothPass.usdStartPrice()).to.equal(ethers.parseUnits("50", 18));
     });
 
-    it("Should initialize the priceIncrement correctly", async function () {
-      expect(await flothPass.priceIncrement()).to.equal(ethers.parseUnits("50", 18));
+    it("Should initialize the usdPriceIncrement correctly", async function () {
+      expect(await flothPass.usdPriceIncrement()).to.equal(ethers.parseUnits("50", 18));
     });
   });
 
