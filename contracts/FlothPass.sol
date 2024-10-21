@@ -84,6 +84,9 @@ contract FlothPass is
      * Calls the internal initialize function.
      */
     function initialize(address _ftsoV2ConsumerAddress) public initializer {
+        if (_ftsoV2ConsumerAddress == address(0)) {
+            revert ZeroAddress();
+        }
         __ERC721_init("Floth Pass", "FPASS");
         __ERC721Enumerable_init();
         __ERC721Votes_init();

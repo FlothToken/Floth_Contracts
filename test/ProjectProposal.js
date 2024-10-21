@@ -15,12 +15,21 @@ describe("ProjectProposal Contract", function () {
   let addr1;
   let addr2;
   let currentTime;
+  let ftsoV2ConsumerMock;
+  let ftsoAddress;
 
   const ADMIN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE"));
   const SNAPSHOTTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SNAPSHOTTER_ROLE"));
   const ROUND_MANAGER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ROUND_MANAGER_ROLE"));
 
   beforeEach(async function () {
+    // Deploy the FtsoV2ConsumerMock contract
+    const FtsoV2ConsumerMockFactory = await ethers.getContractFactory("FtsoV2ConsumerMock");
+    ftsoV2ConsumerMock = await FtsoV2ConsumerMockFactory.deploy(zeroAddress);
+    await ftsoV2ConsumerMock.waitForDeployment();
+
+    ftsoAddress = await ftsoV2ConsumerMock.getAddress();
+
     [owner, addr1, addr2, dexAddress, _] = await ethers.getSigners();
 
     // Deploy the Floth mock contract
@@ -32,7 +41,7 @@ describe("ProjectProposal Contract", function () {
 
     // Deploy FlothPass contract using deployProxy
     FlothPass = await ethers.getContractFactory("FlothPass");
-    flothPass = await upgrades.deployProxy(FlothPass, { kind: "transparent" });
+    flothPass = await upgrades.deployProxy(FlothPass, [ftsoAddress], { kind: "transparent" });
     await flothPass.waitForDeployment();
 
     flothPassAddress = await flothPass.getAddress();

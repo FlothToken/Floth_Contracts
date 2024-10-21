@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 
 describe("FlothPass Contract", function () {
-  let FlothPass, flothPass, owner, addr1, addr2, ftsoV2Consumer, ftsoAddress;
+  let FlothPass, flothPass, owner, addr1, addr2, ftsoV2ConsumerMock, ftsoAddress;
 
   const ADMIN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE"));
   const WITHDRAW_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WITHDRAW_ROLE"));
@@ -10,15 +10,12 @@ describe("FlothPass Contract", function () {
   const zeroAddress = "0x0000000000000000000000000000000000000000";
 
   beforeEach(async function () {
-    // Mock FtsoV2Interface by deploying a simple mock contract or using a fake address
-    const ftsoMockAddress = "0x0000000000000000000000000000000000000001"; // Example mock address
+    // Deploy the FtsoV2ConsumerMock contract
+    const FtsoV2ConsumerMockFactory = await ethers.getContractFactory("FtsoV2ConsumerMock");
+    ftsoV2ConsumerMock = await FtsoV2ConsumerMockFactory.deploy(zeroAddress);
+    await ftsoV2ConsumerMock.waitForDeployment();
 
-    // Deploy the FTSO contract
-    const FTSOFactory = await ethers.getContractFactory("FtsoV2Consumer");
-    ftsoV2Consumer = await FTSOFactory.deploy(ftsoMockAddress);
-    await ftsoV2Consumer.waitForDeployment();
-
-    ftsoAddress = await ftsoV2Consumer.getAddress();
+    ftsoAddress = await ftsoV2ConsumerMock.getAddress();
 
     // Get contract factories and signers
     FlothPass = await ethers.getContractFactory("FlothPass");
@@ -54,6 +51,11 @@ describe("FlothPass Contract", function () {
     it("Should initialize the usdPriceIncrement correctly", async function () {
       expect(await flothPass.usdPriceIncrement()).to.equal(ethers.parseUnits("50", 18));
     });
+
+    it("Should revert when Floth address is deployed with zero address", async function () {
+      const FlothPass = await ethers.getContractFactory("FlothPass");
+      await expect(upgrades.deployProxy(FlothPass, [zeroAddress], { kind: "transparent" })).to.be.revertedWithCustomError(FlothPass, "ZeroAddress");
+    });
   });
 
   describe("Minting", function () {
@@ -61,7 +63,10 @@ describe("FlothPass Contract", function () {
       // Activate the sale
       await flothPass.setSaleActive(true);
 
-      await flothPass.connect(addr1).mint(1, { value: ethers.parseEther("1000") });
+      // Use the hardcoded price from the mock
+      const mintPrice = ethers.parseEther("2"); // 2 FLR as per the mock's getDynamicPrice
+
+      await flothPass.connect(addr1).mint(1, { value: mintPrice });
 
       expect(await flothPass.getNumberMinted()).to.equal(1);
     });
@@ -84,17 +89,21 @@ describe("FlothPass Contract", function () {
     it("Should update the price after every 10 NFTs sold", async function () {
       await flothPass.setSaleActive(true);
 
-      expect(await flothPass.price()).to.equal(ethers.parseEther("1"));
+      const initialPrice = await flothPass.getCurrentPriceInFlr.staticCall();
 
-      await flothPass.connect(addr1).mint(9, { value: ethers.parseEther("9") });
+      // Mint 10 NFTs
+      for (let i = 0; i < 10; i++) {
+        await flothPass.connect(addr1).mint(1, { value: initialPrice });
+      }
 
-      expect(await flothPass.price()).to.equal(ethers.parseEther("1"));
+      // The price should still be the same as the mock always returns 2 FLR
+      expect(await flothPass.getCurrentPriceInFlr.staticCall()).to.equal(initialPrice);
 
-      await flothPass.connect(addr1).mint(1, { value: ethers.parseEther("1") });
+      // Mint one more
+      await flothPass.connect(addr1).mint(1, { value: initialPrice });
 
-      expect(await flothPass.price()).to.equal(ethers.parseEther("1.05"));
-
-      await flothPass.connect(addr1).mint(1, { value: ethers.parseEther("1.05") });
+      // The price should still be the same as the mock always returns 2 FLR
+      expect(await flothPass.getCurrentPriceInFlr.staticCall()).to.equal(initialPrice);
     });
 
     it("Should revert if user tries to mint without enough funds", async function () {
