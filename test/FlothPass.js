@@ -109,7 +109,9 @@ describe("FlothPass Contract", function () {
     it("Should revert if user tries to mint without enough funds", async function () {
       await flothPass.setSaleActive(true);
 
-      await expect(flothPass.connect(addr1).mint(1, { value: ethers.parseEther("999") })).to.be.revertedWithCustomError(
+      const initialPrice = await flothPass.getCurrentPriceInFlr.staticCall();
+
+      await expect(flothPass.connect(addr1).mint(1, { value: initialPrice - BigInt(1) })).to.be.revertedWithCustomError(
         flothPass,
         "InsufficientFunds"
       );
