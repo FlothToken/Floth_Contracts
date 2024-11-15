@@ -40,7 +40,7 @@ describe("ProjectProposal Contract", function () {
     flothAddress = await floth.getAddress();
 
     // Deploy FlothPass contract using deployProxy
-    FlothPass = await ethers.getContractFactory("FlothPass");
+    FlothPass = await ethers.getContractFactory("FlothPassMock");
     flothPass = await upgrades.deployProxy(FlothPass, [ftsoAddress], { kind: "transparent" });
     await flothPass.waitForDeployment();
 
