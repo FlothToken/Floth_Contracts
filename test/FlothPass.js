@@ -18,7 +18,7 @@ describe("FlothPass Contract", function () {
     ftsoAddress = await ftsoV2ConsumerMock.getAddress();
 
     // Get contract factories and signers
-    FlothPass = await ethers.getContractFactory("FlothPass");
+    FlothPass = await ethers.getContractFactory("FlothPassMock");
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
     // Deploy FlothPass contract using deployProxy
