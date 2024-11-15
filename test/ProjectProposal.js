@@ -4,6 +4,15 @@ const { ethers } = require("hardhat");
 const zeroBytes32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
 const zeroAddress = "0x0000000000000000000000000000000000000000";
 
+async function setBalances(addresses, balance) {
+  for (const address of addresses) {
+    await network.provider.send("hardhat_setBalance", [
+      address, // Address to set the balance for
+      `0x${balance}`, // Convert balance to hexadecimal format
+    ]);
+  }
+}
+
 describe("ProjectProposal Contract", function () {
   let projectProposal;
   let owner;
@@ -31,6 +40,15 @@ describe("ProjectProposal Contract", function () {
     ftsoAddress = await ftsoV2ConsumerMock.getAddress();
 
     [owner, addr1, addr2, dexAddress, _] = await ethers.getSigners();
+
+    // Define the amount of ETH you want to set
+    let balance = ethers.parseEther("5000"); // Set to 5000 ETH in wei
+    balance = balance.toString(16).padStart(64, "0");
+
+    // Define the addresses to set the balance for
+    const addresses = [owner.address, addr1.address, addr2.address];
+
+    await setBalances(addresses, balance);
 
     // Deploy the Floth mock contract
     const FlothFactory = await ethers.getContractFactory("Floth");
@@ -307,7 +325,6 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("1", 18),
       });
       const round = await projectProposal.getRoundById(1);
-      console.log("Max flare = " + round.maxFlareAmount);
       expect(round.maxFlareAmount).to.equal(ethers.parseUnits("11", 18));
     });
 
@@ -796,7 +813,6 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_mine");
 
       const power = await projectProposal.getFlothVotingPower(addr2.address);
-      console.log("Voting power = " + power.toString());
 
       //Use 10 votes.
       await projectProposal.connect(addr2).addVotesToProposal(2, ethers.parseUnits("10", 18));
@@ -883,8 +899,6 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await flothPass.connect(owner).setMintPrice(ethers.parseEther("1"));
-
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
@@ -904,8 +918,8 @@ describe("ProjectProposal Contract", function () {
       //Delegate addr1 to itself.
       await flothPass.connect(addr1).delegate(addr1.address);
 
-      //Mint 2 FlothPass token for addr1. (Spent 2 Floth).
-      await flothPass.connect(addr1).mint(2, { value: ethers.parseEther("2") });
+      //Mint 2 FlothPass token for addr1. (Spent 2000 Floth).
+      await flothPass.connect(addr1).mint(2, { value: ethers.parseEther("2000") });
 
       await projectProposal.takeSnapshot();
 
@@ -938,8 +952,6 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await flothPass.connect(owner).setMintPrice(ethers.parseEther("1"));
-
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
@@ -959,8 +971,8 @@ describe("ProjectProposal Contract", function () {
       //Delegate addr1 to itself.
       await flothPass.connect(addr1).delegate(addr1.address);
 
-      //Mint 2 FlothPass token for addr1. (Spent 2 Floth).
-      await flothPass.connect(addr1).mint(2, { value: ethers.parseEther("2") });
+      //Mint 2 FlothPass token for addr1. (Spent 2000 Floth).
+      await flothPass.connect(addr1).mint(2, { value: ethers.parseEther("2000") });
 
       await projectProposal.takeSnapshot();
 
@@ -983,8 +995,6 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await flothPass.connect(owner).setMintPrice(ethers.parseEther("1"));
-
       await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
@@ -1002,8 +1012,8 @@ describe("ProjectProposal Contract", function () {
       //Delegate addr1 to itself.
       await flothPass.connect(addr1).delegate(addr1.address);
 
-      //Mint 2 FlothPass token for addr1. (Spent 2 Floth).
-      await flothPass.connect(addr1).mint(2, { value: ethers.parseEther("2") });
+      //Mint 2 FlothPass token for addr1. (Spent 2000 Floth).
+      await flothPass.connect(addr1).mint(2, { value: ethers.parseEther("2000") });
 
       await projectProposal.takeSnapshot();
 
@@ -1535,11 +1545,7 @@ describe("ProjectProposal Contract", function () {
       const round = await projectProposal.getRoundById(1);
       const snapshotBlock = round.snapshotBlock;
 
-      console.log("Snapshot block = " + snapshotBlock);
-
       const power = (await projectProposal.flothPassesOwned(snapshotBlock, addr1.address)) * (await projectProposal.nftMultiplier());
-
-      console.log("Power = " + power);
 
       expect(power).to.equal(1 * 200);
     });
