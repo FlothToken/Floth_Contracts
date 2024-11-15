@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Enumer
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721VotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "hardhat/console.sol";
 import "./FtsoV2ConsumerMock.sol";
 
 
@@ -134,7 +135,8 @@ contract FlothPassMock is
         uint256 usdPrice = usdStartPrice + ((numberMinted / 50) * usdPriceIncrement);
 
         // Use FtsoV2Consumer's dynamic price function
-        uint256 flrPrice = ftsoV2Consumer.getDynamicPrice{value: msg.value}(usdPrice);
+        // TODO Need to calculate fee for using this feed and send it to this function (NOT msg.value!)
+        uint256 flrPrice = ftsoV2Consumer.getDynamicPrice(usdPrice);
 
         return flrPrice;
     }
