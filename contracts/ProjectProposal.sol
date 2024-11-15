@@ -402,8 +402,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         
         } else {
 
-            console.log("Current voting power: %d", currentVotingPower);
-
             //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
             if (currentVotingPower == 0) {
                 revert InvalidVotingPower();
