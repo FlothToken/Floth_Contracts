@@ -30,6 +30,11 @@ describe("Floth Contract", function () {
       const ownerBalance = await floth.balanceOf(owner.address);
       expect(await floth.totalSupply()).to.equal(ownerBalance);
     });
+
+    it("Should revert when deploying with empty name or symbol", async function () {
+      await expect(Floth.deploy([dexAddress.address], "", "FLOTH")).to.be.revertedWithCustomError(Floth, "InvalidTokenNameOrSymbol");
+      await expect(Floth.deploy([dexAddress.address], "Floth Token", "")).to.be.revertedWithCustomError(Floth, "InvalidTokenNameOrSymbol");
+    });
   });
 
   describe("Transactions", function () {
