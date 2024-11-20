@@ -35,7 +35,7 @@ contract Floth is ERC20Votes, Ownable {
     error InvalidTaxAmount();
     error ZeroAddress();
     error SelfTransfer();
-
+    error InvalidTokenNameOrSymbol();
     /**
      * Constructor to initialize the contract.
      * @param _dexAddresses Initial array of DEX addresses FLOTH is traded on
@@ -47,6 +47,10 @@ contract Floth is ERC20Votes, Ownable {
         string memory _name,
         string memory _symbol
     ) ERC20(_name, _symbol) ERC20Permit(_name) {
+        if (bytes(_name).length == 0 || bytes(_symbol).length == 0) {
+            revert InvalidTokenNameOrSymbol();
+        }
+
         _mint(msg.sender, 100 * 10 ** 9 * 10 ** 18); // 100 billion tokens with 18 decimals.
 
         for (uint256 i = 0; i < _dexAddresses.length; i++) {
