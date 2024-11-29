@@ -39,6 +39,8 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     event DexAddressAdded(address indexed dexAddress);
     event DexAddressRemoved(address indexed dexAddress);
     event EmergencyPause(bool indexed paused);
+    event GrantFundWalletUpdated(address indexed newGrantFundWallet);
+    event LpFundWalletUpdated(address indexed newLpFundWallet);
 
     // Custom errors save gas compared to require statements
     error InvalidTaxAmount();
@@ -125,7 +127,9 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param _newGrantFundWallet New grant fund wallet to be set.
      */
     function setGrantFundWallet(address _newGrantFundWallet) external onlyOwner {
+        if (_newGrantFundWallet == address(0)) revert ZeroAddress();
         grantFundWallet = _newGrantFundWallet;
+        emit GrantFundWalletUpdated(_newGrantFundWallet);
     }
 
     /**
@@ -133,7 +137,9 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param _newLpFundWallet New LP fund wallet to be set.
      */
     function setLpFundWallet(address _newLpFundWallet) external onlyOwner {
+        if (_newLpFundWallet == address(0)) revert ZeroAddress();
         lpFundWallet = _newLpFundWallet;
+        emit LpFundWalletUpdated(_newLpFundWallet);
     }
 
     /**
