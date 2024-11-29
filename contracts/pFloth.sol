@@ -12,13 +12,23 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 // ERC20 contract for presale floth token
 contract pFloth is ERC20, Ownable, ReentrancyGuard {
-    //Constants
-    uint256 public constant MAX_SUPPLY = 30 * 10 ** 9 * 10 ** 18; // 30 billion pFLOTH
-    uint256 public constant EXCHANGE_RATE = 10000; // 1 FLR = 10,000 pFLOTH
-    uint256 public constant WALLET_LIMIT = 2.5 * 10 ** 9 * 10 ** 18; // 2.5 billion pFLOTH per wallet
 
-    // Variables
-    uint256 public presaleEndTime;
+    // More readable and gas efficient way to write large numbers
+    uint256 private constant DECIMALS = 18;
+    uint256 private constant BILLION = 1_000_000_000;
+    uint256 public constant MAX_SUPPLY = 30 * BILLION * 10**DECIMALS;
+    uint256 public constant WALLET_LIMIT = 25 * (BILLION / 10) * 10**DECIMALS; // 2.5 billion
+    uint256 public constant EXCHANGE_RATE = 10_000;
+    uint256 public constant MIN_PURCHASE = 100_000_000 gwei; // 0.1 FLR
+
+    // Pack variables together to save storage slots
+    struct PresaleInfo {
+        uint64 startTime;
+        uint64 endTime;
+        bool paused;
+        bool finalized;
+    }
+    PresaleInfo public presaleInfo;
 
     // Mappings
     mapping(address => uint256) public pFLOTHBalance;
@@ -28,7 +38,8 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
      * @param _presaleDuration The duration of the presale in seconds
      */
     constructor(uint256 _presaleDuration) ERC20("Presale Floth", "pFloth") {
-        presaleEndTime = block.timestamp + _presaleDuration;
+        presaleInfo.startTime = uint64(block.timestamp);
+        presaleInfo.endTime = uint64(block.timestamp + _presaleDuration);
     }
 
     // Events
@@ -40,12 +51,13 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     error ExceedsSupply();
     error WalletLimitExceeded();
     error TransferFailed();
+    error PresaleNotActive();
 
     /**
      * @dev Function to buy pFLOTH during the presale
      */
     function presale() external payable {
-        if (block.timestamp > presaleEndTime) {
+        if (block.timestamp > presaleInfo.endTime) {
             revert PresaleEnded();
         }
 
@@ -72,7 +84,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
      * Only the owner can call this function
      */
     function extendPresale(uint256 _duration) external onlyOwner {
-        presaleEndTime += _duration;
+        presaleInfo.endTime += _duration;
     }
 
     /**
