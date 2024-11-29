@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -207,7 +207,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
                 taxAmount = (_amount * _taxInfo.buyTax) / BASIS_POINTS;
             }
             if (taxAmount > 0) {
-                super._transfer(_sender, GRANT_FUND_WALLET, taxAmount);
+                super._transfer(_sender, grantFundWallet, taxAmount); 
             }
         } else {
             // Sell transaction
