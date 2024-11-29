@@ -25,7 +25,8 @@
     "@nomicfoundation/hardhat-verify": "^2.0.8",
     "dotenv": "^16.4.5",
     "erc721a-upgradeable": "^4.3.0",
-    "hardhat": "^2.22.16"
+    "hardhat": "^2.22.16",
+    "solc": "^0.8.28"
   },
   "dependencies": {
     "@flarenetwork/flare-periphery-contracts": "^0.1.16",

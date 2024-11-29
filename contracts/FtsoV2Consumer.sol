@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity >=0.8.2 <0.9.0;
+pragma solidity 0.8.20;
 
 import "@flarenetwork/flare-periphery-contracts/flare/ContractRegistry.sol";
 import "@flarenetwork/flare-periphery-contracts/flare/FtsoV2Interface.sol";
