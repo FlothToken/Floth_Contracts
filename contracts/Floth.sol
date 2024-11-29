@@ -11,11 +11,15 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  */
 contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     uint256 private constant INITIAL_SUPPLY = 100 * 10**9; // 100 billion
+    uint256 private constant MAX_TAX = 500; // 5%
+    uint256 private constant BASIS_POINTS = 10000;
+
+    uint256 private  GRANT_FUND_SPLIT = 8333; // 83.3% of tax amount (2.5% from the 3%)
 
     // Packing similar storage variables together to save slots
     struct TaxInfo {
-        uint128 buyTax;  // Reduced to uint128 as it never exceeds 5%
-        uint128 sellTax; // Reduced to uint128 as it never exceeds 5%
+        uint128 buyTax;  // Reduced to uint128 as it never exceeds this value
+        uint128 sellTax; // Reduced to uint128 as it never exceeds this value
         bool lpTaxIsActive; // Flag to enable/disable LP tax
         bool paused; // Flag to enable/disable emergency pause
     }
@@ -61,7 +65,8 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
 
         _mint(msg.sender, 100 * 10 ** 9 * 10 ** 18); // 100 billion tokens with 18 decimals.
 
-        // Initialize tax structure
+        // Initialize tax structure 
+        // Initially 25/35% for taxes but can only be changed to 5% after this initial period
         taxInfo.buyTax = 2500;  // 25%
         taxInfo.sellTax = 3500; // 35%
         taxInfo.lpTaxIsActive = true;
@@ -211,10 +216,10 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
             }
             if (taxAmount > 0) {
                 uint256 grantFundAmount = (taxAmount * GRANT_FUND_SPLIT) / BASIS_POINTS;
-                super._transfer(_sender, GRANT_FUND_WALLET, grantFundAmount);
+                super._transfer(_sender, grantFundWallet, grantFundAmount);
 
                 if (_taxInfo.lpTaxIsActive) {
-                    super._transfer(_sender, LP_FUND_WALLET, taxAmount - grantFundAmount);
+                    super._transfer(_sender, lpFundWallet, taxAmount - grantFundAmount);
                 }
             }
         }
