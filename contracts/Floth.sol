@@ -64,9 +64,6 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         if (bytes(_name).length == 0 || bytes(_symbol).length == 0) {
             revert InvalidTokenNameOrSymbol();
         }
-
-        _mint(msg.sender, 100 * 10 ** 9 * 10 ** 18); // 100 billion tokens with 18 decimals.
-
         // Initialize tax structure 
         // Initially 25/35% for taxes but can only be changed to 5% after this initial period
         taxInfo.buyTax = 2500;  // 25%
