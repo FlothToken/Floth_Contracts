@@ -190,5 +190,10 @@ contract Floth is ERC20Votes, Ownable {
 
         uint256 totalPayable = _amount - taxAmount; // Final tax amount is deducted.
         super._transfer(_sender, _recipient, totalPayable);
+
+        // Auto-delegate to self on transfer to allow voting immediately.
+        if (delegates(_recipient) == address(0)) {
+            _delegate(_recipient, _recipient);
+        }
     }
 }
