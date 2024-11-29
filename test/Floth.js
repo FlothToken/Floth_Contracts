@@ -219,6 +219,7 @@ describe("Floth Contract", function () {
   describe("Admin functions", function () {
     it("Should allow owner to set new buy tax", async function () {
       await floth.setBuyTax(400);
+      const taxInfo = await floth.getTaxInfo();
       expect(taxInfo.buyTax).to.equal(400);
     });
 
@@ -228,6 +229,7 @@ describe("Floth Contract", function () {
 
     it("Should allow owner to set new sell tax", async function () {
       await floth.setSellTax(400);
+      const taxInfo = await floth.getTaxInfo();
       expect(taxInfo.sellTax).to.equal(400);
     });
 
@@ -264,19 +266,21 @@ describe("Floth Contract", function () {
     });
 
     it("Should allow owner to set lp pair address", async function () {
-      await floth.setLpFundWalletAddress(addr1.address);
+      await floth.setLpFundWallet(addr1.address);
       expect(await floth.lpFundWallet()).to.equal(addr1.address);
     });
 
     it("Should revert when setting lp pair address to zero address", async function () {
-      await expect(floth.setLpFundWalletAddress(zeroAddress)).to.be.revertedWithCustomError(Floth, "ZeroAddress");
+      await expect(floth.setLpFundWallet(zeroAddress)).to.be.revertedWithCustomError(Floth, "ZeroAddress");
     });
 
     it("Should allow owner to toggle LP tax status", async function () {
       await floth.setLpTaxStatus(false);
-      expect(await floth.lpTaxIsActive()).to.equal(false);
+      const taxInfo = await floth.getTaxInfo();
+      expect(taxInfo.lpTaxActive).to.equal(false);
       await floth.setLpTaxStatus(true);
-      expect(await floth.lpTaxIsActive()).to.equal(true);
+      const taxInfo2 = await floth.getTaxInfo();
+      expect(taxInfo2.lpTaxActive).to.equal(true);
     });
 
     it("Should emit events on admin actions", async function () {
@@ -285,7 +289,7 @@ describe("Floth Contract", function () {
       await expect(floth.addDexAddress(addr1.address)).to.emit(floth, "DexAddressAdded").withArgs(addr1.address);
       await expect(floth.removeDexAddress(addr1.address)).to.emit(floth, "DexAddressRemoved").withArgs(addr1.address);
       await expect(floth.setGrantFundWallet(addr1.address)).to.emit(floth, "GrantFundWalletUpdated").withArgs(addr1.address);
-      await expect(floth.setLpFundWalletAddress(addr1.address)).to.emit(floth, "LpFundWalletUpdated").withArgs(addr1.address);
+      await expect(floth.setLpFundWallet(addr1.address)).to.emit(floth, "LpFundWalletUpdated").withArgs(addr1.address);
     });
   });
 
