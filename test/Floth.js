@@ -219,7 +219,7 @@ describe("Floth Contract", function () {
   describe("Admin functions", function () {
     it("Should allow owner to set new buy tax", async function () {
       await floth.setBuyTax(400);
-      expect(await floth.buyTax()).to.equal(400);
+      expect(taxInfo.buyTax).to.equal(400);
     });
 
     it("Should revert when non-owner tries to set buy tax", async function () {
@@ -228,7 +228,7 @@ describe("Floth Contract", function () {
 
     it("Should allow owner to set new sell tax", async function () {
       await floth.setSellTax(400);
-      expect(await floth.sellTax()).to.equal(400);
+      expect(taxInfo.sellTax).to.equal(400);
     });
 
     it("Should revert when non-owner tries to set sell tax", async function () {
@@ -286,6 +286,74 @@ describe("Floth Contract", function () {
       await expect(floth.removeDexAddress(addr1.address)).to.emit(floth, "DexAddressRemoved").withArgs(addr1.address);
       await expect(floth.setGrantFundWallet(addr1.address)).to.emit(floth, "GrantFundWalletUpdated").withArgs(addr1.address);
       await expect(floth.setLpFundWalletAddress(addr1.address)).to.emit(floth, "LpFundWalletUpdated").withArgs(addr1.address);
+    });
+  });
+
+  describe("Tax Information", function () {
+    it("Should return correct tax information", async function () {
+      const taxInfo = await floth.getTaxInfo();
+      expect(taxInfo.buyTax).to.equal(2500); // Initial 25%
+      expect(taxInfo.sellTax).to.equal(3500); // Initial 35%
+      expect(taxInfo.lpTaxActive).to.equal(true);
+      expect(taxInfo.paused).to.equal(false);
+    });
+
+    it("Should update tax info when values change", async function () {
+      await floth.setBuyTax(300);  // 3%
+      await floth.setSellTax(400); // 4%
+      await floth.setLpTaxStatus(false);
+      
+      const taxInfo = await floth.getTaxInfo();
+      expect(taxInfo.buyTax).to.equal(300);
+      expect(taxInfo.sellTax).to.equal(400);
+      expect(taxInfo.lpTaxActive).to.equal(false);
+    });
+  });
+
+  describe("Emergency Pause", function () {
+    it("Should allow owner to toggle pause", async function () {
+      await floth.togglePause();
+      const taxInfo = await floth.getTaxInfo();
+      expect(taxInfo.paused).to.equal(true);
+    });
+
+    it("Should prevent transfers when paused", async function () {
+      await floth.togglePause();
+      await expect(floth.transfer(addr1.address, 100))
+        .to.be.revertedWithCustomError(floth, "Paused");
+    });
+
+    it("Should allow transfers after unpause", async function () {
+      await floth.togglePause();
+      await floth.togglePause(); // unpause
+      await floth.transfer(addr1.address, 100);
+      expect(await floth.balanceOf(addr1.address)).to.equal(100);
+    });
+  });
+
+  describe("Invalid Operations", function () {
+    it("Should revert on zero amount transfers", async function () {
+      await expect(floth.transfer(addr1.address, 0))
+        .to.be.revertedWithCustomError(floth, "InvalidAmount");
+    });
+
+    it("Should revert on transfers to self", async function () {
+      await expect(floth.transfer(owner.address, 100))
+        .to.be.revertedWithCustomError(floth, "SelfTransfer");
+    });
+  });
+
+  describe("Delegation", function () {
+    it("Should auto-delegate to self on first transfer", async function () {
+      await floth.transfer(addr1.address, 100);
+      expect(await floth.delegates(addr1.address)).to.equal(addr1.address);
+    });
+
+    it("Should maintain delegation on subsequent transfers", async function () {
+      await floth.transfer(addr1.address, 100);
+      await floth.connect(addr1).transfer(addr2.address, 50);
+      expect(await floth.delegates(addr1.address)).to.equal(addr1.address);
+      expect(await floth.delegates(addr2.address)).to.equal(addr2.address);
     });
   });
 });

@@ -121,6 +121,22 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     }
 
     /**
+     * @dev Setter for grant fund wallet.
+     * @param _newGrantFundWallet New grant fund wallet to be set.
+     */
+    function setGrantFundWallet(address _newGrantFundWallet) external onlyOwner {
+        grantFundWallet = _newGrantFundWallet;
+    }
+
+    /**
+     * @dev Setter for LP fund wallet.
+     * @param _newLpFundWallet New LP fund wallet to be set.
+     */
+    function setLpFundWallet(address _newLpFundWallet) external onlyOwner {
+        lpFundWallet = _newLpFundWallet;
+    }
+
+    /**
      * @dev Toggle emergency pause
      */
     function togglePause() external onlyOwner {
