@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title Test Presale Floth Token
- * @author Ethereal Labs
+ * @author Ethereal Labs Ltd
  */
 contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
     // More readable and gas efficient way to write large numbers
@@ -46,7 +46,7 @@ contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
     error PresaleNotActive();
     error PresaleNotStarted();
     error PresaleEnded();
-    error PresalePaused();
+    error PresaleIsPaused();
     error BelowMinimumPurchase();
     error ExceedsSupply();
     error WalletLimitExceeded();
@@ -70,7 +70,7 @@ contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
     modifier onlyDuringPresale() {
         if (block.timestamp < presaleInfo.startTime) revert PresaleNotStarted();
         if (block.timestamp > presaleInfo.endTime) revert PresaleEnded();
-        if (presaleInfo.paused) revert PresalePaused();
+        if (presaleInfo.paused) revert PresaleIsPaused();
         _;
     }
 
