@@ -69,7 +69,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     error TransferFailed();
     error PresaleNotActive();
     error PresaleNotStarted();
-    error PresalePaused();
+    error PresaleIsPaused();
     error BelowMinimumPurchase();
     error ExceedsWalletLimit();
     error InvalidRecoveryAmount();
@@ -78,7 +78,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     modifier onlyDuringPresale() {
         if (block.timestamp < presaleInfo.startTime) revert PresaleNotStarted();
         if (block.timestamp > presaleInfo.endTime) revert PresaleEnded();
-        if (presaleInfo.paused) revert PresalePaused();
+        if (presaleInfo.paused) revert PresaleIsPaused();
         _;
     }
 
