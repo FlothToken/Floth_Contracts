@@ -108,4 +108,9 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
 
         emit Withdraw(msg.sender, _amount);
     }
+
+    function togglePause() external onlyOwner {
+        presaleInfo.paused = !presaleInfo.paused;
+        emit PresalePaused(presaleInfo.paused);
+    }
 }
