@@ -44,7 +44,22 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     }
 
     // Events
-    event Presale(address buyer, uint256 amountFLR, uint256 amountpFLOTH);
+    event PresaleStarted(uint256 startTime, uint256 endTime);
+    event PresaleExtended(uint256 oldEndTime, uint256 newEndTime);
+    event PresalePaused(bool isPaused);
+    event PresaleFinalized(uint256 totalRaised, uint256 totalMinted);
+    event Presale(
+        address indexed buyer,
+        uint256 amountFLR,
+        uint256 amountpFLOTH,
+        uint256 timestamp
+    );
+    event Refunded(
+        address indexed buyer,
+        uint256 amountFLR,
+        uint256 amountpFLOTH
+    );
+    event TokenRecovered(address token, uint256 amount);
     event Withdraw(address owner, uint256 amount);
 
     // Errors
@@ -55,7 +70,11 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     error PresaleNotActive();
     error PresaleNotStarted();
     error PresalePaused();
+    error BelowMinimumPurchase();
+    error ExceedsWalletLimit();
+    error InvalidRecoveryAmount();
 
+    // Modifiers
     modifier onlyDuringPresale() {
         if (block.timestamp < presaleInfo.startTime) revert PresaleNotStarted();
         if (block.timestamp > presaleInfo.endTime) revert PresaleEnded();
@@ -66,40 +85,50 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     /**
      * @dev Function to buy pFLOTH during the presale
      */
-    function presale() external payable {
-        if (block.timestamp > presaleInfo.endTime) {
-            revert PresaleEnded();
-        }
-
-        uint256 amountFLR = msg.value; // msg.value is the amount of FLR sent as native token
-        uint256 amountpFLOTH = amountFLR * EXCHANGE_RATE;
-
-        if (totalSupply() + amountpFLOTH > MAX_SUPPLY) {
-            revert ExceedsSupply();
-        }
-        if (balanceOf(msg.sender) + amountpFLOTH > WALLET_LIMIT) {
-            revert WalletLimitExceeded();
-        }
-
-        pFLOTHBalance[msg.sender] += amountpFLOTH;
+    function presale() external payable onlyDuringPresale nonReentrant {
+        if (msg.value < MIN_PURCHASE) revert BelowMinimumPurchase();
+        
+        uint256 amountpFLOTH = msg.value * EXCHANGE_RATE;
+        
+        if (totalSupply() + amountpFLOTH > MAX_SUPPLY) revert ExceedsSupply();
+        if (balanceOf(msg.sender) + amountpFLOTH > WALLET_LIMIT) revert ExceedsWalletLimit();
 
         _mint(msg.sender, amountpFLOTH);
-
-        emit Presale(msg.sender, amountFLR, amountpFLOTH);
+        
+        emit Presale(
+            msg.sender,
+            msg.value,
+            amountpFLOTH,
+            block.timestamp
+        );
     }
 
     /**
-     * Function to extend the presale duration
+     * @dev Function to extend the presale duration
      * @param _duration The duration in seconds to extend the presale by
      * Only the owner can call this function
      */
     function extendPresale(uint256 _duration) external onlyOwner {
-        presaleInfo.endTime += _duration;
+        uint256 oldEndTime = presaleInfo.endTime;
+        presaleInfo.endTime += uint64(_duration);
+        emit PresaleExtended(oldEndTime, presaleInfo.endTime);
     }
 
     /**
-     * Function to withdraw FLR collected during the presale
+     * @dev Toggle emergency pause functionality
      * Only the owner can call this function
+     * Emits a PresalePaused event
+     */
+    function togglePause() external onlyOwner {
+        presaleInfo.paused = !presaleInfo.paused;
+        emit PresalePaused(presaleInfo.paused);
+    }
+
+    /**
+     * @dev Function to withdraw FLR collected during the presale
+     * Only the owner can call this function
+     * Implements nonReentrant pattern for security
+     * Emits a Withdraw event upon successful withdrawal
      */
     function withdraw() external onlyOwner nonReentrant {
         uint256 _amount = address(this).balance;
@@ -109,8 +138,63 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
         emit Withdraw(msg.sender, _amount);
     }
 
-    function togglePause() external onlyOwner {
-        presaleInfo.paused = !presaleInfo.paused;
-        emit PresalePaused(presaleInfo.paused);
+    /**
+     * @dev Recover any ERC20 tokens accidentally sent to the contract
+     * @param token The address of the token to recover
+     * @param amount The amount of tokens to recover
+     * Only the owner can call this function
+     * Cannot be used to recover pFLOTH tokens
+     * Implements nonReentrant pattern for security
+     * Emits a TokenRecovered event upon successful recovery
+     */
+    function recoverERC20(
+        address token,
+        uint256 amount
+    ) external onlyOwner nonReentrant {
+        if (token == address(this)) revert InvalidRecoveryAmount();
+        if (amount > IERC20(token).balanceOf(address(this))) 
+            revert InvalidRecoveryAmount();
+        
+        IERC20(token).transfer(owner(), amount);
+        emit TokenRecovered(token, amount);
+    }
+
+    /**
+     * @dev View function to get remaining supply of pFLOTH tokens
+     * @return uint256 The number of tokens still available for presale
+     */
+    function remainingSupply() external view returns (uint256) {
+        return MAX_SUPPLY - totalSupply();
+    }
+
+    /**
+     * @dev View function to get remaining time in the presale
+     * @return uint256 The number of seconds remaining in the presale
+     * Returns 0 if presale has ended
+     */
+    function presaleTimeRemaining() external view returns (uint256) {
+        if (block.timestamp >= presaleInfo.endTime) return 0;
+        return presaleInfo.endTime - block.timestamp;
+    }
+
+    /**
+     * @dev View function to get comprehensive presale statistics
+     * @return totalRaised The total amount of FLR raised
+     * @return totalMinted The total amount of pFLOTH tokens minted
+     * @return remaining The remaining amount of pFLOTH tokens available
+     * @return isActive Whether the presale is currently active
+     */
+    function getPresaleStats() external view returns (
+        uint256 totalRaised,
+        uint256 totalMinted,
+        uint256 remaining,
+        bool isActive
+    ) {
+        totalRaised = address(this).balance;
+        totalMinted = totalSupply();
+        remaining = MAX_SUPPLY - totalMinted;
+        isActive = block.timestamp >= presaleInfo.startTime && 
+                   block.timestamp <= presaleInfo.endTime && 
+                   !presaleInfo.paused;
     }
 }
