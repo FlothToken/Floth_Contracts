@@ -40,6 +40,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     constructor(uint256 _presaleDuration) ERC20("Presale Floth", "pFloth") {
         presaleInfo.startTime = uint64(block.timestamp);
         presaleInfo.endTime = uint64(block.timestamp + _presaleDuration);
+        emit PresaleStarted(presaleInfo.startTime, presaleInfo.endTime);
     }
 
     // Events
@@ -52,6 +53,15 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     error WalletLimitExceeded();
     error TransferFailed();
     error PresaleNotActive();
+    error PresaleNotStarted();
+    error PresalePaused();
+
+    modifier onlyDuringPresale() {
+        if (block.timestamp < presaleInfo.startTime) revert PresaleNotStarted();
+        if (block.timestamp > presaleInfo.endTime) revert PresaleEnded();
+        if (presaleInfo.paused) revert PresalePaused();
+        _;
+    }
 
     /**
      * @dev Function to buy pFLOTH during the presale
