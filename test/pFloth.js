@@ -25,26 +25,35 @@ describe("pFLOTH Contract", function () {
   describe("Deployment", function () {
     it("Should set the correct presale end time", async function () {
       const blockTimestamp = (await ethers.provider.getBlock()).timestamp;
-      expect(await pFLOTH.presaleEndTime()).to.be.closeTo(blockTimestamp + PRESALE_DURATION, 1);
+      const presaleInfo = await pFLOTH.presaleInfo();
+      expect(presaleInfo.endTime).to.be.closeTo(blockTimestamp + PRESALE_DURATION, 1);
     });
   });
 
   describe("Presale", function () {
+    it("Should revert if below minimum purchase", async function () {
+      const minPurchase = ethers.parseUnits("0.1", "gwei");
+      await expect(pFLOTH.connect(addr1).presale({ value: minPurchase - 1n }))
+        .to.be.revertedWithCustomError(pFLOTH, "BelowMinimumPurchase");
+    });
+
     it("Should revert if presale has ended", async function () {
       await ethers.provider.send("evm_increaseTime", [PRESALE_DURATION + 1]);
       await ethers.provider.send("evm_mine", []);
 
-      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.be.revertedWithCustomError(pFLOTH, "PresaleEnded");
+      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) }))
+        .to.be.revertedWithCustomError(pFLOTH, "PresaleEnded");
     });
 
     it("Should be able to extend the presale end time", async function () {
       const additionalTime = 3600; // 1 hour
-      const presaleEndTime = await pFLOTH.presaleEndTime();
+      const presaleInfo = await pFLOTH.presaleInfo();
+      const presaleEndTime = await presaleInfo.presaleEndTime;
       await pFLOTH.extendPresale(additionalTime);
 
       const newEndTime = BigInt(presaleEndTime) + BigInt(additionalTime);
 
-      expect(await pFLOTH.presaleEndTime()).to.equal(newEndTime);
+      expect(await presaleInfo.presaleEndTime).to.equal(newEndTime);
     });
 
     it("Should mint the correct amount of pFLOTH tokens", async function () {
@@ -78,10 +87,12 @@ describe("pFLOTH Contract", function () {
     it("Should emit Presale event", async function () {
       const amountFLR = ethers.parseUnits("1", 18);
       const amountpFLOTH = amountFLR * EXCHANGE_RATE;
+      const blockBefore = await ethers.provider.getBlock("latest").timestamp;
+      const timestamp = BigInt(blockBefore.timestamp);
 
       await expect(pFLOTH.connect(addr1).presale({ value: amountFLR }))
         .to.emit(pFLOTH, "Presale")
-        .withArgs(addr1.address, amountFLR, amountpFLOTH);
+        .withArgs(addr1.address, amountFLR, amountpFLOTH, timestamp + BigInt(1));
     });
 
     it("Should handle multiple presale transactions from different accounts correctly", async function () {
@@ -120,6 +131,44 @@ describe("pFLOTH Contract", function () {
       await ethers.provider.send("evm_mine", []);
 
       await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.be.revertedWithCustomError(pFLOTH, "PresaleEnded");
+    });
+
+    it("Should return correct presale time remaining", async function () {
+      const timeRemaining = await pFLOTH.presaleTimeRemaining();
+      expect(timeRemaining).to.be.closeTo(BigInt(PRESALE_DURATION), 2n);
+
+      // After presale ends
+      await ethers.provider.send("evm_increaseTime", [PRESALE_DURATION + 1]);
+      await ethers.provider.send("evm_mine", []);
+      
+      expect(await pFLOTH.presaleTimeRemaining()).to.equal(0);
+    });
+
+    it("Should return correct presale stats", async function () {
+      const amountFLR = ethers.parseUnits("1", 18);
+      await pFLOTH.connect(addr1).presale({ value: amountFLR });
+
+      const stats = await pFLOTH.getPresaleStats();
+      expect(stats.totalRaised).to.equal(amountFLR);
+      expect(stats.totalMinted).to.equal(amountFLR * EXCHANGE_RATE);
+      expect(stats.isActive).to.be.true;
+
+      // Test remaining supply
+      const remainingSupply = await pFLOTH.remainingSupply();
+      const MAX_SUPPLY = await pFLOTH.MAX_SUPPLY();
+      expect(remainingSupply).to.equal(MAX_SUPPLY - (amountFLR * EXCHANGE_RATE));
+    });
+
+    it("Should handle pause functionality", async function () {
+      await pFLOTH.connect(owner).togglePause();
+      
+      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) }))
+        .to.be.revertedWithCustomError(pFLOTH, "PresaleIsPaused");
+
+      // Unpause and verify presale works again
+      await pFLOTH.connect(owner).togglePause();
+      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) }))
+        .to.not.be.reverted;
     });
   });
 
