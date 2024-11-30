@@ -6,7 +6,7 @@ import "./IFloth.sol";
 
 /**
  * @title ProjectProposalTest contract for the Floth protocol
- * @author Ethereal Labs
+ * @author Ethereal Labs Ltd
  */
 contract ProjectProposalTest is AccessControl {
     // Define roles for the contract

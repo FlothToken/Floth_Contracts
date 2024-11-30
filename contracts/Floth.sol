@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title Floth ERC20 token on Flare.
- * @author Ethereal Labs
+ * @author Ethereal Labs Ltd
  */
 contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     uint256 private constant INITIAL_SUPPLY = 100 * 10**9; // 100 billion

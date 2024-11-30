@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+/**
+ * @title Floth Interface
+ * @author Ethereal Labs Ltd
+ */
 interface IFloth {
     // Core ERC20 & voting functionality
     function getPastVotes(address account, uint256 timepoint) external view returns (uint256);

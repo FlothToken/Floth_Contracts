@@ -9,7 +9,7 @@ import "./IFlothPass.sol";
 
 /**
  * @title ProjectProposalUpgrade contract for the Floth protocol
- * @author Ethereal Labs
+ * @author Ethereal Labs Ltd
  */
 contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     // Define roles for the contract

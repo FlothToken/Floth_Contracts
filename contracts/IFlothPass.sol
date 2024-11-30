@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+/**
+ * @title Floth Pass Interface
+ * @author Ethereal Labs Ltd
+ */
 interface IFlothPass {
     function balanceOf(address account) external view returns (uint256);
 
