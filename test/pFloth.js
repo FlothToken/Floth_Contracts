@@ -88,7 +88,7 @@ describe("pFLOTH Contract", function () {
 
       const amountFLR = newWalletLimit / EXCHANGE_RATE + BigInt(1);
 
-      await expect(pFLOTHTest.connect(addr1).presale({ value: amountFLR })).to.be.revertedWithCustomError(pFLOTHTest, "WalletLimitExceeded");
+      await expect(pFLOTHTest.connect(addr1).presale({ value: amountFLR })).to.be.revertedWithCustomError(pFLOTHTest, "ExceedsWalletLimit");
     });
 
     it("Should emit Presale event", async function () {
