@@ -47,13 +47,20 @@ describe("pFLOTH Contract", function () {
 
     it("Should be able to extend the presale end time", async function () {
       const additionalTime = 3600; // 1 hour
-      const presaleInfo = await pFLOTH.presaleInfo();
-      const presaleEndTime = await presaleInfo.presaleEndTime;
+      
+      // Get initial presale info
+      const initialPresaleInfo = await pFLOTH.presaleInfo();
+      const initialEndTime = initialPresaleInfo[1]; // Accessing endTime using array indexing
+      
+      // Extend the presale
       await pFLOTH.extendPresale(additionalTime);
-
-      const newEndTime = BigInt(presaleEndTime) + BigInt(additionalTime);
-
-      expect(await presaleInfo.presaleEndTime).to.equal(newEndTime);
+      
+      // Get updated presale info
+      const updatedPresaleInfo = await pFLOTH.presaleInfo();
+      const newEndTime = updatedPresaleInfo[1]; // Accessing endTime using array indexing
+      
+      // Verify the end time was extended correctly
+      expect(newEndTime).to.equal(initialEndTime + BigInt(additionalTime));
     });
 
     it("Should mint the correct amount of pFLOTH tokens", async function () {
@@ -87,8 +94,8 @@ describe("pFLOTH Contract", function () {
     it("Should emit Presale event", async function () {
       const amountFLR = ethers.parseUnits("1", 18);
       const amountpFLOTH = amountFLR * EXCHANGE_RATE;
-      const blockBefore = await ethers.provider.getBlock("latest").timestamp;
-      const timestamp = BigInt(blockBefore.timestamp);
+      const block = await ethers.provider.getBlock("latest");
+      const timestamp = BigInt(block.timestamp);
 
       await expect(pFLOTH.connect(addr1).presale({ value: amountFLR }))
         .to.emit(pFLOTH, "Presale")
