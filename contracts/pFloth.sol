@@ -34,12 +34,12 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     mapping(address => uint256) public pFLOTHBalance;
 
     /**
-     * Constructor for the pFloth contract
+     * @dev Constructor for the pFloth contract
      * @param _presaleDuration The duration of the presale in seconds
      */
     constructor(uint256 _presaleDuration) ERC20("Presale Floth", "pFloth") {
-        presaleInfo.startTime = (block.timestamp);
-        presaleInfo.endTime = (block.timestamp + _presaleDuration);
+        presaleInfo.startTime = block.timestamp;
+        presaleInfo.endTime = block.timestamp + _presaleDuration;
         emit PresaleStarted(presaleInfo.startTime, presaleInfo.endTime);
     }
 
@@ -47,17 +47,11 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     event PresaleStarted(uint256 startTime, uint256 endTime);
     event PresaleExtended(uint256 oldEndTime, uint256 newEndTime);
     event PresalePaused(bool isPaused);
-    event PresaleFinalized(uint256 totalRaised, uint256 totalMinted);
     event Presale(
         address indexed buyer,
         uint256 amountFLR,
         uint256 amountpFLOTH,
         uint256 timestamp
-    );
-    event Refunded(
-        address indexed buyer,
-        uint256 amountFLR,
-        uint256 amountpFLOTH
     );
     event TokenRecovered(address token, uint256 amount);
     event Withdraw(address owner, uint256 amount);
@@ -65,9 +59,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     // Errors
     error PresaleEnded();
     error ExceedsSupply();
-    error WalletLimitExceeded();
     error TransferFailed();
-    error PresaleNotActive();
     error PresaleNotStarted();
     error PresaleIsPaused();
     error BelowMinimumPurchase();
@@ -83,7 +75,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Function to buy pFLOTH during the presale
+     * @dev Main presale function to purchase pFLOTH tokens
      */
     function presale() external payable onlyDuringPresale nonReentrant {
         if (msg.value < MIN_PURCHASE) revert BelowMinimumPurchase();
@@ -94,6 +86,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
         if (balanceOf(msg.sender) + amountpFLOTH > WALLET_LIMIT) revert ExceedsWalletLimit();
 
         _mint(msg.sender, amountpFLOTH);
+        pFLOTHBalance[msg.sender] += amountpFLOTH;
         
         emit Presale(
             msg.sender,
