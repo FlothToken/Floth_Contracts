@@ -23,8 +23,8 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
 
     // Pack variables together to save storage slots
     struct PresaleInfo {
-        uint64 startTime;
-        uint64 endTime;
+        uint256 startTime;
+        uint256 endTime;
         bool paused;
         bool finalized;
     }
@@ -38,8 +38,8 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
      * @param _presaleDuration The duration of the presale in seconds
      */
     constructor(uint256 _presaleDuration) ERC20("Presale Floth", "pFloth") {
-        presaleInfo.startTime = uint64(block.timestamp);
-        presaleInfo.endTime = uint64(block.timestamp + _presaleDuration);
+        presaleInfo.startTime = (block.timestamp);
+        presaleInfo.endTime = (block.timestamp + _presaleDuration);
         emit PresaleStarted(presaleInfo.startTime, presaleInfo.endTime);
     }
 
@@ -110,7 +110,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
      */
     function extendPresale(uint256 _duration) external onlyOwner {
         uint256 oldEndTime = presaleInfo.endTime;
-        presaleInfo.endTime += uint64(_duration);
+        presaleInfo.endTime += _duration;
         emit PresaleExtended(oldEndTime, presaleInfo.endTime);
     }
 
