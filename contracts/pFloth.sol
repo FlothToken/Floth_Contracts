@@ -14,20 +14,18 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 contract pFloth is ERC20, Ownable, ReentrancyGuard {
 
     // More readable and gas efficient way to write large numbers
-    uint256 private constant DECIMALS = 18;
     uint256 private constant BILLION = 1_000_000_000;
-    uint256 public constant MAX_SUPPLY = 30 * BILLION * 10**DECIMALS;
-    uint256 public constant WALLET_LIMIT = 25 * (BILLION / 10) * 10**DECIMALS; // 2.5 billion
+    uint256 public constant MAX_SUPPLY = 30 * BILLION * 10**decimals();
+    uint256 public constant WALLET_LIMIT = 25 * (BILLION / 10) * 10**decimals(); // 2.5 billion
     uint256 public constant EXCHANGE_RATE = 10_000;
-    uint256 public constant MIN_PURCHASE = 100_000_000 gwei; // 0.1 FLR
 
     // Pack variables together to save storage slots
     struct PresaleInfo {
         uint256 startTime;
         uint256 endTime;
         bool paused;
-        bool finalized;
     }
+    
     PresaleInfo public presaleInfo;
 
     // Mappings
@@ -62,9 +60,8 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     error TransferFailed();
     error PresaleNotStarted();
     error PresaleIsPaused();
-    error BelowMinimumPurchase();
     error ExceedsWalletLimit();
-    error InvalidRecoveryAmount();
+    error InvalidRecoveryToken();
 
     // Modifiers
     modifier onlyDuringPresale() {
@@ -78,16 +75,15 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
      * @dev Main presale function to purchase pFLOTH tokens
      */
     function presale() external payable onlyDuringPresale nonReentrant {
-        if (msg.value < MIN_PURCHASE) revert BelowMinimumPurchase();
         
         uint256 amountpFLOTH = msg.value * EXCHANGE_RATE;
         
         if (totalSupply() + amountpFLOTH > MAX_SUPPLY) revert ExceedsSupply();
-        if (balanceOf(msg.sender) + amountpFLOTH > WALLET_LIMIT) revert ExceedsWalletLimit();
-
-        _mint(msg.sender, amountpFLOTH);
-        pFLOTHBalance[msg.sender] += amountpFLOTH;
+        if (pFLOTHBalance[msg.sender] + amountpFLOTH > WALLET_LIMIT) revert ExceedsWalletLimit();
         
+        pFLOTHBalance[msg.sender] += amountpFLOTH;
+        _mint(msg.sender, amountpFLOTH);
+
         emit Presale(
             msg.sender,
             msg.value,
@@ -131,6 +127,9 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
         emit Withdraw(msg.sender, _amount);
     }
 
+    //TODO: We need to be able to track who sent incorrect erc20s so we can send
+    // them back to the user. For example, wrapped flare might be sent.
+    
     /**
      * @dev Recover any ERC20 tokens accidentally sent to the contract
      * @param token The address of the token to recover
@@ -144,7 +143,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
         address token,
         uint256 amount
     ) external onlyOwner nonReentrant {
-        if (token == address(this)) revert InvalidRecoveryAmount();
+        if (token == address(this)) revert InvalidRecoveryToken();
         if (amount > IERC20(token).balanceOf(address(this))) 
             revert InvalidRecoveryAmount();
         
