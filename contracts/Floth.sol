@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+//TODO: On dex swap, swap FLOTH to Flare - take % and add to grant fund wallet.
+//TODO: Let's check the decimilisation is correct etc.
 /**
  * @title Floth ERC20 token on Flare.
  * @author Ethereal Labs Ltd
@@ -14,7 +16,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     uint256 private constant MAX_TAX = 500; // 5%
     uint256 private constant BASIS_POINTS = 10000;
 
-    uint256 private  GRANT_FUND_SPLIT = 8333; // 83.3% of tax amount (2.5% from the 3%)
+    uint256 private grantFundSplit = 8333; // 83.3% of tax amount (2.5% from the 3%)
 
     // Packing similar storage variables together to save slots
     struct TaxInfo {
@@ -48,7 +50,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     error SelfTransfer();
     error InvalidTokenNameOrSymbol();
     error Paused();
-    error InvalidAmount();
+    error ZeroAmount();
 
     /**
      * Constructor to initialize the contract.
@@ -64,6 +66,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         if (bytes(_name).length == 0 || bytes(_symbol).length == 0) {
             revert InvalidTokenNameOrSymbol();
         }
+
         // Initialize tax structure 
         // Initially 25/35% for taxes but can only be changed to 5% after this initial period
         taxInfo.buyTax = 2500;  // 25%
@@ -87,7 +90,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param amount Amount to be checked.
      */
     modifier validAmount(uint256 amount) {
-        if (amount == 0) revert InvalidAmount();
+        if (amount == 0) revert ZeroAmount();
         _;
     }
 
@@ -220,37 +223,51 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         }
 
         uint256 taxAmount;
-        if (dexAddresses[_sender]) {
+        if (dexAddresses[_sender] && _taxInfo.buyTax > 0) {
             // Buy transaction
+    
+            //Calculate tax amount
             unchecked {
                 taxAmount = (_amount * _taxInfo.buyTax) / BASIS_POINTS;
             }
-            if (taxAmount > 0) {
-                super._transfer(_sender, grantFundWallet, taxAmount); 
-            }
-        } else {
+
+            //Transfer tax amount to grant fund wallet
+            super._transfer(_sender, grantFundWallet, taxAmount);
+
+        } else if (dexAddresses[_recipient] && _taxInfo.sellTax > 0) {
             // Sell transaction
+
+            //Calculate tax amount
             unchecked {
                 taxAmount = (_amount * _taxInfo.sellTax) / BASIS_POINTS;
             }
-            if (taxAmount > 0) {
-                uint256 grantFundAmount = (taxAmount * GRANT_FUND_SPLIT) / BASIS_POINTS;
-                super._transfer(_sender, grantFundWallet, grantFundAmount);
 
-                if (_taxInfo.lpTaxIsActive) {
-                    super._transfer(_sender, lpFundWallet, taxAmount - grantFundAmount);
-                }
+            //TODO: The full sell tax goes to the grant fund wallet.
+            //TODO: Additional 0.5% of the total amount goes to the lp fund wallet.
+
+            //Transfer tax amount to grant fund wallet
+            uint256 grantFundAmount = (taxAmount * grantFundSplit) / BASIS_POINTS;
+            super._transfer(_sender, grantFundWallet, grantFundAmount);
+
+            //Transfer tax amount to LP fund wallet
+            if (_taxInfo.lpTaxIsActive) {
+                super._transfer(_sender, lpFundWallet, taxAmount - grantFundAmount);
             }
         }
 
+        //Transfer amount to recipient
         super._transfer(_sender, _recipient, _amount - taxAmount);
+
+        //Handle delegation
         _handleDelegation(_recipient);
     }
 
     /**
      * @dev Handle delegation logic
+     * @param account Address of the account to handle delegation for.
      */
     function _handleDelegation(address account) private {
+        //TODO: Check this is correct.
         if (delegates(account) == address(0)) {
             _delegate(account, account);
         }
