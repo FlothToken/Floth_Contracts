@@ -21,6 +21,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     struct TaxInfo {
         uint128 buyTax;  // Reduced to uint128 as it never exceeds this value
         uint128 sellTax; // Reduced to uint128 as it never exceeds this value
+        uint128 lpTax; // Reduced to uint128 as it never exceeds this value
         bool lpTaxIsActive; // Flag to enable/disable LP tax
         bool paused; // Flag to enable/disable emergency pause
     }
@@ -42,7 +43,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     event EmergencyPause(bool indexed paused);
     event GrantFundWalletUpdated(address indexed newGrantFundWallet);
     event LpFundWalletUpdated(address indexed newLpFundWallet);
-
+    event LpTaxUpdate(uint256 indexed newTax);
     // Custom errors save gas compared to require statements
     error InvalidTaxAmount();
     error ZeroAddress();
@@ -119,6 +120,16 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         if (_newBuyTax > MAX_TAX) revert InvalidTaxAmount();
         taxInfo.buyTax = _newBuyTax;
         emit BuyTaxUpdate(_newBuyTax);
+    }
+
+    /**
+     * @dev Set LP tax with validation
+     * @param _newLpTax New LP tax to be set.
+     */
+    function setLpTax(uint128 _newLpTax) external onlyOwner {
+        //TODO: Do we have a max for this?
+        taxInfo.lpTax = _newLpTax;
+        emit LpTaxUpdate(_newLpTax);
     }
 
     /**
@@ -222,6 +233,8 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         }
 
         uint256 taxAmount;
+        uint256 lpTaxAmount;
+
         if (dexAddresses[_sender] && _taxInfo.buyTax > 0) {
             // Buy transaction
     
@@ -245,17 +258,19 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
             //TODO: Additional 0.5% of the total amount goes to the lp fund wallet.
 
             //Transfer tax amount to grant fund wallet
-            uint256 grantFundAmount = (taxAmount * grantFundSplit) / BASIS_POINTS;
-            super._transfer(_sender, grantFundWallet, grantFundAmount);
+            super._transfer(_sender, grantFundWallet, taxAmount);
 
             //Transfer tax amount to LP fund wallet
             if (_taxInfo.lpTaxIsActive) {
-                super._transfer(_sender, lpFundWallet, taxAmount - grantFundAmount);
+                unchecked {
+                    lpTaxAmount = (_amount * _taxInfo.lpTax) / BASIS_POINTS;
+                }
+                super._transfer(_sender, lpFundWallet, lpTaxAmount);
             }
         }
 
         //Transfer amount to recipient
-        super._transfer(_sender, _recipient, _amount - taxAmount);
+        super._transfer(_sender, _recipient, _amount - taxAmount - lpTaxAmount);
 
         //Handle delegation
         _handleDelegation(_recipient);
