@@ -254,9 +254,6 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
                 taxAmount = (_amount * _taxInfo.sellTax) / BASIS_POINTS;
             }
 
-            //TODO: The full sell tax goes to the grant fund wallet.
-            //TODO: Additional 0.5% of the total amount goes to the lp fund wallet.
-
             //Transfer tax amount to grant fund wallet
             super._transfer(_sender, grantFundWallet, taxAmount);
 
