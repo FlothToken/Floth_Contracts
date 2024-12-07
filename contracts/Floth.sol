@@ -73,6 +73,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         // Initially 25/35% for taxes but can only be changed to 5% after this initial period
         taxInfo.buyTax = 2500;  // 25%
         taxInfo.sellTax = 3500; // 35%
+        taxInfo.lpTax = 500; // 0.5%
         taxInfo.lpTaxIsActive = true;
         taxInfo.paused = false;
 
