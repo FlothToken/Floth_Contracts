@@ -267,9 +267,6 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param account Address of the account to handle delegation for.
      */
     function _handleDelegation(address account) private {
-        //TODO: Check this is correct.
-        if (delegates(account) == address(0)) {
-            _delegate(account, account);
-        }
+        _delegate(account, account);
     }
 }
