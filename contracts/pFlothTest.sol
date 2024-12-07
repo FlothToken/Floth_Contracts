@@ -26,12 +26,13 @@ contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
         uint256 startTime;
         uint256 endTime;
         bool paused;
-        bool finalized;
     }
+
     PresaleInfo public presaleInfo;
 
     // Mappings
     mapping(address => uint256) public pFLOTHBalance;
+    mapping(address => mapping(address => uint256)) public tokenSenders; // token => sender => amount
 
     /**
      * @dev Constructor initializes the contract with test parameters
@@ -55,6 +56,7 @@ contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
     );
     event TokenRecovered(address token, uint256 amount);
     event Withdraw(address owner, uint256 amount);
+    event TokenReturned(address indexed token, address indexed sender, uint256 amount);
 
     // Errors
     error PresaleEnded();
@@ -62,9 +64,10 @@ contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
     error TransferFailed();
     error PresaleNotStarted();
     error PresaleIsPaused();
-    error BelowMinimumPurchase();
     error ExceedsWalletLimit();
+    error InvalidRecoveryToken();
     error InvalidRecoveryAmount();
+    error UnauthorizedRecovery();
 
     // Modifiers
     modifier onlyDuringPresale() {
@@ -74,42 +77,25 @@ contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
         _;
     }
 
-    /**
+   /**
      * @dev Main presale function to purchase pFLOTH tokens
      */
     function presale() external payable onlyDuringPresale nonReentrant {
-        if (msg.value < MIN_PURCHASE) revert BelowMinimumPurchase();
         
         uint256 amountpFLOTH = msg.value * EXCHANGE_RATE;
         
         if (totalSupply() + amountpFLOTH > MAX_SUPPLY) revert ExceedsSupply();
-        if (balanceOf(msg.sender) + amountpFLOTH > WALLET_LIMIT) revert ExceedsWalletLimit();
-
-        _mint(msg.sender, amountpFLOTH);
-        pFLOTHBalance[msg.sender] += amountpFLOTH;
+        if (pFLOTHBalance[msg.sender] + amountpFLOTH > WALLET_LIMIT) revert ExceedsWalletLimit();
         
+        pFLOTHBalance[msg.sender] += amountpFLOTH;
+        _mint(msg.sender, amountpFLOTH);
+
         emit Presale(
             msg.sender,
             msg.value,
             amountpFLOTH,
             block.timestamp
         );
-    }
-
-    /**
-     * @dev Test helper function to modify total supply
-     * @param _supply New max supply value
-     */
-    function setTotalSupply(uint256 _supply) external onlyOwner {
-        MAX_SUPPLY = _supply;
-    }
-
-    /**
-     * @dev Test helper function to modify wallet limit
-     * @param _limit New wallet limit value
-     */
-    function setWalletLimit(uint256 _limit) external onlyOwner {
-        WALLET_LIMIT = _limit;
     }
 
     /**
@@ -133,7 +119,7 @@ contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
         emit PresalePaused(presaleInfo.paused);
     }
 
-     /**
+    /**
      * @dev Function to withdraw FLR collected during the presale
      * Only the owner can call this function
      * Implements nonReentrant pattern for security
@@ -148,24 +134,59 @@ contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Recover any ERC20 tokens accidentally sent to the contract
-     * @param token The address of the token to recover
-     * @param amount The amount of tokens to recover
-     * Only the owner can call this function
-     * Cannot be used to recover pFLOTH tokens
-     * Implements nonReentrant pattern for security
-     * Emits a TokenRecovered event upon successful recovery
+     * @dev Override the token transfer hook to track incoming ERC20 tokens
+     * @param token The token being transferred
+     * @param sender The address sending the tokens
+     * @param amount The amount of tokens being transferred
      */
-    function recoverERC20(
+    function _beforeTokenTransfer(
         address token,
+        address sender,
         uint256 amount
-    ) external onlyOwner nonReentrant {
-        if (token == address(this)) revert InvalidRecoveryAmount();
-        if (amount > IERC20(token).balanceOf(address(this))) 
-            revert InvalidRecoveryAmount();
+    ) internal override {
+        if (token != address(this)) { // Only track non-pFLOTH tokens
+            tokenSenders[token][sender] += amount;
+        }
+    }
+
+    /**
+     * @dev Test helper function to modify total supply
+     * @param _supply New max supply value
+     */
+    function setTotalSupply(uint256 _supply) external onlyOwner {
+        MAX_SUPPLY = _supply;
+    }
+
+    /**
+     * @dev Test helper function to modify wallet limit
+     * @param _limit New wallet limit value
+     */
+    function setWalletLimit(uint256 _limit) external onlyOwner {
+        WALLET_LIMIT = _limit;
+    }
+
+    /**
+     * @dev Recover ERC20 tokens and return them to their original sender
+     * @param token The address of the token to recover
+     * @param sender The address that originally sent the tokens
+     * Anyone can recover their own tokens, owner can recover for others
+     * Cannot be used to recover pFLOTH tokens
+     */
+    function returnERC20ToSender(
+        address token,
+        address sender
+    ) external nonReentrant {
+        // Only allow msg.sender to recover their own tokens, or owner to recover for anyone
+        // TODO: Discuss the ramifications of this owner being able to recover for anyone.
+        if (msg.sender != sender && msg.sender != owner()) revert UnauthorizedRecovery();
+        if (token == address(this)) revert InvalidRecoveryToken();
         
-        IERC20(token).transfer(owner(), amount);
-        emit TokenRecovered(token, amount);
+        uint256 amount = tokenSenders[token][sender];
+        if (amount == 0) revert InvalidRecoveryAmount();
+        
+        tokenSenders[token][sender] = 0; // Reset the tracked amount
+        IERC20(token).transfer(sender, amount);
+        emit TokenReturned(token, sender, amount);
     }
 
     /**

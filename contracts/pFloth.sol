@@ -14,9 +14,10 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 contract pFloth is ERC20, Ownable, ReentrancyGuard {
 
     // More readable and gas efficient way to write large numbers
+    uint256 private constant DECIMALS = 18;
     uint256 private constant BILLION = 1_000_000_000;
-    uint256 public constant MAX_SUPPLY = 30 * BILLION * 10**decimals();
-    uint256 public constant WALLET_LIMIT = 25 * (BILLION / 10) * 10**decimals(); // 2.5 billion
+    uint256 public constant MAX_SUPPLY = 30 * BILLION * 10**DECIMALS;
+    uint256 public constant WALLET_LIMIT = 25 * (BILLION / 10) * 10**DECIMALS; // 2.5 billion
     uint256 public constant EXCHANGE_RATE = 10_000;
 
     // Pack variables together to save storage slots
