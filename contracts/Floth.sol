@@ -42,6 +42,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     event GrantFundWalletUpdated(address indexed newGrantFundWallet);
     event LpFundWalletUpdated(address indexed newLpFundWallet);
     event LpTaxUpdate(uint256 indexed newTax);
+    event LiquidityProviderUpdated(address indexed provider, bool indexed status);
     // Custom errors save gas compared to require statements
     error InvalidTaxAmount();
     error ZeroAddress();
@@ -49,6 +50,9 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     error InvalidTokenNameOrSymbol();
     error Paused();
     error ZeroAmount();
+    error UnauthorizedLiquidityProvider();
+
+    mapping(address => bool) public liquidityProviders;
 
     /**
      * Constructor to initialize the contract.
@@ -211,6 +215,17 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     }
 
     /**
+     * @dev Set or remove liquidity provider status
+     * @param _provider Address to update
+     * @param _status New status
+     */
+    function setLiquidityProvider(address _provider, bool _status) external onlyOwner {
+        if (_provider == address(0)) revert ZeroAddress();
+        liquidityProviders[_provider] = _status;
+        emit LiquidityProviderUpdated(_provider, _status);
+    }
+
+    /**
      * @dev Transfer tokens with/without tax, based on buy/sell.
      * @param _sender Address of the sender.
      * @param _recipient Address of the recipient.
@@ -223,15 +238,15 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     ) internal override whenNotPaused nonReentrant validAmount(_amount) {
         if (_sender == _recipient) revert SelfTransfer();
 
-        // Cache tax info in memory to save gas
-        TaxInfo memory _taxInfo = taxInfo;
-
-        // Early return for non-taxed transfers
-        if (!dexAddresses[_sender] && !dexAddresses[_recipient]) {
+        // Allow tax-free transfers for liquidity providers
+        if (!dexAddresses[_sender] && !dexAddresses[_recipient] || liquidityProviders[_sender]) {
             super._transfer(_sender, _recipient, _amount);
             _handleDelegation(_recipient);
             return;
         }
+
+        // Cache tax info in memory to save gas
+        TaxInfo memory _taxInfo = taxInfo;
 
         uint256 taxAmount;
         uint256 lpTaxAmount;
