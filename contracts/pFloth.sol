@@ -62,6 +62,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     error PresaleIsPaused();
     error ExceedsWalletLimit();
     error InvalidRecoveryToken();
+    error InvalidRecoveryAmount();
 
     // Modifiers
     modifier onlyDuringPresale() {
