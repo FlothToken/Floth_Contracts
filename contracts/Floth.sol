@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 //TODO: On dex swap, swap FLOTH to Flare - take % and add to grant fund wallet.
-//TODO: Let's check the decimilisation is correct etc.
 /**
  * @title Floth ERC20 token on Flare.
  * @author Ethereal Labs Ltd
