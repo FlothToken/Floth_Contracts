@@ -15,8 +15,6 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     uint256 private constant MAX_TAX = 500; // 5%
     uint256 private constant BASIS_POINTS = 10000;
 
-    uint256 private grantFundSplit = 8333; // 83.3% of tax amount (2.5% from the 3%)
-
     // Packing similar storage variables together to save slots
     struct TaxInfo {
         uint128 buyTax;  // Reduced to uint128 as it never exceeds this value
