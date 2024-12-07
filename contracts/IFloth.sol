@@ -20,6 +20,7 @@ interface IFloth {
     function getTaxInfo() external view returns (
         uint128 buyTax,
         uint128 sellTax,
+        uint128 lpTax,
         bool lpTaxActive,
         bool paused
     );

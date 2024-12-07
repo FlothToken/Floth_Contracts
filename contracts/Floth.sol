@@ -164,18 +164,21 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @dev Batch read of tax information
      * @return buyTax Buy tax.  
      * @return sellTax Sell tax.
+     * @return lpTax LP tax.
      * @return lpTaxActive LP tax active.
      * @return paused Paused.
      */
     function getTaxInfo() external view returns (
         uint128 buyTax,
         uint128 sellTax,
+        uint128 lpTax,
         bool lpTaxActive,
         bool paused
     ) {
         return (
             taxInfo.buyTax,
             taxInfo.sellTax,
+            taxInfo.lpTax,
             taxInfo.lpTaxIsActive,
             taxInfo.paused
         );
