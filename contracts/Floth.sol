@@ -42,6 +42,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     event GrantFundWalletUpdated(address indexed newGrantFundWallet);
     event LpFundWalletUpdated(address indexed newLpFundWallet);
     event LpTaxUpdate(uint256 indexed newTax);
+    event LpTaxStatusUpdate(bool indexed status);
     event LiquidityProviderUpdated(address indexed provider, bool indexed status);
     // Custom errors save gas compared to require statements
     error InvalidTaxAmount();
@@ -213,6 +214,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      */
     function setLpTaxStatus(bool _status) external onlyOwner {
         taxInfo.lpTaxIsActive = _status;
+        emit LpTaxStatusUpdate(_status);
     }
 
     /**
