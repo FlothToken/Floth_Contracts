@@ -13,7 +13,7 @@ import "./FtsoV2Consumer.sol";
  * @author Ethereal Labs Ltd
  * @notice This contract allows users to mint Floth Pass NFTs using FLOTH tokens.
  */
-contract FlothPass is
+contract FlothPassUpgrade is
     ERC721VotesUpgradeable,
     ERC721EnumerableUpgradeable,
     AccessControlUpgradeable,
