@@ -19,6 +19,7 @@ contract FlothPass is
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    
     // Pack related storage variables together to save slots
     struct SaleConfig {
         uint16 numberMinted;
@@ -26,38 +27,24 @@ contract FlothPass is
         uint16 maxSupply;           // 1000 NFTs
         bool saleActive;
     }
+
+    // Pack sale-related variables
     SaleConfig public saleConfig;
 
-    // Pack price-related variables
+    // Pack price-related variadbles
     struct PriceConfig {
-        uint128 usdStartPrice;      // Changed from uint256 to uint128
-        uint128 usdPriceIncrement;  // Changed from uint256 to uint128
+        uint128 usdStartPrice;
+        uint128 usdPriceIncrement;
     }
+    
+    // Pack price-related variables
     PriceConfig public priceConfig;
 
     // Immutable roles for gas savings
     bytes32 private constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 private constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
 
-    // Events moved together
-    event FallbackCalled(address indexed sender, uint256 value, bytes data);
-    event PriceUpdated(uint256 newPrice);
-    event BaseURIUpdated(string newUri);
-    event TokensMinted(address indexed to, uint16 quantity, uint256 price);
-    event NameUpdated(string newName);
-    event SymbolUpdated(string newSymbol);
-
-    // Custom errors for gas savings
-    error SaleInactive();
-    error InsufficientFunds();
-    error InsufficientFundsInContract();
-    error InsufficientRole();
-    error ExceedsMaxSupply();
-    error TransferFailed();
-    error ZeroAddress();
-    error InvalidPrice();
-
-    // Address to withdraw funds to.
+     // Address to withdraw funds to.
     address payable public withdrawAddress;
 
     // Base URI for token metadata.
@@ -76,6 +63,24 @@ contract FlothPass is
     // Gap for upgradeability
     uint256[50] private __gap;
 
+    // Events
+    event FallbackCalled(address indexed sender, uint256 value, bytes data);
+    event PriceUpdated(uint256 newPrice);
+    event BaseURIUpdated(string newUri);
+    event TokensMinted(address indexed to, uint16 quantity, uint256 price);
+    event NameUpdated(string newName);
+    event SymbolUpdated(string newSymbol);
+
+    // Custom errors for gas savings
+    error SaleInactive();
+    error InsufficientFunds();
+    error InsufficientFundsInContract();
+    error InsufficientRole();
+    error ExceedsMaxSupply();
+    error TransferFailed();
+    error ZeroAddress();
+    error InvalidPrice();
+
     // Function to receive Ether. msg.data must be empty.
     receive() external payable {}
 
@@ -93,6 +98,7 @@ contract FlothPass is
         if (_ftsoV2ConsumerAddress == address(0)) {
             revert ZeroAddress();
         }
+
         _name = "Floth Pass";
         _symbol = "FPASS";
         __ERC721_init(_name, _symbol);
@@ -122,6 +128,11 @@ contract FlothPass is
         ftsoV2Consumer = FtsoV2Consumer(_ftsoV2ConsumerAddress);
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @dev Calculate current NFT price in FLR based on the dynamic FLR/USD price
      * @return Current NFT price in FLR
@@ -133,6 +144,7 @@ contract FlothPass is
             return ftsoV2Consumer.getDynamicPrice(usdPrice);
         }
     }
+
 
     /**
      * @dev Mint function to mint floth pass to the caller.
@@ -206,7 +218,7 @@ contract FlothPass is
     /**
      * @dev Override for the tokenURI function to return the token URI
      * @param _tokenId the token id to get the URI for
-     * @return the token URI
+     * @return tokenURI the token URI
      */
     function tokenURI(uint256 _tokenId) public view override(ERC721Upgradeable) returns (string memory) {
         return super.tokenURI(_tokenId);
@@ -314,7 +326,6 @@ contract FlothPass is
     function _baseURI() internal view override returns (string memory) {
         return _currentBaseURI;
     }
-
 
     /**
      * @dev Getter for the contract symbol

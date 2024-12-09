@@ -5,7 +5,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Enumer
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721VotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "hardhat/console.sol";
 import "./FtsoV2ConsumerMock.sol";
 
 
@@ -20,40 +19,43 @@ contract FlothPassMock is
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable
 {
-    // Address to withdraw funds to.
+
+    // Pack related storage variables together to save slots
+    struct SaleConfig {
+        uint16 numberMinted;
+        uint16 mintsSinceLastIncrement;
+        uint16 maxSupply;           // 1000 NFTs
+        bool saleActive;
+    }
+
+    // Pack sale-related variables
+    SaleConfig public saleConfig;
+
+    // Pack price-related variadbles
+    struct PriceConfig {
+        uint128 usdStartPrice;
+        uint128 usdPriceIncrement;
+    }
+    
+    // Pack price-related variables
+    PriceConfig public priceConfig;
+
+     // Immutable roles for gas savings
+    bytes32 private constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 private constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
+
+    // Address to withdraw funds to
     address payable public withdrawAddress;
 
-    // Base URI for token metadata.
+    // Base URI for token metadata
     string public _currentBaseURI;
 
-    // Initial price in USD.
-    uint256 public usdStartPrice;
-
-    //Price increment variable in USD.
-    uint256 public usdPriceIncrement;
-
-    // Mapping from address to list of owned token IDs
-    mapping(address => uint256[]) private _ownedTokens;
-
-    // Number of tokens minted.
-    uint16 public numberMinted;
-
-    // Number of mints since last price increment.
-    uint16 public mintsSinceLastIncrement;
-
-    // Maximum number of tokens that can be minted.
-    uint16 public maxSupply;
-
-    // Whether the sale is active.
-    bool public saleActive;
-
-    // Custom name and symbol storage
+    // Name and Symbol of the token
     string private _name;
     string private _symbol;
 
-    // Roles
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
+    // Mapping from address to list of owned token IDs
+    mapping(address => uint256[]) private _ownedTokens;
 
     // Reference to FtsoV2Consumer contract
     FtsoV2ConsumerMock public ftsoV2Consumer;
@@ -61,16 +63,15 @@ contract FlothPassMock is
     // Gap for upgradeability
     uint256[50] private __gap;
 
-    // Function to receive Ether. msg.data must be empty.
-    receive() external payable {}
-
-    // Fallback function is called when msg.data is not empty.
-    fallback() external payable {
-        emit FallbackCalled(msg.sender, msg.value, msg.data);
-    }
-
     // Events
-    event FallbackCalled(address sender, uint256 value, bytes data);
+    event FallbackCalled(address indexed sender, uint256 value, bytes data);
+    event PriceUpdated(uint256 newPrice);
+    event BaseURIUpdated(string newUri);
+    event TokensMinted(address indexed to, uint16 quantity, uint256 price);
+    event NameUpdated(string newName);
+    event SymbolUpdated(string newSymbol);
+
+    // Custom errors for gas savings
     error SaleInactive();
     error InsufficientFunds();
     error InsufficientFundsInContract();
@@ -78,6 +79,15 @@ contract FlothPassMock is
     error ExceedsMaxSupply();
     error TransferFailed();
     error ZeroAddress();
+    error InvalidPrice();
+
+    // Function to receive Ether. msg.data must be empty
+    receive() external payable {}
+
+    // Fallback function is called when msg.data is not empty
+    fallback() external payable {
+        emit FallbackCalled(msg.sender, msg.value, msg.data);
+    }
 
     /**
      *
@@ -88,39 +98,36 @@ contract FlothPassMock is
         if (_ftsoV2ConsumerAddress == address(0)) {
             revert ZeroAddress();
         }
-        __ERC721_init("Floth Pass", "FPASS");
+
+        _name = "Floth Pass";
+        _symbol = "FPASS";
+        __ERC721_init(_name, _symbol);
         __ERC721Enumerable_init();
         __ERC721Votes_init();
         __AccessControl_init();
         __ReentrancyGuard_init();
-        __FlothPass_init();
 
-        _name = "Floth Pass";
-        _symbol = "FPASS";
+        // Initialize structs
+        saleConfig = SaleConfig({
+            numberMinted: 0,
+            mintsSinceLastIncrement: 0,
+            maxSupply: 1000,
+            saleActive: false
+        });
 
+        priceConfig = PriceConfig({
+            usdStartPrice: 50 ether,
+            usdPriceIncrement: 50 ether
+        });
 
         _grantRole(ADMIN_ROLE, msg.sender);
         _setRoleAdmin(WITHDRAW_ROLE, ADMIN_ROLE);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         // Set reference to the deployed FtsoV2Consumer contract
-        ftsoV2Consumer = FtsoV2ConsumerMock(_ftsoV2ConsumerAddress);
+        ftsoV2Consumer = FtsoV2Consumer(_ftsoV2ConsumerAddress);
     }
 
-    /**
-     * @dev Initialize function which sets the defaults for state variables
-     */
-    function __FlothPass_init() internal initializer {
-        _currentBaseURI = "";
-        maxSupply = 1000; //NFT supply = 1000.
-        usdStartPrice = 50 ether; //Price starts at $50.
-        usdPriceIncrement = 50 ether; //Increment price every 50 NFTs sold.
-        withdrawAddress = payable(0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739);
-    }
-
-    /**
-     * @dev Constructor prevents the contract from being initialized again
-     */
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -141,7 +148,7 @@ contract FlothPassMock is
         return flrPrice;
     }
 
-    /**
+     /**
      * @dev Mint function to mint floth pass to the caller.
      * Requires the caller to have enough FLOTH to mint.
      * Requires the sale to be active.
@@ -150,21 +157,20 @@ contract FlothPassMock is
      * @param _quantity the number of floth pass to mint
      */
     function mint(uint16 _quantity) external payable nonReentrant {
-        if (!saleActive) {
+        if (!saleConfig.saleActive) {
             revert SaleInactive();
         }
 
-        // Check if the total minted plus the quantity is less than the max supply.
-        if (numberMinted + _quantity > maxSupply) {
+        if (saleConfig.numberMinted + _quantity > saleConfig.maxSupply) {
             revert ExceedsMaxSupply();
         }
 
         uint256 totalPrice = 0;
+        uint256 currentPrice = getCurrentPriceInFlr();
 
-        // Calculate the total price considering the price increments every 10 mints
-        // @dev Note i = 1 not i = 0
-        for (uint16 i = 1; i <= _quantity; i++) {
-            totalPrice += getCurrentPriceInFlr();
+        // Optimize gas by using unchecked for arithmetic operations
+        unchecked {
+            totalPrice = currentPrice * _quantity;
         }
 
         // Check if the caller sent enough Flare to cover the cost
@@ -172,10 +178,17 @@ contract FlothPassMock is
             revert InsufficientFunds();
         }
 
-        // Mint the quantity of tokens to the caller and increase the number minted by 1.
-        for (uint16 i = 0; i < _quantity; i++) {
-            _safeMint(msg.sender, numberMinted += 1);
+        // Batch mint tokens
+        uint16 startTokenId = saleConfig.numberMinted;
+        unchecked {
+            for (uint16 i = 0; i < _quantity; i++) {
+                _safeMint(msg.sender, startTokenId + i + 1);
+            }
+            saleConfig.numberMinted += _quantity;
+            saleConfig.mintsSinceLastIncrement += _quantity;
         }
+
+        emit TokensMinted(msg.sender, _quantity, currentPrice); // Emit event after minting
     }
     
     /**
@@ -189,22 +202,16 @@ contract FlothPassMock is
             revert InsufficientRole();
         }
 
-        uint256 amountToWithdraw = _withdrawAll ? address(this).balance : _amount;
-        if (!_withdrawAll && amountToWithdraw > address(this).balance) {
+        uint256 balance = address(this).balance;
+        uint256 amountToWithdraw = _withdrawAll ? balance : _amount;
+        
+        if (!_withdrawAll && amountToWithdraw > balance) {
             revert InsufficientFundsInContract();
         }
 
         address payable recipient = withdrawAddress != address(0) ? withdrawAddress : payable(msg.sender);
-        _withdraw(recipient, amountToWithdraw);
-    }
 
-    /**
-     * @dev Internal helper for withdrawing ether from the contract
-     * @param _address the address to withdraw to
-     * @param _amount the amount to withdraw
-     */
-    function _withdraw(address _address, uint256 _amount) internal {
-        (bool success, ) = _address.call{value: _amount}("");
+        (bool success, ) = recipient.call{value: amountToWithdraw}("");
         if (!success) {
             revert TransferFailed();
         }
@@ -213,7 +220,7 @@ contract FlothPassMock is
     /**
      * @dev Override for the tokenURI function to return the token URI
      * @param _tokenId the token id to get the URI for
-     * @return the token URI
+     * @return tokenURI the token URI
      */
     function tokenURI(uint256 _tokenId) public view override(ERC721Upgradeable) returns (string memory) {
         return super.tokenURI(_tokenId);
@@ -228,12 +235,12 @@ contract FlothPassMock is
         return ERC721EnumerableUpgradeable.supportsInterface(interfaceId) || AccessControlUpgradeable.supportsInterface(interfaceId);
     }
 
-    /**
+     /**
      * @dev Getter for the number of tokens minted
      * @return the number of tokens minted
      */
     function getNumberMinted() external view returns (uint16) {
-        return numberMinted;
+        return saleConfig.numberMinted;
     }
 
     /**
@@ -250,7 +257,7 @@ contract FlothPassMock is
      * @param _saleActive the new sale active status
      */
     function setSaleActive(bool _saleActive) external onlyRole(ADMIN_ROLE) {
-        saleActive = _saleActive;
+        saleConfig.saleActive = _saleActive;
     }
 
     /**
@@ -265,8 +272,8 @@ contract FlothPassMock is
      * @dev Setter for the price increment
      * @param _newPriceIncrement the new price increment
      */
-    function setPriceIncrement(uint256 _newPriceIncrement) external onlyRole(ADMIN_ROLE) {
-        usdPriceIncrement = _newPriceIncrement;
+    function setPriceIncrement(uint128 _newPriceIncrement) external onlyRole(ADMIN_ROLE) {
+        priceConfig.usdPriceIncrement = _newPriceIncrement;
     }
 
     /**
@@ -274,15 +281,16 @@ contract FlothPassMock is
      * @param _newMaxSupply the new max supply of tokens
      */
     function setMaxSupply(uint16 _newMaxSupply) external onlyRole(ADMIN_ROLE) {
-        maxSupply = _newMaxSupply;
+        saleConfig.maxSupply = _newMaxSupply;
     }
 
-   /**
+ /**
      * @dev Setter for the contract symbol
      * @param _newSymbol the new symbol for the contract
      */
     function setSymbol(string calldata _newSymbol) external onlyRole(ADMIN_ROLE) {
         _symbol = _newSymbol;
+        emit SymbolUpdated(_newSymbol);
     }
 
     /**
@@ -291,6 +299,7 @@ contract FlothPassMock is
      */
     function setName(string calldata _newName) external onlyRole(ADMIN_ROLE) {
         _name = _newName;
+        emit NameUpdated(_newName);
     }
 
     /**
@@ -304,7 +313,7 @@ contract FlothPassMock is
         withdrawAddress = _withdrawAddress;
     }
 
-    /**
+/**
      * @dev Setter for the base uri
      * @param _baseUri the new base uri
      */
@@ -320,8 +329,7 @@ contract FlothPassMock is
         return _currentBaseURI;
     }
 
-
-    /**
+/**
      * @dev Getter for the contract symbol
      * @return the symbol of the contract
      */
@@ -337,7 +345,7 @@ contract FlothPassMock is
         return _name;
     }
 
-    /**
+   /**
      * @dev Internal override for the before token transfer function
      * This is to ensure that all logic is called before a token is transferred
      * Updates the owner mappings for the token
@@ -356,13 +364,19 @@ contract FlothPassMock is
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
 
         if (from != address(0)) {
-            // Remove the token from the previous owner's list
-            _removeTokenFromOwnerMapping(from, tokenId);
+            uint256[] storage tokens = _ownedTokens[from];
+            for (uint256 i = 0; i < tokens.length; i++) {
+                if (tokens[i] == tokenId) {
+                    tokens[i] = tokens[tokens.length - 1];
+                    tokens.pop();
+                    break;
+                }
+            }
         }
 
+        // Add to new owner
         if (to != address(0)) {
-            // Add the token to the new owner's list
-            _addTokenToOwnerMapping(to, tokenId);
+            _ownedTokens[to].push(tokenId);
         }
     }
 
@@ -376,38 +390,5 @@ contract FlothPassMock is
      */
     function _afterTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override(ERC721Upgradeable, ERC721VotesUpgradeable) {
         super._afterTokenTransfer(from, to, tokenId, batchSize);
-    }
-
-    /**
-     * @dev Adds a token to the owner's list
-     * @param to the address to add the token to
-     * @param tokenId the token id to add
-     */
-    function _addTokenToOwnerMapping(address to, uint256 tokenId) private {
-        _ownedTokens[to].push(tokenId);
-    }
-
-    /**
-     * @dev Removes a token from the owner's list
-     * @param from the address to remove the token from
-     * @param tokenId the token id to remove
-     */
-    function _removeTokenFromOwnerMapping(address from, uint256 tokenId) private {
-        uint256 lastTokenIndex = _ownedTokens[from].length - 1;
-        uint256 tokenIndex;
-
-        // Find the index of the token to be removed
-        for (uint256 i = 0; i < _ownedTokens[from].length; i++) {
-            if (_ownedTokens[from][i] == tokenId) {
-                tokenIndex = i;
-                break;
-            }
-        }
-
-        // Move the last token to the slot of the one being removed
-        _ownedTokens[from][tokenIndex] = _ownedTokens[from][lastTokenIndex];
-
-        // Remove the last element
-        _ownedTokens[from].pop();
-    }
+    }    
 }
