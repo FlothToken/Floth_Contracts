@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 
 describe("FlothPass Contract", function () {
-  let FlothPass, flothPass, owner, addr1, addr2, ftsoV2ConsumerMock, ftsoAddress;
+  let FlothPass, flothPass, owner, addr1, addr2, ftsoV2ConsumerMock, ftsoAddress, withdrawAddress;
 
   const ADMIN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE"));
   const WITHDRAW_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WITHDRAW_ROLE"));
@@ -19,7 +19,7 @@ describe("FlothPass Contract", function () {
 
     // Get contract factories and signers
     FlothPass = await ethers.getContractFactory("FlothPassMock");
-    [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
+    [owner, addr1, addr2, withdrawAddress, ...addrs] = await ethers.getSigners();
 
     // Deploy FlothPass contract using deployProxy
     flothPass = await upgrades.deployProxy(FlothPass, [ftsoAddress], { kind: "transparent" });
@@ -33,11 +33,12 @@ describe("FlothPass Contract", function () {
     });
 
     it("Should initialize the max supply correctly", async function () {
-      expect(await flothPass.maxSupply()).to.equal(1000);
+      const salesConfig = await flothPass.saleConfig();
+      expect(salesConfig.maxSupply).to.equal(1000);
     });
 
     it("Should initialize the withdrawAddress correctly", async function () {
-      expect(await flothPass.withdrawAddress()).to.equal("0xDF53617A8ba24239aBEAaF3913f456EbAbA8c739");
+      expect(await flothPass.withdrawAddress()).to.equal(zeroAddress);
     });
 
     it("Should initialize the _currentBaseURI correctly", async function () {
@@ -45,11 +46,13 @@ describe("FlothPass Contract", function () {
     });
 
     it("Should initialize the price correctly", async function () {
-      expect(await flothPass.usdStartPrice()).to.equal(ethers.parseUnits("50", 18));
+      const priceConfig = await flothPass.priceConfig();
+      expect(priceConfig.usdStartPrice).to.equal(ethers.parseUnits("50", 18));
     });
 
     it("Should initialize the usdPriceIncrement correctly", async function () {
-      expect(await flothPass.usdPriceIncrement()).to.equal(ethers.parseUnits("50", 18));
+      const priceConfig = await flothPass.priceConfig();
+      expect(priceConfig.usdPriceIncrement).to.equal(ethers.parseUnits("50", 18));
     });
 
     it("Should revert when Floth address is deployed with zero address", async function () {
@@ -167,22 +170,31 @@ describe("FlothPass Contract", function () {
     it("Should allow withdrawal of native tokens from the FlothPASS contract to the withdrawal address", async function () {
       const flothPassAddress = await flothPass.getAddress();
 
+      // Send ETH to contract
       await owner.sendTransaction({
         to: flothPassAddress,
         value: ethers.parseEther("1000"),
       });
 
+      // Verify initial balance
       const balanceBefore = await ethers.provider.getBalance(flothPassAddress);
       expect(balanceBefore).to.equal(ethers.parseEther("1000"));
 
-      expect(await ethers.provider.getBalance(flothPass.withdrawAddress())).to.equal(0);
+      // Set withdraw address
+      await flothPass.connect(owner).setWithdrawAddress(withdrawAddress.address);
 
+      // Get initial withdraw address balance
+      const withdrawBalanceBefore = await ethers.provider.getBalance(withdrawAddress.address);
+
+      // Perform withdrawal
       await flothPass.connect(owner).withdraw(ethers.parseEther("1000"), false);
 
+      // Check contract balance after withdrawal
       const balanceAfter = await ethers.provider.getBalance(flothPassAddress);
       expect(balanceAfter).to.equal(0);
 
-      expect(await ethers.provider.getBalance(flothPass.withdrawAddress())).to.equal(ethers.parseEther("1000"));
+      // Check withdraw address received the funds
+      expect(await ethers.provider.getBalance(withdrawAddress.address)).to.equal(withdrawBalanceBefore + ethers.parseEther("1000"));
     });
 
     it("Should revert when withdrawing flare with insufficient funds in contract", async function () {
@@ -289,8 +301,8 @@ describe("FlothPass Contract", function () {
 
     it("Should allow admins to set the maxSupply", async function () {
       await flothPass.connect(owner).setMaxSupply(666);
-
-      expect(await flothPass.maxSupply()).to.equal(666);
+      const saleConfig = await flothPass.saleConfig();
+      expect(saleConfig.maxSupply).to.equal(666);
     });
 
     // it("Should allow admins to set the mintPrice", async function () {
@@ -326,8 +338,8 @@ describe("FlothPass Contract", function () {
 
     it("Should allow admins to set the saleActive", async function () {
       await flothPass.connect(owner).setSaleActive(true);
-
-      expect(await flothPass.saleActive()).to.be.true;
+      const saleConfig = await flothPass.saleConfig();
+      expect(saleConfig.saleActive).to.be.true;
     });
 
     it("Should not allow non-admins to set the saleActive", async function () {
