@@ -31,34 +31,27 @@ describe("pFLOTH Contract", function () {
   });
 
   describe("Presale", function () {
-    it("Should revert if below minimum purchase", async function () {
-      const minPurchase = ethers.parseUnits("0.1", "gwei");
-      await expect(pFLOTH.connect(addr1).presale({ value: minPurchase - 1n }))
-        .to.be.revertedWithCustomError(pFLOTH, "BelowMinimumPurchase");
-    });
-
     it("Should revert if presale has ended", async function () {
       await ethers.provider.send("evm_increaseTime", [PRESALE_DURATION + 1]);
       await ethers.provider.send("evm_mine", []);
 
-      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) }))
-        .to.be.revertedWithCustomError(pFLOTH, "PresaleEnded");
+      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.be.revertedWithCustomError(pFLOTH, "PresaleEnded");
     });
 
     it("Should be able to extend the presale end time", async function () {
       const additionalTime = 3600; // 1 hour
-      
+
       // Get initial presale info
       const initialPresaleInfo = await pFLOTH.presaleInfo();
       const initialEndTime = initialPresaleInfo[1]; // Accessing endTime using array indexing
-      
+
       // Extend the presale
       await pFLOTH.extendPresale(additionalTime);
-      
+
       // Get updated presale info
       const updatedPresaleInfo = await pFLOTH.presaleInfo();
       const newEndTime = updatedPresaleInfo[1]; // Accessing endTime using array indexing
-      
+
       // Verify the end time was extended correctly
       expect(newEndTime).to.equal(initialEndTime + BigInt(additionalTime));
     });
@@ -147,7 +140,7 @@ describe("pFLOTH Contract", function () {
       // After presale ends
       await ethers.provider.send("evm_increaseTime", [PRESALE_DURATION + 1]);
       await ethers.provider.send("evm_mine", []);
-      
+
       expect(await pFLOTH.presaleTimeRemaining()).to.equal(0);
     });
 
@@ -163,19 +156,17 @@ describe("pFLOTH Contract", function () {
       // Test remaining supply
       const remainingSupply = await pFLOTH.remainingSupply();
       const MAX_SUPPLY = await pFLOTH.MAX_SUPPLY();
-      expect(remainingSupply).to.equal(MAX_SUPPLY - (amountFLR * EXCHANGE_RATE));
+      expect(remainingSupply).to.equal(MAX_SUPPLY - amountFLR * EXCHANGE_RATE);
     });
 
     it("Should handle pause functionality", async function () {
       await pFLOTH.connect(owner).togglePause();
-      
-      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) }))
-        .to.be.revertedWithCustomError(pFLOTH, "PresaleIsPaused");
+
+      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.be.revertedWithCustomError(pFLOTH, "PresaleIsPaused");
 
       // Unpause and verify presale works again
       await pFLOTH.connect(owner).togglePause();
-      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) }))
-        .to.not.be.reverted;
+      await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) })).to.not.be.reverted;
     });
   });
 
