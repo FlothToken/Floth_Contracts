@@ -125,7 +125,7 @@ contract FlothPassMock is
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         // Set reference to the deployed FtsoV2Consumer contract
-        ftsoV2Consumer = FtsoV2Consumer(_ftsoV2ConsumerAddress);
+        ftsoV2Consumer = FtsoV2ConsumerMock(_ftsoV2ConsumerAddress);
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -139,7 +139,7 @@ contract FlothPassMock is
      */
     function getCurrentPriceInFlr() public payable returns (uint256) {
         // Calculate the base USD price (starting price + increments)
-        uint256 usdPrice = usdStartPrice + ((numberMinted / 50) * usdPriceIncrement);
+        uint256 usdPrice = priceConfig.usdStartPrice + ((saleConfig.numberMinted / 50) * priceConfig.usdPriceIncrement);
 
         // Use FtsoV2Consumer's dynamic price function
         // TODO Need to calculate fee for using this feed and send it to this function (NOT msg.value!)
