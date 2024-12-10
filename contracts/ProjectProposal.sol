@@ -877,19 +877,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      */
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
-        
-        if(latestRound.snapshotDatetime == 0){
-            return false;
-        }
-
-        // Check if the current time is within the voting period
-        if (block.timestamp >= latestRound.snapshotDatetime) {
-            if (block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime) {
-                return true;
-            }
-        }
-        
-        return false;
+        return getRoundStatus(latestRound.id) == RoundStatus.VotingOpen;
     }
     
 
@@ -898,10 +886,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      */
     function isSubmissionWindowOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
-       
-        return
-            block.timestamp < latestRound.expectedSnapshotDatetime &&
-            block.timestamp >= latestRound.roundStartDatetime;
+        return getRoundStatus(latestRound.id) == RoundStatus.SubmissionOpen;
     }
     
     //
