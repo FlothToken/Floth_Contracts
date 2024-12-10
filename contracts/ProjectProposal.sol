@@ -63,6 +63,15 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         _disableInitializers();
     }
 
+    // Add this enum before the Proposal struct
+    enum ProposalState {
+        Active,     // Initial state when proposal is created
+        Winning,    // Proposal has won but funds not claimed
+        Claimed,    // Funds have been claimed
+        Expired,    // Claiming period expired (>30 days)
+        Abstained   // Was the abstain proposal
+    }
+
     // Proposal struct to store proposal data
     struct Proposal {
         uint256 id;
@@ -72,7 +81,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         uint256 votesReceived;
         address proposer; //The wallet that submitted the proposal.
         address receiver; //The wallet that will receive the funds.
-        bool fundsClaimed; //Tracked here incase funds are not claimed before new round begins.
+        ProposalState state;  // Replace fundsClaimed with state
     }
 
     // Round struct to store round data
@@ -259,7 +268,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         newProposal.amountRequested = _amountRequested;
         newProposal.receiver = msg.sender; //receiver set to msg.sender by default.
         newProposal.proposer = msg.sender;
-        newProposal.fundsClaimed = false;
+        newProposal.state = ProposalState.Active;  // Set initial state
         rounds[latestRound.id].proposalIds.push(proposalId); //Add proposal ID to round struct.
         proposalsPerWalletPerRound[msg.sender][latestRound.id]++; //Increase proposal count for a wallet by 1.
         emit ProposalAdded(
@@ -535,7 +544,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         abstainProposal.amountRequested = 0;
         abstainProposal.receiver = msg.sender;
         abstainProposal.proposer = msg.sender;
-        abstainProposal.fundsClaimed = false;
+        abstainProposal.state = ProposalState.Active;  // Set initial state
 
         newRound.proposalIds.push(proposalId); //Add abstain proposal to round struct.
         newRound.abstainProposalId = proposalId; //Used to track the abstain proposal of the round.
@@ -917,14 +926,18 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
         //Check if the winning proposal is the abstain proposal.
         if (mostVotedProposal.id == latestRound.abstainProposalId) {
-            //Set as claimed so winner cannot reclaim for the proposal.
-            mostVotedProposal.fundsClaimed = true; 
-            winningProposalByRoundId[mostVotedProposal.roundId].fundsClaimed = true;
-            proposals[mostVotedProposal.id].fundsClaimed = true;
+            mostVotedProposal.state = ProposalState.Abstained;
+            winningProposalByRoundId[mostVotedProposal.roundId].state = ProposalState.Abstained;
+            proposals[mostVotedProposal.id].state = ProposalState.Abstained;
 
             //Send funds back to grant fund wallet.
             (bool success, ) = floth.getGrantFundWallet().call{value: latestRound.maxFlareAmount}("");
             require(success);
+        } else {
+            // Set winning state
+            mostVotedProposal.state = ProposalState.Winning;
+            winningProposalByRoundId[latestRound.id].state = ProposalState.Winning;
+            proposals[mostVotedProposal.id].state = ProposalState.Winning;
         }
 
         emit RoundCompleted(latestRound.id, mostVotedProposal.id);
@@ -944,7 +957,8 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         Proposal[] storage usersWinningProposals = winningProposals[msg.sender];
 
         for (uint256 i = 0; i < usersWinningProposals.length; i++) {
-            if(!usersWinningProposals[i].fundsClaimed && usersWinningProposals[i].roundId == _roundId){
+            if(usersWinningProposals[i].state == ProposalState.Winning && 
+               usersWinningProposals[i].roundId == _roundId) {
                 Round storage claimRound = rounds[_roundId];
 
                 //Check if 30 days have passed since round finished. 86400 seconds in a day.
@@ -961,10 +975,10 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
                     revert InsufficientBalance();
                 }
 
-                //Set as claimed so winner cannot reclaim for the proposal.
-                usersWinningProposals[i].fundsClaimed = true; 
-                winningProposalByRoundId[usersWinningProposals[i].roundId].fundsClaimed = true;
-                proposals[usersWinningProposals[i].id].fundsClaimed = true;
+                //Update state to claimed
+                usersWinningProposals[i].state = ProposalState.Claimed;
+                winningProposalByRoundId[usersWinningProposals[i].roundId].state = ProposalState.Claimed;
+                proposals[usersWinningProposals[i].id].state = ProposalState.Claimed;
 
                 //Send amount requested to winner.
                 (bool success, ) = usersWinningProposals[i].receiver.call{value: amountRequested}("");
@@ -983,22 +997,22 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         Proposal storage proposal = winningProposalByRoundId[_roundId];
         Round memory claimRound = getRoundById(_roundId);
 
-        if(!proposal.fundsClaimed){
+        if(proposal.state == ProposalState.Winning) {  // Check if funds haven't been claimed
             uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
 
             if (daysPassed > 30) {
-                //Set bool for funds claimed to true in both mappings.
-                proposal.fundsClaimed = true; 
+                // Update state to expired in all mappings
+                proposal.state = ProposalState.Expired;
 
                 Proposal[] storage userProposals = winningProposals[proposal.receiver];
                 for (uint256 i = 0; i < userProposals.length; i++) {
                     if (userProposals[i].id == proposal.id) {
-                        userProposals[i].fundsClaimed = true;
-                        proposals[userProposals[i].id].fundsClaimed = true;
+                        userProposals[i].state = ProposalState.Expired;
+                        proposals[userProposals[i].id].state = ProposalState.Expired;
                     }
                 }
                 
-                // Send amount to the grant wallet.
+                // Send amount to the grant wallet
                 (bool success, ) = floth.getGrantFundWallet().call{value: proposal.amountRequested}("");
                 require(success);
 
@@ -1018,7 +1032,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             Proposal storage proposal = winningProposalByRoundId[i];
             Round memory claimRound = getRoundById(i);
 
-            if (!proposal.fundsClaimed) {
+            if (proposal.state == ProposalState.Winning) {  // Check if funds haven't been claimed
                 uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
                 if (daysPassed > 30) {
                     count++;
@@ -1035,7 +1049,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             Proposal storage proposal = winningProposalByRoundId[i];
             Round memory claimRound = getRoundById(i); // Define claimRound here as well
 
-            if (!proposal.fundsClaimed) {
+            if (proposal.state == ProposalState.Winning) {  // Check if funds haven't been claimed
                 uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
 
                 if (daysPassed > 30) {
