@@ -63,16 +63,27 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         _disableInitializers();
     }
 
+    // Define the enum outside the struct for better organization
+    enum ProposalState {
+        Created,    // Initial state when proposal is created
+        Active,     // Proposal is in active voting round
+        Succeeded,  // Proposal won but funds not claimed
+        Claimed,    // Proposal won and funds were claimed
+        Failed,     // Proposal did not win
+        Abstained   // Proposal was the abstain option
+    }
+
     // Proposal struct to store proposal data
     struct Proposal {
-        uint256 id;
-        uint256 roundId; //Tracked for claiming funds.
-        string title;
-        uint256 amountRequested;
-        uint256 votesReceived;
-        address proposer; //The wallet that submitted the proposal.
-        address receiver; //The wallet that will receive the funds.
-        bool fundsClaimed; //Tracked here incase funds are not claimed before new round begins.
+        string title;            // 32 bytes (pointer) - separate slot
+        uint128 amountRequested; // 16 bytes
+        uint128 votesReceived;   // 16 bytes - packed with amountRequested
+        address proposer;        // 20 bytes - separate slot
+        address receiver;        // 20 bytes - separate slot
+        uint32 id;              // 4 bytes
+        uint32 roundId;         // 4 bytes
+        ProposalState state;    // 1 byte (enums are uint8 by default)
+        bool fundsClaimed;      // 1 byte - packed with id, roundId, and state
     }
 
     // Round struct to store round data
