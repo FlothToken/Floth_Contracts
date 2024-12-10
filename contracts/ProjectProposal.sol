@@ -84,6 +84,16 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         ProposalState state;  // Replace fundsClaimed with state
     }
 
+    
+    // Add round status enum
+    enum RoundStatus {
+        NotStarted,
+        SubmissionOpen,
+        VotingOpen,
+        Completed,
+        Expired
+    }
+
     // Round struct to store round data
     struct Round {
         uint256 id;
@@ -96,6 +106,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         uint256 snapshotBlock;
         uint256[] proposalIds;
         bool isActive;
+        RoundStatus status;
     }
 
     //Used to return proposal ids and their vote count for a specific round. And used for votedOnProposals mapping.
@@ -143,8 +154,8 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     // Tracks the FlothPass voting power at a snapshot block.
     mapping(uint256 => mapping(address => uint256)) public flothPassesOwned; // (snapshotBlock => (FlothPass Owner => number of FlothPass' owned))
 
-    //Keeps track of all round IDs.
-    uint256[] roundIds;
+    // Replace roundIds array with a mapping for O(1) lookups
+    mapping(uint256 => bool) public roundExists;
 
     /**
      * Events for the ProjectProposal contract
@@ -549,7 +560,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         newRound.proposalIds.push(proposalId); //Add abstain proposal to round struct.
         newRound.abstainProposalId = proposalId; //Used to track the abstain proposal of the round.
 
-        roundIds.push(roundId); //Keep track of the round ids.
+        roundExists[roundId] = true;
         emit RoundAdded(roundId, _maxFlareAmount, _roundRuntime);
     }
 
@@ -1067,5 +1078,29 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      */
     function getFlothAddress() external view returns (address) {
         return address(floth);
+    }
+
+    // Replace multiple round state checks with a single function
+    function getRoundStatus(uint256 _roundId) public view returns (RoundStatus) {
+        Round storage round = rounds[_roundId];
+        
+        if (block.timestamp < round.roundStartDatetime) {
+            return RoundStatus.NotStarted;
+        }
+        
+        if (block.timestamp < round.expectedSnapshotDatetime) {
+            return RoundStatus.SubmissionOpen;
+        }
+        
+        if (block.timestamp <= round.roundStartDatetime + round.roundRuntime) {
+            return RoundStatus.VotingOpen;
+        }
+        
+        uint256 daysPassed = (block.timestamp - (round.roundStartDatetime + round.roundRuntime)) / 86400;
+        if (daysPassed > 30) {
+            return RoundStatus.Expired;
+        }
+        
+        return RoundStatus.Completed;
     }
 }
