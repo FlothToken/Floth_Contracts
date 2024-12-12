@@ -127,13 +127,13 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         uint256 proposalCount;
         bool hasVoted;
         uint256 votingPower;
+        uint256 flothPassesOwned;
         Votes[] votedProposals;
     }
 
     struct RoundData {
         Round round;
         mapping(address => UserRoundData) userRoundData;
-        mapping(address => uint256) flothPassesOwned;
     }
 
     // Core mappings
@@ -672,9 +672,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         //Starts at 1 as the first FlothPass minted is 1 not 0.
         for (uint256 i = 1; i <= numberMinted; i++) {
             address owner = flothPass.ownerOf(i);
-
-            //Update the mapping with the number of FlothPass' owned by an address.
-            currentRoundData.flothPassesOwned[owner]++;
+            currentRoundData.userRoundData[owner].flothPassesOwned++;
         }
     }
 
@@ -845,7 +843,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         uint256 flothVotingPower = floth.getPastVotes(_address, snapshotBlock);
 
         //Get voting power for holding FlothPass.
-        uint256 nftVotingPower = roundData[roundId].flothPassesOwned[_address] * nftMultiplier;
+        uint256 nftVotingPower = roundData[roundId].userRoundData[_address].flothPassesOwned * nftMultiplier;
 
         return flothVotingPower + nftVotingPower;
     }
@@ -871,7 +869,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      */
     function getFlothPassVotingPower(address _address) public view returns (uint256) {
         RoundData storage currentRoundData = roundData[roundId];
-        return currentRoundData.flothPassesOwned[_address] * nftMultiplier;
+        return currentRoundData.userRoundData[_address].flothPassesOwned * nftMultiplier;
     }
 
     /**
