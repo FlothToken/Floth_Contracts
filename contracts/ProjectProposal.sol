@@ -212,6 +212,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     error InvalidAbstainVote();
     error InvalidRoundRuntime();
     error InvalidPageNumberPageSize();
+    error TransferFailed();
 
     //Modifiers for the ProjectProposal contract
     modifier roundManagerOrAdmin() {
@@ -976,8 +977,10 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
                usersWinningProposals[i].roundId == _roundId) {
                 Round storage claimRound = roundData_.round;
 
+                //Check if 30 days have passed since round finished. 86400 seconds in a day.
                 uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
 
+                //Check if 30 days have passed since round finished.
                 if (daysPassed > 30) {
                     emit FundsNotClaimed(usersWinningProposals[i].id, msg.sender);
                     revert FundsClaimingPeriodExpired();
@@ -988,18 +991,29 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
                     revert InsufficientBalance();
                 }
 
+                uint256 amountToSend = usersWinningProposals[i].amountRequested;
+                address payable receiver = payable(usersWinningProposals[i].receiver);
+                uint256 proposalId = usersWinningProposals[i].id;
+
+                // Update all state before external call
                 usersWinningProposals[i].state = ProposalState.Claimed;
                 winningProposalByRoundId[usersWinningProposals[i].roundId].state = ProposalState.Claimed;
-                proposals[usersWinningProposals[i].id].state = ProposalState.Claimed;
+                proposals[proposalId].state = ProposalState.Claimed;
+                roundData[_roundId].round.status = RoundStatus.Claimed;
 
-                (bool success, ) = usersWinningProposals[i].receiver.call{value: amountRequested}("");
-                require(success);
+                emit RoundStatusUpdated(_roundId, RoundStatus.Claimed);
+                emit FundsClaimed(proposalId, msg.sender, amountToSend);
 
-                emit FundsClaimed(usersWinningProposals[i].id, msg.sender, amountRequested);
+                // External call last (CEI pattern)
+                (bool success, ) = receiver.call{value: amountToSend}("");
+                if (!success) {
+                    revert TransferFailed();
+                }
                 return;
             }
         }
 
+        // Update round status through proposal state
         roundData_.round.status = RoundStatus.Claimed;
         emit RoundStatusUpdated(_roundId, RoundStatus.Claimed);
     }
@@ -1026,6 +1040,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         uint256 daysPassed = (block.timestamp - round.roundStartDatetime + round.roundRuntime) / 86400;
 
         if (daysPassed > 30) {
+            // Update state to expired in all mappings
             proposal.state = ProposalState.Expired;
             round.status = RoundStatus.Expired;
 
@@ -1037,6 +1052,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
                 }
             }
             
+            // Send amount to the grant wallet
             (bool success, ) = floth.getGrantFundWallet().call{value: proposal.amountRequested}("");
             require(success);
 
