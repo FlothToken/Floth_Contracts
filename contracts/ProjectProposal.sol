@@ -47,7 +47,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         floth = IFloth(_flothAddress);
         flothPass = IFlothPass(_flothPassAddress);
 
-        nftMultiplier = 200;
+        nftMultiplier = 100_000_000;
 
         _setRoleAdmin(SNAPSHOTTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
