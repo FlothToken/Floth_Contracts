@@ -126,6 +126,9 @@ contract FlothPass is
 
         // Set reference to the deployed FtsoV2Consumer contract
         ftsoV2Consumer = FtsoV2Consumer(_ftsoV2ConsumerAddress);
+
+        // Auto-delegate to self when initializing
+        _delegate(msg.sender, msg.sender);
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -186,7 +189,12 @@ contract FlothPass is
             saleConfig.mintsSinceLastIncrement += _quantity;
         }
 
-        emit TokensMinted(msg.sender, _quantity, currentPrice); // Emit event after minting
+        // Auto-delegate to self after minting
+        if (!isDelegate(msg.sender, msg.sender)) {
+            _delegate(msg.sender, msg.sender);
+        }
+
+        emit TokensMinted(msg.sender, _quantity, currentPrice);
     }
     
     /**
@@ -386,8 +394,28 @@ contract FlothPass is
      * @param tokenId the token id
      * @param batchSize the batch size
      */
-    function _afterTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override(ERC721Upgradeable, ERC721VotesUpgradeable) {
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 batchSize
+    ) internal override(ERC721Upgradeable, ERC721VotesUpgradeable) {
         super._afterTokenTransfer(from, to, tokenId, batchSize);
+
+        // Auto-delegate for new owner if they haven't delegated before
+        if (to != address(0) && !isDelegate(to, to)) {
+            _delegate(to, to);
+        }
+    }
+
+    // Helper function to check if address is already delegated
+    function isDelegate(address account, address delegate) public view returns (bool) {
+        return delegates(account) == delegate;
+    }
+
+    // Add explicit delegation function
+    function delegate(address delegatee) public override {
+        _delegate(_msgSender(), delegatee);
     }
 }
 
