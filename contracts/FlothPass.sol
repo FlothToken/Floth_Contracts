@@ -371,11 +371,14 @@ contract FlothPass is
 
         if (from != address(0)) {
             uint256[] storage tokens = _ownedTokens[from];
-            for (uint256 i = 0; i < tokens.length; i++) {
-                if (tokens[i] == tokenId) {
-                    tokens[i] = tokens[tokens.length - 1];
-                    tokens.pop();
-                    break;
+            // Use unchecked for gas savings in loops
+            unchecked {
+                for (uint256 i = 0; i < tokens.length; i++) {
+                    if (tokens[i] == tokenId) {
+                        tokens[i] = tokens[tokens.length - 1];
+                        tokens.pop();
+                        break;
+                    }
                 }
             }
         }
