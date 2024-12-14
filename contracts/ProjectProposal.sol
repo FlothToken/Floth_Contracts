@@ -596,9 +596,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      * Function to change the snapshot datetime of a round to a future datetime
      * @param _newExpectedSnapshotDatetime The extended time to add to snapshot datetime and round runtime for the round
      */
-    function extendRoundExpectedSnapshotDatetime(
-        uint256 _newExpectedSnapshotDatetime
-    ) external managerOrAdmin {
+    function extendRoundExpectedSnapshotDatetime(uint256 _newExpectedSnapshotDatetime) external managerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
         RoundStatus status = getRoundStatus(roundToUpdate.id);
 
@@ -607,6 +605,11 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             status == RoundStatus.Claimed || 
             status == RoundStatus.Expired) {
             revert RoundIsClosed();
+        }
+
+        // Add check to prevent extending after snapshot is taken
+        if (status == RoundStatus.VotingOpen) {
+            revert VotingPeriodOpen();
         }
 
         // Ensure the new snapshot time is in the future and within the round runtime
@@ -629,10 +632,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         roundToUpdate.roundRuntime += timeDifference;
 
         // Emit events for updating the snapshot datetime and round runtime
-        emit expectedSnapshotDatetimeUpdated(
-            roundId,
-            _newExpectedSnapshotDatetime
-        );
+        emit expectedSnapshotDatetimeUpdated(roundId, _newExpectedSnapshotDatetime);
         emit RoundRuntimeUpdated(roundId, roundToUpdate.roundRuntime);
     }
 
