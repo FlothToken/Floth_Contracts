@@ -667,21 +667,22 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
     function _getFlothPassesOwned(uint256 _snapshotBlock) internal {
         RoundData storage currentRoundData = roundData[roundId];
-        uint256 numberMinted = flothPass.getNumberMinted();
-
-        //Starts at 1 as the first FlothPass minted is 1 not 0.
-        for (uint256 i = 1; i <= numberMinted; i++) {
-            address owner = flothPass.ownerOf(i);
-            currentRoundData.userRoundData[owner].flothPassesOwned++;
+        uint256 totalSupply = flothPass.totalSupply();
+        
+        for (uint256 i = 0; i < totalSupply; i++) {
+            address owner = flothPass.ownerOf(i + 1);
+            uint256 votingPower = flothPass.getPastVotes(owner, _snapshotBlock);
+            if (votingPower > 0) {
+                UserRoundData storage userData = currentRoundData.userRoundData[owner];
+                userData.flothPassesOwned = votingPower;
+            }
         }
     }
 
     /**
      * Function to get the total votes for a round
      */
-    function getTotalVotesForRound(
-        uint256 _roundId
-    ) external view returns (uint256) {
+    function getTotalVotesForRound(uint256 _roundId) external view returns (uint256) {
         RoundData storage roundData_ = roundData[_roundId];
         uint256 totalVotes = 0;
         for (uint256 i = 0; i < roundData_.round.proposalIds.length; i++) {
@@ -868,8 +869,13 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      * @param _address the address to get voting power
      */
     function getFlothPassVotingPower(address _address) public view returns (uint256) {
-        RoundData storage currentRoundData = roundData[roundId];
-        return currentRoundData.userRoundData[_address].flothPassesOwned * nftMultiplier;
+        Round storage round = getLatestRound();
+        if(round.snapshotBlock == 0) {
+            return 0;
+        }
+        // Use the built-in votes functionality
+        uint256 votingPower = flothPass.getPastVotes(_address, round.snapshotBlock);
+        return votingPower * nftMultiplier;
     }
 
     /**
@@ -970,10 +976,8 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
                usersWinningProposals[i].roundId == _roundId) {
                 Round storage claimRound = roundData_.round;
 
-                //Check if 30 days have passed since round finished. 86400 seconds in a day.
                 uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
 
-                //Check if 30 days have passed since round finished.
                 if (daysPassed > 30) {
                     emit FundsNotClaimed(usersWinningProposals[i].id, msg.sender);
                     revert FundsClaimingPeriodExpired();
@@ -984,12 +988,10 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
                     revert InsufficientBalance();
                 }
 
-                //Update state to claimed
                 usersWinningProposals[i].state = ProposalState.Claimed;
                 winningProposalByRoundId[usersWinningProposals[i].roundId].state = ProposalState.Claimed;
                 proposals[usersWinningProposals[i].id].state = ProposalState.Claimed;
 
-                //Send amount requested to winner.
                 (bool success, ) = usersWinningProposals[i].receiver.call{value: amountRequested}("");
                 require(success);
 
@@ -998,7 +1000,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             }
         }
 
-        // Update round status through proposal state
         roundData_.round.status = RoundStatus.Claimed;
         emit RoundStatusUpdated(_roundId, RoundStatus.Claimed);
     }
@@ -1025,7 +1026,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         uint256 daysPassed = (block.timestamp - round.roundStartDatetime + round.roundRuntime) / 86400;
 
         if (daysPassed > 30) {
-            // Update state to expired in all mappings
             proposal.state = ProposalState.Expired;
             round.status = RoundStatus.Expired;
 
@@ -1037,7 +1037,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
                 }
             }
             
-            // Send amount to the grant wallet
             (bool success, ) = floth.getGrantFundWallet().call{value: proposal.amountRequested}("");
             require(success);
 
