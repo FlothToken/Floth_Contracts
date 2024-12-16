@@ -162,12 +162,14 @@ contract FlothPass is
             revert SaleInactive();
         }
 
+        //TODO MAX _QUANTITY LIMIT?
+
         if (saleConfig.numberMinted + _quantity > saleConfig.maxSupply) {
             revert ExceedsMaxSupply();
         }
 
         uint256 totalPrice = 0;
-        uint256 currentPrice = getCurrentPriceInFlr();
+        uint256 currentPrice = getCurrentPriceInFlr(); //TODO need to check of when quantity goes over the every 50 minted threshold within a single purchase. E.g. 48 minted + user tries to mint 3. 
 
         // Optimize gas by using unchecked for arithmetic operations
         unchecked {
@@ -182,11 +184,11 @@ contract FlothPass is
         // Batch mint tokens
         uint16 startTokenId = saleConfig.numberMinted;
         unchecked {
-            for (uint16 i = 0; i < _quantity; i++) {
-                _safeMint(msg.sender, startTokenId + i + 1);
+            for (uint16 i = 1; i <= _quantity; i++) {
+                _safeMint(msg.sender, startTokenId + i);
             }
             saleConfig.numberMinted += _quantity;
-            saleConfig.mintsSinceLastIncrement += _quantity;
+            saleConfig.mintsSinceLastIncrement += _quantity; //TODO do we need mintsSinceLastIncrement?
         }
 
         // Auto-delegate to self after minting
@@ -287,6 +289,8 @@ contract FlothPass is
      * @param _newMaxSupply the new max supply of tokens
      */
     function setMaxSupply(uint16 _newMaxSupply) external onlyRole(ADMIN_ROLE) {
+        //TODO check if _newMaxSupply is greater than the current number minted.
+        //TODO shouldn't be able to set max supply more than the max.
         saleConfig.maxSupply = _newMaxSupply;
     }
 
@@ -382,6 +386,7 @@ contract FlothPass is
                 }
             }
         }
+    //TODO do we need to do this? Is this in the ERC721EnumerableUpgradeable?
 
         // Add to new owner
         if (to != address(0)) {

@@ -242,7 +242,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         if (_sender == _recipient) revert SelfTransfer();
 
         // Allow tax-free transfers for liquidity providers
-        if (!dexAddresses[_sender] && !dexAddresses[_recipient] || liquidityProviders[_sender]) {
+        if ((!dexAddresses[_sender] && !dexAddresses[_recipient]) || liquidityProviders[_sender]) {
             super._transfer(_sender, _recipient, _amount);
             _handleDelegation(_recipient);
             return;
@@ -312,3 +312,4 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     function isDelegate(address account, address delegate) public view returns (bool) {
         return delegates(account) == delegate;
     }
+}
