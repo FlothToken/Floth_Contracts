@@ -192,7 +192,7 @@ contract FlothPass is
         }
 
         // Auto-delegate to self after minting
-        if (!isDelegate(msg.sender, msg.sender)) {
+        if (!isDelegated(msg.sender, msg.sender)) {
             _delegate(msg.sender, msg.sender);
         }
 
@@ -411,13 +411,13 @@ contract FlothPass is
         super._afterTokenTransfer(from, to, tokenId, batchSize);
 
         // Auto-delegate for new owner if they haven't delegated before
-        if (to != address(0) && !isDelegate(to, to)) {
+        if (to != address(0) && !isDelegated(to, to)) {
             _delegate(to, to);
         }
     }
 
     // Helper function to check if address is already delegated
-    function isDelegate(address account, address delegate) public view returns (bool) {
+    function isDelegated(address account, address delegate) public view returns (bool) {
         return delegates(account) == delegate;
     }
 
