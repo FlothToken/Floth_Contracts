@@ -29,6 +29,11 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     // Gap for upgradeability
     uint256[50] private __gap;
 
+    /**
+     * @dev Initialize the contract
+     * @param _flothAddress The address of the Floth contract
+     * @param _flothPassAddress The address of the FlothPass contract
+     */
     function initialize(address _flothAddress, address _flothPassAddress) public initializer {
         __AccessControl_init();
         __ProjectProposal_init(_flothAddress, _flothPassAddress);
@@ -76,7 +81,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     struct Proposal {
         uint256 id;
         uint256 roundId; //Tracked for claiming funds.
-        string title;
+        string title; //TODO do we even need onchain?
         uint256 amountRequested;
         uint256 votesReceived;
         address proposer; //The wallet that submitted the proposal.
@@ -106,7 +111,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         uint256 snapshotDatetime;
         uint256 snapshotBlock;
         uint256[] proposalIds;
-        bool isActive;
         RoundStatus status;
     }
 
@@ -328,9 +332,10 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         RoundData storage roundData_ = roundData[_roundId];
         uint256 count = roundData_.userRoundData[_account].proposalCount;
         Proposal[] memory accountProposals = new Proposal[](count);
-        uint256 index = 0;
+        uint256 index = 0; //TODO can we not just use i?
 
         for (uint256 i = 0; i < roundData_.round.proposalIds.length; i++) {
+            //TODO can this be memory not storage?
             Proposal storage proposal = proposals[roundData_.round.proposalIds[i]];
             if (proposal.proposer == _account) {
                 accountProposals[index] = proposal;
@@ -379,7 +384,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
         Proposal storage proposal = proposals[_proposalId];
 
-        //If they haven't voted yet, set votingPowerByRound, else retrieve current voting power
+        //If they haven't voted yet, retrieve current voting power
         if(!userData.hasVoted){
             userData.votingPower = getFlothVotingPower(msg.sender) + getFlothPassVotingPower(msg.sender);
         }
@@ -527,7 +532,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         newRound.expectedSnapshotDatetime = _expectedSnapshotDatetime;
         newRound.snapshotBlock = 0;
         newRound.snapshotDatetime = 0; 
-        newRound.isActive = true;
         newRound.status = RoundStatus.NotStarted;  // Set initial status
 
         //Add 'Abstain' proposal for the new round.
@@ -658,7 +662,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         if(round.snapshotBlock == 0){
             round.snapshotBlock = block.number;
             round.snapshotDatetime = block.timestamp; //Set the actual snapshot time.
-            _getFlothPassesOwned(round.snapshotBlock);
+            _getFlothPassesOwned(round.snapshotBlock); //Takes a snapshot of the FlothPasses owned.
             round.status = RoundStatus.VotingOpen;
             emit RoundStatusUpdated(round.id, RoundStatus.VotingOpen);
         }
@@ -668,7 +672,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
     function _getFlothPassesOwned(uint256 _snapshotBlock) internal {
         RoundData storage currentRoundData = roundData[roundId];
-        uint256 totalSupply = flothPass.totalSupply();
+        uint256 totalSupply = flothPass.totalSupply(); //TODO add totalSupply method.
         
         for (uint256 i = 0; i < totalSupply; i++) {
             address owner = flothPass.ownerOf(i + 1);
@@ -764,7 +768,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             revert RoundIsClosed();
         }
 
-        round.isActive = false;
         round.status = RoundStatus.Expired;
 
         //Send funds back to grant fund wallet.
@@ -845,6 +848,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         uint256 flothVotingPower = floth.getPastVotes(_address, snapshotBlock);
 
         //Get voting power for holding FlothPass.
+        //TODO getTotalVotingPower uses flothPassesOwned from the snapshot but getFlothPassVotingPower uses the current number of FlothPasses owned.
         uint256 nftVotingPower = roundData[roundId].userRoundData[_address].flothPassesOwned * nftMultiplier;
 
         return flothVotingPower + nftVotingPower;
@@ -875,6 +879,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             return 0;
         }
         // Use the built-in votes functionality
+        //TODO shouldn't we use the flothPassesOwned from the snapshot?
         uint256 votingPower = flothPass.getPastVotes(_address, round.snapshotBlock);
         return votingPower * nftMultiplier;
     }
@@ -896,7 +901,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         return getRoundStatus(latestRound.id) == RoundStatus.SubmissionOpen;
     }
     
-    //
     /**
      * Function to finish a round
      */
