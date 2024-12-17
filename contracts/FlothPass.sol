@@ -289,8 +289,8 @@ contract FlothPass is
      * @param _newMaxSupply the new max supply of tokens
      */
     function setMaxSupply(uint16 _newMaxSupply) external onlyRole(ADMIN_ROLE) {
-        //TODO check if _newMaxSupply is greater than the current number minted.
-        //TODO shouldn't be able to set max supply more than the max.
+        if(_newMaxSupply < saleConfig.numberMinted) revert InvalidMaxSupply();
+        if(_newMaxSupply > saleConfig.maxSupply) revert InvalidMaxSupply();
         saleConfig.maxSupply = _newMaxSupply;
     }
 
