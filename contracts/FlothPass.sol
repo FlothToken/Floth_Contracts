@@ -31,7 +31,7 @@ contract FlothPass is
     // Pack sale-related variables
     SaleConfig public saleConfig;
 
-    // Pack price-related variadbles
+    // Pack price-related variables
     struct PriceConfig {
         uint128 usdStartPrice;
         uint128 usdPriceIncrement;

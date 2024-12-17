@@ -52,7 +52,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         floth = IFloth(_flothAddress);
         flothPass = IFlothPass(_flothPassAddress);
 
-        nftMultiplier = 100_000_000;
+        nftMultiplier = 50_000_000;
 
         _setRoleAdmin(SNAPSHOTTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
@@ -81,7 +81,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     struct Proposal {
         uint256 id;
         uint256 roundId; //Tracked for claiming funds.
-        string title; //TODO do we even need onchain?
         uint256 amountRequested;
         uint256 votesReceived;
         address proposer; //The wallet that submitted the proposal.
@@ -154,7 +153,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         address creator,
         uint256 proposalId,
         uint256 roundId,
-        string title,
         uint256 amountRequested
     );
     event ProposalReceiverAddressUpdated(
@@ -242,11 +240,9 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
     /**
      * Function to add a proposal to the contract
-     * @param _title The title of the proposal
      * @param _amountRequested The amount requested for the proposal
      */
     function addProposal(
-        string memory _title,
         uint256 _amountRequested
     ) external {
         RoundData storage currentRoundData = roundData[roundId];
@@ -265,7 +261,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         Proposal storage newProposal = proposals[proposalId];
         newProposal.id = proposalId;
         newProposal.roundId = latestRound.id;
-        newProposal.title = _title;
         newProposal.amountRequested = _amountRequested;
         newProposal.receiver = msg.sender; //receiver set to msg.sender by default.
         newProposal.proposer = msg.sender;
@@ -274,7 +269,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         latestRound.proposalIds.push(proposalId);
         currentRoundData.userRoundData[msg.sender].proposalCount++;
         
-        emit ProposalAdded(msg.sender, proposalId, latestRound.id, _title, _amountRequested);
+        emit ProposalAdded(msg.sender, proposalId, latestRound.id, _amountRequested);
     }
 
     /**
@@ -539,7 +534,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         Proposal storage abstainProposal = proposals[proposalId];
         abstainProposal.id = proposalId;
         abstainProposal.roundId = roundId;
-        abstainProposal.title = "Abstain";
         abstainProposal.amountRequested = 0;
         abstainProposal.receiver = msg.sender;
         abstainProposal.proposer = msg.sender;
