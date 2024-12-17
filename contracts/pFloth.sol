@@ -151,25 +151,21 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard {
     /**
      * @dev Recover ERC20 tokens and return them to their original sender
      * @param token The address of the token to recover
-     * @param sender The address that originally sent the tokens
-     * Anyone can recover their own tokens, owner can recover for others
+     * Anyone can recover their own tokens
      * Cannot be used to recover pFLOTH tokens
      */
     function returnERC20ToSender(
-        address token,
-        address sender
+        address token
     ) external nonReentrant {
-        // Only allow msg.sender to recover their own tokens, or owner to recover for anyone
-        // TODO: Discuss the ramifications of this owner being able to recover for anyone.
-        if (msg.sender != sender && msg.sender != owner()) revert UnauthorizedRecovery();
+
         if (token == address(this)) revert InvalidRecoveryToken();
         
-        uint256 amount = tokenSenders[token][sender];
+        uint256 amount = tokenSenders[token][msg.sender];
         if (amount == 0) revert InvalidRecoveryAmount();
         
-        tokenSenders[token][sender] = 0; // Reset the tracked amount
-        IERC20(token).transfer(sender, amount);
-        emit TokenReturned(token, sender, amount);
+        tokenSenders[token][msg.sender] = 0; // Reset the tracked amount
+        IERC20(token).transfer(msg.sender, amount);
+        emit TokenReturned(token, msg.sender, amount);
     }
 
     /**
