@@ -23,7 +23,6 @@ contract FlothPass is
     // Pack related storage variables together to save slots
     struct SaleConfig {
         uint16 numberMinted;
-        uint16 mintsSinceLastIncrement;
         uint16 maxSupply;           // 1000 NFTs
         bool saleActive;
     }
@@ -110,7 +109,6 @@ contract FlothPass is
         // Initialize structs
         saleConfig = SaleConfig({
             numberMinted: 0,
-            mintsSinceLastIncrement: 0,
             maxSupply: 1000,
             saleActive: false
         });
@@ -138,14 +136,23 @@ contract FlothPass is
 
     /**
      * @dev Calculate current NFT price in FLR based on the dynamic FLR/USD price
-     * @return Current NFT price in FLR
+     * @param _quantity The number of NFTs to mint
+     * @return totalPrice Total price in FLR for all NFTs
      */
-    function getCurrentPriceInFlr() public payable returns (uint256) {
-        unchecked {
-            uint256 incrementCount = saleConfig.numberMinted / 50;
+    function getCurrentPriceInFlr(uint16 _quantity) public returns (uint256 totalPrice) {
+        uint256 currentMinted = saleConfig.numberMinted;
+        totalPrice = 0;
+        
+        // Calculate price for each token individually as they might cross price thresholds
+        for (uint16 i = 0; i < _quantity;) {
+            uint256 incrementCount = (currentMinted + i) / 50;
             uint256 usdPrice = priceConfig.usdStartPrice + (incrementCount * priceConfig.usdPriceIncrement);
-            return ftsoV2Consumer.getDynamicPrice(usdPrice);
+            totalPrice += ftsoV2Consumer.getDynamicPrice(usdPrice);
+            
+            unchecked { ++i; }
         }
+        
+        return totalPrice;
     }
 
 
@@ -168,13 +175,7 @@ contract FlothPass is
             revert ExceedsMaxSupply();
         }
 
-        uint256 totalPrice = 0;
-        uint256 currentPrice = getCurrentPriceInFlr(); //TODO need to check of when quantity goes over the every 50 minted threshold within a single purchase. E.g. 48 minted + user tries to mint 3. 
-
-        // Optimize gas by using unchecked for arithmetic operations
-        unchecked {
-            totalPrice = currentPrice * _quantity;
-        }
+        uint256 totalPrice = getCurrentPriceInFlr(_quantity);
 
         // Check if the caller sent enough Flare to cover the cost
         if (msg.value < totalPrice) {
@@ -188,7 +189,6 @@ contract FlothPass is
                 _safeMint(msg.sender, startTokenId + i);
             }
             saleConfig.numberMinted += _quantity;
-            saleConfig.mintsSinceLastIncrement += _quantity; //TODO do we need mintsSinceLastIncrement?
         }
 
         // Auto-delegate to self after minting
@@ -196,7 +196,7 @@ contract FlothPass is
             _delegate(msg.sender, msg.sender);
         }
 
-        emit TokensMinted(msg.sender, _quantity, currentPrice);
+        emit TokensMinted(msg.sender, _quantity, totalPrice);
     }
     
     /**
