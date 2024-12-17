@@ -55,6 +55,7 @@ contract FlothPass is
 
     // Mapping from address to list of owned token IDs
     mapping(address => uint256[]) private _ownedTokens;
+    mapping(uint256 => uint256) private _ownedTokensIndex; // tokenId => index in owner's array
 
     // Reference to FtsoV2Consumer contract
     FtsoV2Consumer public ftsoV2Consumer;
@@ -375,22 +376,21 @@ contract FlothPass is
 
         if (from != address(0)) {
             uint256[] storage tokens = _ownedTokens[from];
-            // Use unchecked for gas savings in loops
-            unchecked {
-                for (uint256 i = 0; i < tokens.length; i++) {
-                    if (tokens[i] == tokenId) {
-                        tokens[i] = tokens[tokens.length - 1];
-                        tokens.pop();
-                        break;
-                    }
-                }
-            }
-        }
-    //TODO do we need to do this? Is this in the ERC721EnumerableUpgradeable?
+            uint256 lastTokenIndex = tokens.length - 1;
+            uint256 tokenIndex = _ownedTokensIndex[tokenId];
 
-        // Add to new owner
+            // If not the last token, swap positions
+            if (tokenIndex != lastTokenIndex) {
+                uint256 lastTokenId = tokens[lastTokenIndex];
+                tokens[tokenIndex] = lastTokenId;
+                _ownedTokensIndex[lastTokenId] = tokenIndex;
+            }
+            tokens.pop();
+        }
+
         if (to != address(0)) {
             _ownedTokens[to].push(tokenId);
+            _ownedTokensIndex[tokenId] = _ownedTokens[to].length - 1;
         }
     }
 
