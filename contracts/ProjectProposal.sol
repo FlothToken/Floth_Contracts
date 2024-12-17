@@ -681,9 +681,9 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
     function _getFlothPassesOwned(uint256 _snapshotBlock) internal {
         RoundData storage currentRoundData = roundData[roundId];
-        uint256 totalSupply = flothPass.totalSupply(); //TODO add totalSupply method.
+        uint16 totalSupply = flothPass.getNumberMinted();
         
-        for (uint256 i = 0; i < totalSupply; i++) {
+        for (uint16 i = 0; i < totalSupply; i++) {
             address owner = flothPass.ownerOf(i + 1);
             uint256 votingPower = flothPass.getPastVotes(owner, _snapshotBlock);
             if (votingPower > 0) {
