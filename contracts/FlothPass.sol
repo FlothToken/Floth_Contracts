@@ -259,6 +259,15 @@ contract FlothPass is
     }
 
     /**
+     * @dev Getter for the number of tokens minted by an address
+     * @param _address the address to get the number of tokens minted for
+     * @return the number of tokens minted by the address
+     */
+    function getTokensMintedByAddress(address _address) external view returns (uint16) {
+        return _tokensMintedOnAddress[_address];
+    }
+
+    /**
      * @dev Getter the owned tokens of an address
      * @param owner the address to get the owned tokens for
      * @return the owned tokens of the address
