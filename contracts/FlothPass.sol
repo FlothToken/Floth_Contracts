@@ -142,18 +142,16 @@ contract FlothPass is
      */
     function getCurrentPriceInFlr(uint16 _quantity) public returns (uint256 totalPrice) {
         uint256 currentMinted = saleConfig.numberMinted;
-        totalPrice = 0;
+        uint256 totalUsdPrice = 0;
         
-        // Calculate price for each token individually as they might cross price thresholds
-        for (uint16 i = 0; i < _quantity;) {
+        // Calculate total USD price for all tokens
+        for (uint16 i = 0; i < _quantity; i++) {
             uint256 incrementCount = (currentMinted + i) / 50;
-            uint256 usdPrice = priceConfig.usdStartPrice + (incrementCount * priceConfig.usdPriceIncrement);
-            totalPrice += ftsoV2Consumer.getDynamicPrice(usdPrice);
-            
-            unchecked { ++i; }
+            totalUsdPrice += priceConfig.usdStartPrice + (incrementCount * priceConfig.usdPriceIncrement);
         }
         
-        return totalPrice;
+        // Single FTSO call for the total USD amount
+        return ftsoV2Consumer.getDynamicPrice(totalUsdPrice);
     }
 
 
