@@ -327,14 +327,14 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         RoundData storage roundData_ = roundData[_roundId];
         uint256 count = roundData_.userRoundData[_account].proposalCount;
         Proposal[] memory accountProposals = new Proposal[](count);
-        uint256 index = 0; //TODO can we not just use i?
+        
+        uint256 currentIndex = 0;  // Tracks actual position in accountProposals
 
         for (uint256 i = 0; i < roundData_.round.proposalIds.length; i++) {
-            //TODO can this be memory not storage?
-            Proposal storage proposal = proposals[roundData_.round.proposalIds[i]];
+            Proposal memory proposal = proposals[roundData_.round.proposalIds[i]];
             if (proposal.proposer == _account) {
-                accountProposals[index] = proposal;
-                index++;
+                accountProposals[currentIndex] = proposal;
+                currentIndex++;
             }
         }
         return accountProposals;
