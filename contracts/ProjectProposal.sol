@@ -379,26 +379,44 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
         Proposal storage proposal = proposals[_proposalId];
 
-        //If they haven't voted yet, retrieve current voting power
+        // Get initial voting power only if they haven't voted yet
         if(!userData.hasVoted){
             userData.votingPower = getFlothVotingPower(msg.sender) + getFlothPassVotingPower(msg.sender);
         }
 
-        //If voting for the Abstain proposal.
+        // Handle abstain votes
         if (_proposalId == getRound.abstainProposalId) {
+            uint256 totalRemovedVotes = 0;
+
+            // Remove votes from previous proposals
             if(userData.votedProposals.length > 0){
                 for (uint256 i = 0; i < userData.votedProposals.length; i++) {
-                    proposals[userData.votedProposals[i].proposalId].votesReceived -= userData.votedProposals[i].voteCount;
+                    uint256 voteCount = userData.votedProposals[i].voteCount;
+                    uint256 votedProposalId = userData.votedProposals[i].proposalId;
+                    proposals[votedProposalId].votesReceived -= voteCount;
+                    totalRemovedVotes += voteCount;
+                    
+                    // Emit event for removed votes
+                    emit VotesRemoved(proposalId, msg.sender, voteCount);
                 }
             }
 
-             //Voting power re-retrieved as may be reduced if previously voted.
-            uint256 votingPower = getFlothVotingPower(msg.sender) + getFlothPassVotingPower(msg.sender);
-            proposal.votesReceived += votingPower; //Give all voting power to abstain proposal.
-            userData.votingPower = 0; //All voting power is removed.
-            userData.hasVoted = true; //Set that the user has voted in a round.
-            delete userData.votedProposals; //Remove all votes from user. TODO CHECK THIS
-        
+            // Clear votes array without using delete
+            userData.votedProposals = new Votes[](0);
+            
+            // Use original voting power for abstain
+            uint256 abstainVotes = userData.votingPower + totalRemovedVotes;
+            proposal.votesReceived += abstainVotes;
+            userData.votingPower = 0;
+            userData.hasVoted = true;
+
+            // Add abstain vote to user's votes
+            userData.votedProposals.push(Votes({
+                proposalId: _proposalId,
+                voteCount: abstainVotes
+            }));
+
+            emit VotesAdded(_proposalId, msg.sender, abstainVotes);
         } else {
             //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
             if (userData.votingPower == 0) {
@@ -414,16 +432,13 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             userData.votingPower -= _numberOfVotes; //Reduce voting power in a round.
             userData.hasVoted = true; //Set that the user has voted in a round.
 
-               //Create votes struct object of the users vote.
-            Votes memory newVote = Votes({
+            userData.votedProposals.push(Votes({
                 proposalId: _proposalId,
                 voteCount: _numberOfVotes
-            });
+            }));
 
-            userData.votedProposals.push(newVote);
+            emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
         }
-        
-        emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
     }
 
     /**
