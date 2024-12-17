@@ -13,6 +13,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     uint256 private constant INITIAL_SUPPLY = 100 * 10**9; // 100 billion
     uint256 private constant MAX_TAX = 500; // 5%
+    uint256 private constant MAX_LP_TAX = 250; // 2.5%
     uint256 private constant BASIS_POINTS = 10000;
 
     // Packing similar storage variables together to save slots
@@ -131,7 +132,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param _newLpTax New LP tax to be set.
      */
     function setLpTax(uint128 _newLpTax) external onlyOwner {
-        //TODO: Do we have a max for this?
+        if (_newLpTax > MAX_LP_TAX) revert InvalidTaxAmount();
         taxInfo.lpTax = _newLpTax;
         emit LpTaxUpdate(_newLpTax);
     }
