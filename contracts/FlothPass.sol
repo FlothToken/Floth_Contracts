@@ -24,6 +24,7 @@ contract FlothPass is
     struct SaleConfig {
         uint16 numberMinted;
         uint16 maxSupply;           // 1000 NFTs
+        uint16 maxWalletLimit;     // 25 NFTs
         bool saleActive;
     }
 
@@ -56,6 +57,7 @@ contract FlothPass is
     // Mapping from address to list of owned token IDs
     mapping(address => uint256[]) private _ownedTokens;
     mapping(uint256 => uint256) private _ownedTokensIndex; // tokenId => index in owner's array
+    mapping(address => uint16) private _tokensMintedOnAddress;
 
     // Reference to FtsoV2Consumer contract
     FtsoV2Consumer public ftsoV2Consumer;
@@ -80,6 +82,8 @@ contract FlothPass is
     error TransferFailed();
     error ZeroAddress();
     error InvalidPrice();
+    error ExceedsWalletLimit();
+    error InvalidMaxSupply();
 
     // Function to receive Ether. msg.data must be empty.
     receive() external payable {}
@@ -111,6 +115,7 @@ contract FlothPass is
         saleConfig = SaleConfig({
             numberMinted: 0,
             maxSupply: 1000,
+            maxWalletLimit: 25,
             saleActive: false
         });
 
@@ -168,7 +173,9 @@ contract FlothPass is
             revert SaleInactive();
         }
 
-        //TODO MAX _QUANTITY LIMIT?
+        if (_tokensMintedOnAddress[msg.sender] + _quantity > saleConfig.maxWalletLimit) {
+            revert ExceedsWalletLimit();
+        }
 
         if (saleConfig.numberMinted + _quantity > saleConfig.maxSupply) {
             revert ExceedsMaxSupply();
@@ -188,6 +195,7 @@ contract FlothPass is
                 _safeMint(msg.sender, startTokenId + i);
             }
             saleConfig.numberMinted += _quantity;
+            _tokensMintedOnAddress[msg.sender] += _quantity;
         }
 
         // Auto-delegate to self after minting
@@ -415,8 +423,8 @@ contract FlothPass is
     }
 
     // Helper function to check if address is already delegated
-    function isDelegated(address account, address delegate) public view returns (bool) {
-        return delegates(account) == delegate;
+    function isDelegated(address account, address accountDelegate) public view returns (bool) {
+        return delegates(account) == accountDelegate;
     }
 
     // Add explicit delegation function
