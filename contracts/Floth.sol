@@ -12,9 +12,9 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  */
 contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     uint256 private constant INITIAL_SUPPLY = 100 * 10**9; // 100 billion
-    uint256 private constant MAX_TAX = 500; // 5%
-    uint256 private constant MAX_LP_TAX = 250; // 2.5%
-    uint256 private constant BASIS_POINTS = 10000;
+    uint256 private constant MAX_TAX = 5 * 10**16;     // 5%
+    uint256 private constant MAX_LP_TAX = 25 * 10**15; // 2.5%
+    uint256 private constant BASIS_POINTS = 10**18; // 18 decimal places
 
     // Packing similar storage variables together to save slots
     struct TaxInfo {
@@ -73,9 +73,9 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
 
         // Initialize tax structure 
         // Initially 25/35% for taxes but can only be changed to 5% after this initial period
-        taxInfo.buyTax = 2500;  // 25%
-        taxInfo.sellTax = 3500; // 35%
-        taxInfo.lpTax = 50; // 0.5%
+        taxInfo.buyTax = 25 * 10**16;  // 25%
+        taxInfo.sellTax = 35 * 10**16; // 35%
+        taxInfo.lpTax = 5 * 10**15;    // 0.5%
         taxInfo.lpTaxIsActive = true;
         taxInfo.paused = false;
 
@@ -271,6 +271,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
 
             //Calculate tax amount
             unchecked {
+                // Calculate tax amount - multiply first, then divide to maintain precision
                 taxAmount = (_amount * _taxInfo.sellTax) / BASIS_POINTS;
             }
 
