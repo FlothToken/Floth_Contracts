@@ -424,7 +424,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
             if (userData.votingPower == 0) {
                 revert InvalidVotingPower();
-            }
+            } 
             
             //If the user doesn't have enough voting power, stop them from voting.
             if (userData.votingPower < _numberOfVotes) {
@@ -1009,16 +1009,16 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
                 uint256 amountToSend = usersWinningProposals[i].amountRequested;
                 address payable receiver = payable(usersWinningProposals[i].receiver);
-                uint256 proposalId = usersWinningProposals[i].id;
+                uint256 winningProposalId = usersWinningProposals[i].id;
 
                 // Update all state before external call
                 usersWinningProposals[i].state = ProposalState.Claimed;
                 winningProposalByRoundId[usersWinningProposals[i].roundId].state = ProposalState.Claimed;
-                proposals[proposalId].state = ProposalState.Claimed;
+                proposals[winningProposalId].state = ProposalState.Claimed;
                 roundData[_roundId].round.status = RoundStatus.Claimed;
 
                 emit RoundStatusUpdated(_roundId, RoundStatus.Claimed);
-                emit FundsClaimed(proposalId, msg.sender, amountToSend);
+                emit FundsClaimed(winningProposalId, msg.sender, amountToSend);
 
                 // External call last (CEI pattern)
                 (bool success, ) = receiver.call{value: amountToSend}("");
