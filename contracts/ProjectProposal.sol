@@ -396,21 +396,24 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
                     proposals[votedProposalId].votesReceived -= voteCount;
                     totalRemovedVotes += voteCount;
                     
-                    // Emit event for removed votes
-                    emit VotesRemoved(proposalId, msg.sender, voteCount);
+                    emit VotesRemoved(votedProposalId, msg.sender, voteCount);
                 }
             }
 
-            // Clear votes array without using delete
-            userData.votedProposals = new Votes[](0);
+            // Clear existing votes array
+            delete userData.votedProposals;
             
-            // Use original voting power for abstain
+            // Calculate total abstain votes (current voting power + removed votes)
             uint256 abstainVotes = userData.votingPower + totalRemovedVotes;
+            
+            // Add votes to abstain proposal
             proposal.votesReceived += abstainVotes;
+            
+            // Reset voting power and mark as voted
             userData.votingPower = 0;
             userData.hasVoted = true;
 
-            // Add abstain vote to user's votes
+            // Record abstain vote
             userData.votedProposals.push(Votes({
                 proposalId: _proposalId,
                 voteCount: abstainVotes
@@ -421,7 +424,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
             if (userData.votingPower == 0) {
                 revert InvalidVotingPower();
-            } 
+            }
             
             //If the user doesn't have enough voting power, stop them from voting.
             if (userData.votingPower < _numberOfVotes) {
