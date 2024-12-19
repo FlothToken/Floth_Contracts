@@ -12,15 +12,15 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  */
 contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     uint256 private constant INITIAL_SUPPLY = 100 * 10**9; // 100 billion
-    uint256 private constant MAX_TAX = 5 * 10**16;     // 5%
-    uint256 private constant MAX_LP_TAX = 25 * 10**15; // 2.5%
-    uint256 private constant BASIS_POINTS = 10**18; // 18 decimal places
+    uint256 private constant BASIS_POINTS = 10**18;     
+    uint256 private constant MAX_TAX = 5 * 10**16;     // 5% (0.05 * 10^18)
+    uint256 private constant MAX_LP_TAX = 25 * 10**15; // 2.5% (0.025 * 10^18)
 
     // Packing similar storage variables together to save slots
     struct TaxInfo {
-        uint128 buyTax;  // Reduced to uint128 as it never exceeds this value
-        uint128 sellTax; // Reduced to uint128 as it never exceeds this value
-        uint128 lpTax; // Reduced to uint128 as it never exceeds this value
+        uint256 buyTax;
+        uint256 sellTax;
+        uint256 lpTax;
         bool lpTaxIsActive; // Flag to enable/disable LP tax
         bool paused; // Flag to enable/disable emergency pause
     }
@@ -71,11 +71,10 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
             revert InvalidTokenNameOrSymbol();
         }
 
-        // Initialize tax structure 
-        // Initially 25/35% for taxes but can only be changed to 5% after this initial period
-        taxInfo.buyTax = 25 * 10**16;  // 25%
-        taxInfo.sellTax = 35 * 10**16; // 35%
-        taxInfo.lpTax = 5 * 10**15;    // 0.5%
+        // Initialize tax structure with correct decimals
+        taxInfo.buyTax = 25 * 10**16;  // 25% = 0.25 * 10^18
+        taxInfo.sellTax = 35 * 10**16; // 35% = 0.35 * 10^18
+        taxInfo.lpTax = 5 * 10**15;    // 0.5% = 0.005 * 10^18
         taxInfo.lpTaxIsActive = true;
         taxInfo.paused = false;
 
@@ -111,7 +110,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @dev Set sell tax with validation
      * @param _newSellTax New sell tax to be set.
      */
-    function setSellTax(uint128 _newSellTax) external onlyOwner {
+    function setSellTax(uint256 _newSellTax) external onlyOwner {
         if (_newSellTax > MAX_TAX) revert InvalidTaxAmount();
         taxInfo.sellTax = _newSellTax;
         emit SellTaxUpdate(_newSellTax);
@@ -121,7 +120,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @dev Set buy tax with validation
      * @param _newBuyTax New buy tax to be set.
      */
-    function setBuyTax(uint128 _newBuyTax) external onlyOwner {
+    function setBuyTax(uint256 _newBuyTax) external onlyOwner {
         if (_newBuyTax > MAX_TAX) revert InvalidTaxAmount();
         taxInfo.buyTax = _newBuyTax;
         emit BuyTaxUpdate(_newBuyTax);
@@ -131,7 +130,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @dev Set LP tax with validation
      * @param _newLpTax New LP tax to be set.
      */
-    function setLpTax(uint128 _newLpTax) external onlyOwner {
+    function setLpTax(uint256 _newLpTax) external onlyOwner {
         if (_newLpTax > MAX_LP_TAX) revert InvalidTaxAmount();
         taxInfo.lpTax = _newLpTax;
         emit LpTaxUpdate(_newLpTax);
@@ -174,9 +173,9 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @return paused Paused.
      */
     function getTaxInfo() external view returns (
-        uint128 buyTax,
-        uint128 sellTax,
-        uint128 lpTax,
+        uint256 buyTax,
+        uint256 sellTax,
+        uint256 lpTax,
         bool lpTaxActive,
         bool paused
     ) {
@@ -315,3 +314,4 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         return delegates(account) == delegate;
     }
 }
+ 
