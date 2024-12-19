@@ -36,6 +36,12 @@ describe("Floth Contract", function () {
       expect(await floth.totalSupply()).to.equal(ownerBalance);
     });
 
+    it("Should have correct initial supply with decimals", async function () {
+      const totalSupply = await floth.totalSupply();
+      const expectedSupply = ethers.parseEther("100000000000"); // 100 billion with 18 decimals
+      expect(totalSupply).to.equal(expectedSupply);
+    });
+
     it("Should revert when deploying with empty name or symbol", async function () {
       await expect(Floth.deploy([dexAddress.address], "", "FLOTH")).to.be.revertedWithCustomError(Floth, "InvalidTokenNameOrSymbol");
       await expect(Floth.deploy([dexAddress.address], "Floth Token", "")).to.be.revertedWithCustomError(Floth, "InvalidTokenNameOrSymbol");
@@ -65,23 +71,23 @@ describe("Floth Contract", function () {
       await floth.setLiquidityProvider(owner.address, true);
 
       // Transfer to DEX without tax
-      await floth.transfer(dexAddress.address, 200);
+      await floth.transfer(dexAddress.address, ethers.parseEther("200"));
 
       // Test buy transaction
-      await floth.connect(dexAddress).transfer(addr1.address, 100);
+      await floth.connect(dexAddress).transfer(addr1.address, ethers.parseEther("100"));
 
       const addr1Balance = await floth.balanceOf(addr1.address);
       const grantFundWallet = await floth.balanceOf(await floth.grantFundWallet());
 
-      expect(addr1Balance).to.equal(75); // 100 - 25% buy tax
-      expect(grantFundWallet).to.equal(25); // 25% buy tax
+      expect(addr1Balance).to.equal(ethers.parseEther("75")); // 100 - 25% buy tax
+      expect(grantFundWallet).to.equal(ethers.parseEther("25")); // 25% buy tax
     });
 
     it("Should apply sell tax when selling to a dex address", async function () {
       // Set up as liquidity provider for initial DEX transfer
       await floth.setLiquidityProvider(owner.address, true);
-      await floth.transfer(addr1.address, 1000);
-      await floth.connect(addr1).transfer(dexAddress.address, 1000);
+      await floth.transfer(addr1.address, ethers.parseEther("1000"));
+      await floth.connect(addr1).transfer(dexAddress.address, ethers.parseEther("1000"));
 
       const dexBalance = await floth.balanceOf(dexAddress.address);
       const grantFundWallet = await floth.balanceOf(await floth.grantFundWallet());
@@ -90,31 +96,55 @@ describe("Floth Contract", function () {
       // For 1000 tokens:
       // 35% sell tax = 350 tokens
       // 0.5% LP tax = 5 tokens
-      expect(dexBalance).to.equal(645);
-      expect(grantFundWallet).to.equal(350);
-      expect(lpFundBalance).to.equal(5);
+      expect(dexBalance).to.equal(ethers.parseEther("645"));
+      expect(grantFundWallet).to.equal(ethers.parseEther("350"));
+      expect(lpFundBalance).to.equal(ethers.parseEther("5"));
     });
 
     it("Should apply correct tax after changing buy tax", async function () {
-      // Set up as liquidity provider for initial DEX transfer
       await floth.setLiquidityProvider(owner.address, true);
-      await floth.setBuyTax(500); // Set buy tax to 5%
-      await floth.transfer(dexAddress.address, 200);
-      await floth.connect(dexAddress).transfer(addr1.address, 100);
+      
+      // Set buy tax to 5% (5 * 10^18)
+      const newBuyTax = ethers.parseEther("0.05"); // 5%
+      await floth.setBuyTax(newBuyTax);
+      
+      const amount = ethers.parseEther("1000");
+      await floth.transfer(dexAddress.address, amount);
+      await floth.connect(dexAddress).transfer(addr1.address, amount);
 
-      const addr1Balance = await floth.balanceOf(addr1.address);
-      expect(addr1Balance).to.equal(95); // 5% tax applied
+      const expectedBalance = ethers.parseEther("950"); // 95% of 1000
+      expect(await floth.balanceOf(addr1.address)).to.equal(expectedBalance);
     });
 
     it("Should apply correct tax after changing sell tax", async function () {
-      // Set up as liquidity provider for initial DEX transfer
       await floth.setLiquidityProvider(owner.address, true);
-      await floth.setSellTax(500); // Set sell tax to 5%
-      await floth.transfer(addr1.address, 200);
-      await floth.connect(addr1).transfer(dexAddress.address, 100);
+      await floth.setSellTax(ethers.parseEther("0.05")); // Set sell tax to 5%
+      
+      const amount = ethers.parseEther("1000");
+      await floth.transfer(addr1.address, amount);
+      await floth.connect(addr1).transfer(dexAddress.address, amount);
 
-      const dexBalance = await floth.balanceOf(dexAddress.address);
-      expect(dexBalance).to.equal(95); // 5% tax applied
+      // Expected balances:
+      // DEX: 94.5% (100% - 5% sell tax - 0.5% LP tax)
+      // Grant Fund: 5% (sell tax)
+      // LP Fund: 0.5% (LP tax)
+      const expectedDexBalance = ethers.parseEther("945"); // 94.5% of 1000
+      const expectedGrantFundBalance = ethers.parseEther("50"); // 5% of 1000
+      const expectedLpFundBalance = ethers.parseEther("5"); // 0.5% of 1000
+
+      // Verify balances
+      expect(await floth.balanceOf(dexAddress.address)).to.equal(expectedDexBalance);
+      expect(await floth.balanceOf(await floth.grantFundWallet())).to.equal(expectedGrantFundBalance);
+      expect(await floth.balanceOf(await floth.lpFundWallet())).to.equal(expectedLpFundBalance);
+    });
+
+    it("Should verify initial tax settings", async function () {
+      const taxInfo = await floth.getTaxInfo();
+      
+      // Check initial tax rates
+      expect(taxInfo.buyTax).to.equal(ethers.parseEther("0.25"));  // 25%
+      expect(taxInfo.sellTax).to.equal(ethers.parseEther("0.35")); // 35%
+      expect(taxInfo.lpTax).to.equal(ethers.parseEther("0.005"));  // 0.5%
     });
 
     it("Should allow large token transfers", async function () {
@@ -166,15 +196,48 @@ describe("Floth Contract", function () {
     });
 
     it("Should revert when setting buy tax beyond limit", async function () {
-      await expect(floth.setBuyTax(600)).to.be.revertedWithCustomError(floth, "InvalidTaxAmount");
+      await expect(floth.setBuyTax(ethers.parseEther("0.06"))).to.be.revertedWithCustomError(floth, "InvalidTaxAmount");
     });
 
     it("Should revert when setting sell tax beyond limit", async function () {
-      await expect(floth.setSellTax(600)).to.be.revertedWithCustomError(floth, "InvalidTaxAmount");
+      await expect(floth.setSellTax(ethers.parseEther("0.06"))).to.be.revertedWithCustomError(floth, "InvalidTaxAmount");
     });
 
     it("Should revert when self transferring", async function () {
       await expect(floth.transfer(owner.address, 50)).to.be.revertedWithCustomError(floth, "SelfTransfer");
+    });
+
+    it("Should apply correct tax after changing buy tax", async function () {
+      await floth.setLiquidityProvider(owner.address, true);
+      await floth.setBuyTax(ethers.parseEther("0.05")); // Set buy tax to 5%
+      
+      const amount = ethers.parseEther("1000");
+      await floth.transfer(dexAddress.address, amount);
+      await floth.connect(dexAddress).transfer(addr1.address, amount);
+
+      const expectedBalance = ethers.parseEther("950"); // 95% of 1000
+      expect(await floth.balanceOf(addr1.address)).to.equal(expectedBalance);
+    });
+
+    it("Should apply correct tax after changing sell tax", async function () {
+      await floth.setLiquidityProvider(owner.address, true);
+      await floth.setSellTax(ethers.parseEther("0.05")); // Set sell tax to 5%
+      
+      const amount = ethers.parseEther("1000");
+      await floth.transfer(addr1.address, amount);
+      await floth.connect(addr1).transfer(dexAddress.address, amount);
+
+      // Expected balances:
+      // DEX: 94.5% (100% - 5% sell tax - 0.5% LP tax)
+      // Grant Fund: 5% (sell tax)
+      // LP Fund: 0.5% (LP tax)
+      const expectedDexBalance = ethers.parseEther("945"); // 94.5% of 1000
+      const expectedGrantFundBalance = ethers.parseEther("50"); // 5% of 1000
+      const expectedLpFundBalance = ethers.parseEther("5"); // 0.5% of 1000
+
+      expect(await floth.balanceOf(dexAddress.address)).to.equal(expectedDexBalance);
+      expect(await floth.balanceOf(await floth.grantFundWallet())).to.equal(expectedGrantFundBalance);
+      expect(await floth.balanceOf(await floth.lpFundWallet())).to.equal(expectedLpFundBalance);
     });
   });
 
@@ -291,20 +354,20 @@ describe("Floth Contract", function () {
   describe("Tax Information", function () {
     it("Should return correct tax information", async function () {
       const taxInfo = await floth.getTaxInfo();
-      expect(taxInfo.buyTax).to.equal(2500); // Initial 25%
-      expect(taxInfo.sellTax).to.equal(3500); // Initial 35%
+      expect(taxInfo.buyTax).to.equal(ethers.parseEther("0.25")); // Initial 25%
+      expect(taxInfo.sellTax).to.equal(ethers.parseEther("0.35")); // Initial 35%
       expect(taxInfo.lpTaxActive).to.equal(true);
       expect(taxInfo.paused).to.equal(false);
     });
 
     it("Should update tax info when values change", async function () {
-      await floth.setBuyTax(300); // 3%
-      await floth.setSellTax(400); // 4%
+      await floth.setBuyTax(ethers.parseEther("0.03")); // 3%
+      await floth.setSellTax(ethers.parseEther("0.04")); // 4%
       await floth.setLpTaxStatus(false);
 
       const taxInfo = await floth.getTaxInfo();
-      expect(taxInfo.buyTax).to.equal(300);
-      expect(taxInfo.sellTax).to.equal(400);
+      expect(taxInfo.buyTax).to.equal(ethers.parseEther("0.03"));
+      expect(taxInfo.sellTax).to.equal(ethers.parseEther("0.04"));
       expect(taxInfo.lpTaxActive).to.equal(false);
     });
   });
@@ -357,46 +420,60 @@ describe("Floth Contract", function () {
     it("Should calculate taxes correctly on sell transactions", async function () {
       await floth.setLiquidityProvider(owner.address, true);
 
-      console.log("Initial owner balance:", (await floth.balanceOf(owner.address)).toString());
-
-      // First transfer to addr1
-      await floth.transfer(addr1.address, 1000);
-      console.log("Addr1 balance after transfer:", (await floth.balanceOf(addr1.address)).toString());
-
-      // Then addr1 sells to DEX
-      await floth.connect(addr1).transfer(dexAddress.address, 1000);
+      const amount = ethers.parseEther("1000"); // 1000 tokens with 18 decimals
+      
+      // Transfer to addr1
+      await floth.transfer(addr1.address, amount);
+      
+      // Sell to DEX
+      await floth.connect(addr1).transfer(dexAddress.address, amount);
 
       const dexBalance = await floth.balanceOf(dexAddress.address);
-      const grantFundWallet = await floth.balanceOf(await floth.grantFundWallet());
+      const grantFundBalance = await floth.balanceOf(await floth.grantFundWallet());
       const lpFundBalance = await floth.balanceOf(await floth.lpFundWallet());
 
-      console.log("DEX balance:", dexBalance.toString());
-      console.log("Grant Fund balance:", grantFundWallet.toString());
-      console.log("LP Fund balance:", lpFundBalance.toString());
+      // Calculate expected amounts
+      const sellTaxAmount = amount * (ethers.parseEther("0.35"))/(ethers.parseEther("1")); // 35%
+      const lpTaxAmount = amount * (ethers.parseEther("0.005"))/(ethers.parseEther("1")); // 0.5%
+      const expectedDexAmount = amount - sellTaxAmount - lpTaxAmount;
 
-      expect(dexBalance).to.equal(645);
-      expect(grantFundWallet).to.equal(350);
-      expect(lpFundBalance).to.equal(5);
+      expect(dexBalance).to.equal(expectedDexAmount);
+      expect(grantFundBalance).to.equal(sellTaxAmount);
+      expect(lpFundBalance).to.equal(lpTaxAmount);
     });
 
     it("Should calculate taxes correctly on buy transactions", async function () {
       // Set up as liquidity provider for initial DEX transfer
       await floth.setLiquidityProvider(owner.address, true);
 
-      // First transfer to DEX
-      await floth.transfer(dexAddress.address, 1000);
+      const amount = ethers.parseEther("1000");
+      
+      // Transfer to DEX
+      await floth.transfer(dexAddress.address, amount);
 
-      // Then DEX sells to addr1 (triggers buy tax)
-      await floth.connect(dexAddress).transfer(addr1.address, 1000);
-
-      // Buy tax (25%) of 1000 = 250 tokens
-      // addr1 receives = 1000 - 250 = 750 tokens
+      // Buy from DEX
+      await floth.connect(dexAddress).transfer(addr1.address, amount);
 
       const addr1Balance = await floth.balanceOf(addr1.address);
-      const grantFundWallet = await floth.balanceOf(await floth.grantFundWallet());
+      const grantFundBalance = await floth.balanceOf(await floth.grantFundWallet());
 
-      expect(addr1Balance).to.equal(750);
-      expect(grantFundWallet).to.equal(250);
+      // Calculate expected amounts
+      const buyTaxAmount = amount * (ethers.parseEther("0.25")) / (ethers.parseEther("1")); // 25%
+      const expectedReceivedAmount = amount - buyTaxAmount;
+
+      expect(addr1Balance).to.equal(expectedReceivedAmount);
+      expect(grantFundBalance).to.equal(buyTaxAmount);
+    });
+
+    it("Should verify initial tax settings", async function () {
+      const taxInfo = await floth.getTaxInfo();
+      
+      // Check initial tax rates
+      expect(taxInfo.buyTax).to.equal(ethers.parseEther("0.25"));  // 25%
+      expect(taxInfo.sellTax).to.equal(ethers.parseEther("0.35")); // 35%
+      expect(taxInfo.lpTax).to.equal(ethers.parseEther("0.005"));  // 0.5%
+      expect(taxInfo.lpTaxActive).to.equal(true);
+      expect(taxInfo.paused).to.equal(false);
     });
   });
 
@@ -528,6 +605,103 @@ describe("Floth Contract", function () {
       const expectedTax = (tradeAmount * 35) / 100;
       const grantFundBalance = await floth.balanceOf(await floth.grantFundWallet());
       expect(grantFundBalance).to.equal(expectedTax);
+    });
+  });
+
+  describe("Edge Cases", function () {
+    it("Should handle multiple tax calculations in the same transaction", async function () {
+      await floth.setLiquidityProvider(owner.address, true);
+      
+      // Setup initial liquidity
+      await floth.transfer(dexAddress.address, ethers.parseEther("10000"));
+      
+      // Setup test accounts
+      await floth.connect(dexAddress).transfer(addr1.address, ethers.parseEther("1000")); // Buy
+      await floth.connect(dexAddress).transfer(addr2.address, ethers.parseEther("1000")); // Buy
+      
+      // Check initial balances after buy tax
+      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseEther("750")); // 1000 - 25% buy tax
+      expect(await floth.balanceOf(addr2.address)).to.equal(ethers.parseEther("750"));
+      
+      // Both accounts sell at the same time
+      await floth.connect(addr1).transfer(dexAddress.address, ethers.parseEther("750"));
+      await floth.connect(addr2).transfer(dexAddress.address, ethers.parseEther("750"));
+      
+      // Check final balances
+      const dexBalance = await floth.balanceOf(dexAddress.address);
+      const grantFundBalance = await floth.balanceOf(await floth.grantFundWallet());
+      const lpFundBalance = await floth.balanceOf(await floth.lpFundWallet());
+      
+      // Verify all taxes were applied correctly
+      expect(grantFundBalance).to.equal(ethers.parseEther("1025")); // 500 (buy tax) + 525 (sell tax)
+      expect(lpFundBalance).to.equal(ethers.parseEther("7.5")); // 0.5% of 1500 sold
+    });
+
+    it("Should handle maximum possible transfer amount", async function () {
+      const totalSupply = await floth.totalSupply();
+      await floth.transfer(addr1.address, totalSupply);
+      expect(await floth.balanceOf(addr1.address)).to.equal(totalSupply);
+    });
+  });
+
+  describe("Voting Power", function () {
+    it("Should correctly delegate voting power on transfer", async function () {
+      await floth.transfer(addr1.address, 1000);
+      expect(await floth.delegates(addr1.address)).to.equal(addr1.address);
+      expect(await floth.getVotes(addr1.address)).to.equal(1000);
+    });
+
+    it("Should update voting power after tax transfers", async function () {
+      await floth.setLiquidityProvider(owner.address, true);
+      await floth.transfer(dexAddress.address, 1000);
+      
+      // Buy transaction
+      await floth.connect(dexAddress).transfer(addr1.address, 1000);
+      
+      // Check voting power after tax
+      expect(await floth.getVotes(addr1.address)).to.equal(750); // 1000 - 25% tax
+    });
+
+    it("Should handle delegation changes", async function () {
+      await floth.transfer(addr1.address, 1000);
+      await floth.connect(addr1).delegate(addr2.address);
+      
+      expect(await floth.delegates(addr1.address)).to.equal(addr2.address);
+      expect(await floth.getVotes(addr2.address)).to.equal(1000);
+      expect(await floth.getVotes(addr1.address)).to.equal(0);
+    });
+  });
+
+  describe("Tax Boundaries", function () {
+    it("Should handle minimum tax amounts correctly", async function () {
+      const minTax = ethers.parseEther("0.001"); // 0.1%
+      await floth.setBuyTax(minTax);
+      await floth.setSellTax(minTax);
+      await floth.setLpTax(minTax);
+      
+      await floth.setLiquidityProvider(owner.address, true);
+      const amount = ethers.parseEther("1000");
+      await floth.transfer(dexAddress.address, amount);
+      
+      // Test buy with minimum tax
+      await floth.connect(dexAddress).transfer(addr1.address, amount);
+      const expectedAmount = amount - ((amount * minTax) / (ethers.parseEther("1")));
+      expect(await floth.balanceOf(addr1.address)).to.equal(expectedAmount);
+    });
+
+    it("Should handle maximum tax amounts correctly", async function () {
+      const maxTax = ethers.parseEther("0.05"); // 5%
+      await floth.setBuyTax(maxTax);
+      await floth.setSellTax(maxTax);
+      
+      await floth.setLiquidityProvider(owner.address, true);
+      const amount = ethers.parseEther("1000");
+      await floth.transfer(dexAddress.address, amount);
+      
+      // Test buy with max tax
+      await floth.connect(dexAddress).transfer(addr1.address, amount);
+      const expectedAmount = amount - amount * (maxTax)/(ethers.parseEther("1"));
+      expect(await floth.balanceOf(addr1.address)).to.equal(expectedAmount);
     });
   });
 });
