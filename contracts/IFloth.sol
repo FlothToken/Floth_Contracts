@@ -18,9 +18,9 @@ interface IFloth {
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
     
     function getTaxInfo() external view returns (
-        uint128 buyTax,
-        uint128 sellTax,
-        uint128 lpTax,
+        uint256 buyTax,
+        uint256 sellTax,
+        uint256 lpTax,
         bool lpTaxActive,
         bool paused
     );
