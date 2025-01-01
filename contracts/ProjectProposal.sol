@@ -93,6 +93,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     enum RoundStatus {
         NotStarted,     // Initial state when round is created
         SubmissionOpen, // Proposals can be submitted
+        SnapshotPending, // Snapshot is pending (we are past the expected snapshot datetime)
         VotingOpen,     // Voting is active (after snapshot)
         Completed,      // Round finished (voting ended)
         Claimed,        // Winner has claimed funds
@@ -206,6 +207,10 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     error NoProposalsInRound();
     error RoundIsOpen();
     error RoundIsClosed();
+    error RoundNotStarted();
+    error SubmissionWindowOpen();
+    error SnapshotIsNotPending();
+    error SnapshotAlreadyTaken();
     error InvalidSnapshotTime();
     error UserVoteNotFound();
     error ZeroAddress();
@@ -661,25 +666,38 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         Round storage round = currentRoundData.round;
         RoundStatus status = getRoundStatus(round.id);
 
+         // Can't take snapshot if round hasn't started
+        if (status == RoundStatus.NotStarted) {
+            revert RoundNotStarted();
+        }
+
+        // Can't take snapshot if round is completed or expired
         if (status == RoundStatus.Completed || 
             status == RoundStatus.Claimed || 
             status == RoundStatus.Expired) {
             revert RoundIsClosed();
         }
 
-        if (status != RoundStatus.SubmissionOpen) {
-            revert InvalidSnapshotTime();
+        if (status == RoundStatus.SubmissionOpen) {
+            revert SubmissionWindowOpen();
         }
 
-        if(round.snapshotBlock == 0){
+        // Can't take snapshot if already taken
+        if (round.snapshotBlock > 0) {
+            revert SnapshotAlreadyTaken();
+        }
+
+        if(status == RoundStatus.SnapshotPending) {
             round.snapshotBlock = block.number;
-            round.snapshotDatetime = block.timestamp; //Set the actual snapshot time.
-            _getFlothPassesOwned(round.snapshotBlock); //Takes a snapshot of the FlothPasses owned.
+            round.snapshotDatetime = block.timestamp;
+            _getFlothPassesOwned(round.snapshotBlock);
             round.status = RoundStatus.VotingOpen;
-            emit RoundStatusUpdated(round.id, RoundStatus.VotingOpen);
+        } else {
+            revert SnapshotIsNotPending();
         }
-
+        
         emit SnapshotTaken(round.id, round.snapshotBlock);
+        emit RoundStatusUpdated(round.id, RoundStatus.VotingOpen);
     }
 
     function _getFlothPassesOwned(uint256 _snapshotBlock) internal {
@@ -1127,30 +1145,41 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     // Replace multiple round state checks with a single function
     function getRoundStatus(uint256 _roundId) public view returns (RoundStatus) {
         Round storage round = roundData[_roundId].round;
+        uint256 roundEndTime = round.roundStartDatetime + round.roundRuntime;
         
+        // Check if round has started
         if (block.timestamp < round.roundStartDatetime) {
             return RoundStatus.NotStarted;
         }
-        
-        if (block.timestamp < round.expectedSnapshotDatetime) {
-            return RoundStatus.SubmissionOpen;
+
+        // If we are started, let's check if we are ended
+        if (block.timestamp > roundEndTime) {
+
+            // If we are ended let's check if claimed
+            if (winningProposalByRoundId[round.id].state == ProposalState.Claimed) {
+                return RoundStatus.Claimed;
+            }
+            
+            // Check if expired (30 days after end)
+            if ((block.timestamp - roundEndTime) > 30 days) {
+                return RoundStatus.Expired;
+            }
+            
+            // If not claimed or expired, round is completed
+            return RoundStatus.Completed;
         }
-        
-        if (block.timestamp <= round.roundStartDatetime + round.roundRuntime) {
+
+        // If we are started, we are not ended and we have a snapshot, we are in voting period
+        if (round.snapshotBlock > 0) {
             return RoundStatus.VotingOpen;
         }
         
-        uint256 daysPassed = (block.timestamp - (round.roundStartDatetime + round.roundRuntime)) / 86400;
-        if (daysPassed > 30) {
-            return RoundStatus.Expired;
+        // If we are started, we are not ended, we do not have a snapshot, and we are past the expected snapshot datetime, we are in snapshot pending period
+        if (block.timestamp >= round.expectedSnapshotDatetime) {
+            return RoundStatus.SnapshotPending;
         }
-        
-        // Check if winning proposal exists and has been claimed
-        Proposal storage winningProposal = winningProposalByRoundId[round.id];
-        if (winningProposal.state == ProposalState.Claimed) {
-            return RoundStatus.Claimed;
-        }
-        
-        return RoundStatus.Completed;
+
+        // If we are started, we are not ended, we do not have a snapshot, and we are not past the expected snapshot datetime, we are in submission period
+        return RoundStatus.SubmissionOpen;
     }
 }
