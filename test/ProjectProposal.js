@@ -105,9 +105,8 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
       const proposal = await projectProposal.getProposalById(2);
-      expect(proposal.title).to.equal("Test Proposal");
       expect(proposal.amountRequested).to.equal(ethers.parseUnits("10", 18));
       expect(proposal.proposer).to.equal(addr1.address);
     });
@@ -116,17 +115,14 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
-      await expect(projectProposal.connect(addr1).addProposal("Test Proposal", 0)).to.be.revertedWithCustomError(
-        projectProposal,
-        "InvalidAmountRequested"
-      );
+      await expect(projectProposal.connect(addr1).addProposal(0)).to.be.revertedWithCustomError(projectProposal, "InvalidAmountRequested");
     });
 
     it("Should revert when adding a proposal with amount greater than round's maxFlareAmount", async function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
-      await expect(projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("200", 18))).to.be.revertedWithCustomError(
+      await expect(projectProposal.connect(addr1).addProposal(ethers.parseUnits("200", 18))).to.be.revertedWithCustomError(
         projectProposal,
         "InvalidAmountRequested"
       );
@@ -136,7 +132,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
       await projectProposal.connect(addr1).setProposalReceiverAddress(2, addr2.address);
       const proposal = await projectProposal.getProposalById(2);
       expect(proposal.receiver).to.equal(addr2.address);
@@ -159,7 +155,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine", []);
@@ -176,7 +172,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
       await expect(projectProposal.connect(addr2).setProposalReceiverAddress(2, addr2.address)).to.be.revertedWithCustomError(
         projectProposal,
         "InvalidPermissions"
@@ -187,38 +183,18 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
       await expect(projectProposal.connect(addr1).setProposalReceiverAddress(2, zeroAddress)).to.be.revertedWithCustomError(
         projectProposal,
         "ZeroAddress"
       );
     });
 
-    it("Should continue with updating proposal receiver address when voting period is open", async function () {
-      await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
-        value: ethers.parseUnits("10", 18),
-      });
-
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-
-      await ethers.provider.send("evm_increaseTime", [7200]);
-      await ethers.provider.send("evm_mine");
-
-      //Take snapshot
-      await projectProposal.takeSnapshot();
-
-      //Increase EVM time
-      await ethers.provider.send("evm_increaseTime", [10000]);
-      await ethers.provider.send("evm_mine");
-
-      await expect(projectProposal.connect(addr1).setProposalReceiverAddress(2, addr1.address)).to.not.be.reverted;
-    });
-
     it("Should revert if trying to add a proposal outside submission window", async function () {
       // Simulate passing of submission window
       await ethers.provider.send("evm_increaseTime", [3600]);
       await ethers.provider.send("evm_mine", []);
-      await expect(projectProposal.connect(addr1).addProposal("Late Proposal", ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
+      await expect(projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
         projectProposal,
         "SubmissionWindowClosed"
       );
@@ -238,7 +214,7 @@ describe("ProjectProposal Contract", function () {
       //Take snapshot
       await projectProposal.takeSnapshot();
 
-      await expect(projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
+      await expect(projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
         projectProposal,
         "SubmissionWindowClosed"
       );
@@ -256,7 +232,7 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_mine", []);
 
       //No snapshot taken after expected snapshot time.
-      await expect(projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
+      await expect(projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
         projectProposal,
         "SubmissionWindowClosed"
       );
@@ -266,8 +242,8 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 7200, currentTime + 3600, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr1).addProposal("Another Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
       const proposals = await projectProposal.getProposalsByAddress(1, addr1.address);
       expect(proposals.length).to.equal(2);
     });
@@ -276,7 +252,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await expect(projectProposal.getProposalById(3)).to.be.revertedWithCustomError(projectProposal, "ProposalIdOutOfRange");
     });
@@ -370,7 +346,11 @@ describe("ProjectProposal Contract", function () {
     });
 
     it("Should allow taking a snapshot", async function () {
-      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime, { value: ethers.parseUnits("10", 18) });
+      await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 1800, { value: ethers.parseUnits("10", 18) });
+
+      await ethers.provider.send("evm_increaseTime", [1800]);
+      await ethers.provider.send("evm_mine", []);
+
       await projectProposal.takeSnapshot();
       const round = await projectProposal.getRoundById(1);
       expect(round.snapshotBlock).to.be.gt(0);
@@ -386,7 +366,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await expect(projectProposal.connect(owner).takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "InvalidSnapshotTime");
+      await expect(projectProposal.connect(owner).takeSnapshot()).to.be.revertedWithCustomError(projectProposal, "SubmissionWindowOpen");
     });
 
     it("Should revert if snapshot is taken when round is closed", async function () {
@@ -406,7 +386,7 @@ describe("ProjectProposal Contract", function () {
       });
       await projectProposal.killRound(1);
       const round = await projectProposal.getRoundById(1);
-      expect(round.isActive).to.equal(false);
+      expect(round.status).to.equal(round.RoundStatus.Expired);
     });
 
     it("Should revert if non-manager tries to kill a round", async function () {
@@ -422,7 +402,7 @@ describe("ProjectProposal Contract", function () {
       });
 
       await projectProposal.connect(owner).extendRoundRuntime(7200);
-      const latestRound = await projectProposal.rounds(1);
+      const latestRound = await projectProposal.getRoundById(1);
       expect(latestRound.roundRuntime).to.equal(7200);
     });
 
@@ -463,7 +443,7 @@ describe("ProjectProposal Contract", function () {
       const newSnapshotDatetime = currentTime + 3600;
       await projectProposal.connect(owner).extendRoundExpectedSnapshotDatetime(newSnapshotDatetime);
 
-      const latestRound = await projectProposal.rounds(1);
+      const latestRound = await projectProposal.getRoundById(1);
 
       expect(latestRound.expectedSnapshotDatetime).to.equal(newSnapshotDatetime);
       expect(latestRound.roundRuntime).to.equal(3600);
@@ -510,7 +490,7 @@ describe("ProjectProposal Contract", function () {
       });
 
       //Add a proposal.
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [40000]);
       await ethers.provider.send("evm_mine");
@@ -524,7 +504,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
@@ -545,7 +525,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
@@ -570,7 +550,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
@@ -592,7 +572,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
@@ -621,7 +601,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -647,9 +627,9 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal 2", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr1).addProposal("Test Proposal 3", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr1).addProposal("Test Proposal 4", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -685,7 +665,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal 2", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -708,9 +688,9 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal 2", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr1).addProposal("Test Proposal 3", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr1).addProposal("Test Proposal 4", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -737,19 +717,19 @@ describe("ProjectProposal Contract", function () {
       const newPower = votingPowerBefore - usedPower;
 
       // Expect voting power to be votingPowerBefore - 55.
-      expect(await projectProposal.votingPowerByRound(addr2.address, 1)).to.equal(newPower);
+      expect(await projectProposal.getRemainingVotingPower(addr2.address)).to.equal(newPower);
 
       //Remove all votes.
       await projectProposal.connect(addr2).removeAllVotesFromAllProposals();
 
-      await expect(await projectProposal.votingPowerByRound(addr2.address, 1)).to.equal(votingPowerBefore);
+      await expect(await projectProposal.getRemainingVotingPower(addr2.address)).to.equal(votingPowerBefore);
     });
 
     it("Should revert if voting power is 0", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -764,22 +744,18 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      //_roundRuntime = 7200
-      //expectedSnapshotDatetime = currentTime + 3600
-
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine", []);
 
       //No snapshot taken after expected snapshot time.
-
-      await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(projectProposal, "VotingPeriodBeginsSoon");
+      await expect(projectProposal.connect(addr1).addVotesToProposal(2, 10)).to.be.revertedWithCustomError(projectProposal, "VotingPeriodClosed");
     });
 
     it("Should revert if user doesn't have enough voting power", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -800,7 +776,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine");
@@ -827,7 +803,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine");
@@ -846,7 +822,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine");
@@ -877,7 +853,6 @@ describe("ProjectProposal Contract", function () {
 
       const flothPassVotingPower = await projectProposal.getFlothPassVotingPower(addr1.address);
 
-      //Expect flothPassVotingPower = 400;
       expect(flothPassVotingPower).to.equal(400);
 
       const flothVotingPower = await projectProposal.getFlothVotingPower(addr1.address);
@@ -889,7 +864,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await expect(projectProposal.connect(addr1).removeVotesFromProposal(2)).to.be.revertedWithCustomError(projectProposal, "UserVoteNotFound");
     });
@@ -899,7 +874,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine");
@@ -937,7 +912,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine");
@@ -952,7 +927,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine");
@@ -995,7 +970,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine");
@@ -1042,9 +1017,9 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
       //Add 3 proposals.
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1071,8 +1046,8 @@ describe("ProjectProposal Contract", function () {
       });
 
       //Add 2 proposals
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr2).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr2).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1102,8 +1077,8 @@ describe("ProjectProposal Contract", function () {
       });
 
       //Add 2 proposals
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr2).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr2).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1131,8 +1106,8 @@ describe("ProjectProposal Contract", function () {
       });
 
       //Add 2 proposals
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr2).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr2).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1158,8 +1133,8 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1188,7 +1163,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       //Send some floth to addr1.
       await floth.transfer(addr1.address, ethers.parseUnits("10", 18));
@@ -1209,7 +1184,7 @@ describe("ProjectProposal Contract", function () {
       await floth.connect(addr2).delegate(addr2.address);
 
       //Addr1 adds proposal
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1236,7 +1211,7 @@ describe("ProjectProposal Contract", function () {
       await floth.connect(addr2).delegate(addr2.address);
 
       //Addr1 adds proposal
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1289,7 +1264,7 @@ describe("ProjectProposal Contract", function () {
       await floth.connect(addr1).delegate(addr1.address);
 
       //Addr1 adds proposal
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1301,13 +1276,13 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(addr1).addVotesToProposal(2, 9);
 
       //Check balance of grant wallet.
-      const balanceBefore = await ethers.provider.getBalance(await floth.getGrantFundWallet());
+      const balanceBefore = await ethers.provider.getBalance(await floth.grantFundWallet());
 
       //Round finished.
       await projectProposal.connect(owner).roundFinished();
 
       //Check balance of grant wallet after round finished.
-      const balanceAfter = await ethers.provider.getBalance(await floth.getGrantFundWallet());
+      const balanceAfter = await ethers.provider.getBalance(await floth.grantFundWallet());
 
       //Verify that the grant wallet received the funds.
       expect(balanceAfter).to.equal(balanceBefore + ethers.parseUnits("10", 18));
@@ -1323,7 +1298,7 @@ describe("ProjectProposal Contract", function () {
       await floth.connect(addr2).delegate(addr2.address);
 
       //Addr1 adds proposal
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1347,7 +1322,7 @@ describe("ProjectProposal Contract", function () {
       await floth.connect(addr2).delegate(addr2.address);
 
       //Addr1 adds proposal
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1374,7 +1349,7 @@ describe("ProjectProposal Contract", function () {
       await floth.connect(addr2).delegate(addr2.address);
 
       //Addr1 adds proposal
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1401,7 +1376,7 @@ describe("ProjectProposal Contract", function () {
       await floth.connect(addr2).delegate(addr2.address);
 
       //Addr1 adds proposal
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
       await ethers.provider.send("evm_mine");
@@ -1415,8 +1390,8 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_increaseTime", [86400 * 32]);
       await ethers.provider.send("evm_mine");
 
-      //Balance of "floth.getGrantFundWallet"
-      const balanceBefore = await ethers.provider.getBalance(await floth.getGrantFundWallet());
+      //Balance of "floth.grantFundWallet"
+      const balanceBefore = await ethers.provider.getBalance(await floth.grantFundWallet());
 
       await projectProposal.connect(owner).reclaimFunds(1);
 
@@ -1424,7 +1399,7 @@ describe("ProjectProposal Contract", function () {
       expect(proposalAfter.fundsClaimed).to.be.true;
 
       //Balance after reclaiming funds.
-      const balanceAfter = await ethers.provider.getBalance(await floth.getGrantFundWallet());
+      const balanceAfter = await ethers.provider.getBalance(await floth.grantFundWallet());
 
       //Check balanceAfter = balanceBefore + 10 ether.
       expect(balanceAfter).to.equal(balanceBefore + ethers.parseUnits("10", 18));
@@ -1440,7 +1415,7 @@ describe("ProjectProposal Contract", function () {
       await floth.connect(addr2).delegate(addr2.address);
 
       //Addr1 adds proposal
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7500]);
 
@@ -1500,7 +1475,7 @@ describe("ProjectProposal Contract", function () {
         value: ethers.parseUnits("10", 18),
       });
 
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7300]);
       await ethers.provider.send("evm_mine");
@@ -1572,7 +1547,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
@@ -1605,7 +1580,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
@@ -1633,7 +1608,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr2).addProposal("Test Proposal 2", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr2).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
@@ -1668,7 +1643,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.connect(addr1).addProposal("Test Proposal 3", ethers.parseUnits("10", 18));
+      await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
       await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
