@@ -745,7 +745,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         rounds[_roundId].isActive = false;
 
         //Send funds back to grant fund wallet.
-        (bool success, ) = floth.getGrantFundWallet().call{value: maxFlareAmount}("");
+        (bool success, ) = floth.grantFundWallet().call{value: maxFlareAmount}("");
         require(success);
 
         emit RoundKilled(_roundId);
@@ -923,7 +923,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
             proposals[mostVotedProposal.id].fundsClaimed = true;
 
             //Send funds back to grant fund wallet.
-            (bool success, ) = floth.getGrantFundWallet().call{value: latestRound.maxFlareAmount}("");
+            (bool success, ) = floth.grantFundWallet().call{value: latestRound.maxFlareAmount}("");
             require(success);
         }
 
@@ -999,10 +999,10 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
                 }
                 
                 // Send amount to the grant wallet.
-                (bool success, ) = floth.getGrantFundWallet().call{value: proposal.amountRequested}("");
+                (bool success, ) = floth.grantFundWallet().call{value: proposal.amountRequested}("");
                 require(success);
 
-                emit FundsReclaimed(proposalId, floth.getGrantFundWallet(), proposal.amountRequested);
+                emit FundsReclaimed(proposalId, floth.grantFundWallet(), proposal.amountRequested);
             }
         }
     }

@@ -635,7 +635,7 @@ contract ProjectProposalTest is AccessControl {
         rounds[_roundId].isActive = false;
 
         //Send funds back to grant fund wallet.
-        (bool success, ) = floth.getGrantFundWallet().call{value: maxFlareAmount}("");
+        (bool success, ) = floth.grantFundWallet().call{value: maxFlareAmount}("");
         require(success);
 
         emit RoundKilled(_roundId);
@@ -824,10 +824,10 @@ contract ProjectProposalTest is AccessControl {
                 unclaimedProposals.pop();
                 
                 // Send amount to the grant wallet.
-                (bool success, ) = floth.getGrantFundWallet().call{value: amountRequested}("");
+                (bool success, ) = floth.grantFundWallet().call{value: amountRequested}("");
                 require(success);
 
-                emit FundsReclaimed(proposalId, floth.getGrantFundWallet(), amountRequested);
+                emit FundsReclaimed(proposalId, floth.grantFundWallet(), amountRequested);
                 return;
             }
         }
@@ -858,10 +858,10 @@ contract ProjectProposalTest is AccessControl {
                 }
                 
                 // Send amount to the grant wallet.
-                (bool success, ) = floth.getGrantFundWallet().call{value: proposal.amountRequested}("");
+                (bool success, ) = floth.grantFundWallet().call{value: proposal.amountRequested}("");
                 require(success);
 
-                emit FundsReclaimed(proposalId, floth.getGrantFundWallet(), proposal.amountRequested);
+                emit FundsReclaimed(proposalId, floth.grantFundWallet(), proposal.amountRequested);
             }
         }
     }

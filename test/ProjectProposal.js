@@ -384,9 +384,11 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.addRound(ethers.parseUnits("10", 18), 3600, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
-      await projectProposal.killRound(1);
+
+      await projectProposal.connect(owner).killRound(1);
+
       const round = await projectProposal.getRoundById(1);
-      expect(round.status).to.equal(round.RoundStatus.Expired);
+      expect(round.status).to.equal(6); // RoundStatus.Expired = 6
     });
 
     it("Should revert if non-manager tries to kill a round", async function () {
@@ -824,38 +826,38 @@ describe("ProjectProposal Contract", function () {
 
       await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
 
+      // Move time forward first
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine");
 
       // Transfer 4000 Floth tokens to addr1.
       await floth.transfer(addr1.address, ethers.parseUnits("4000", 18));
-
       expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("4000", 18));
 
       // Approve the FlothPass contract to spend Floth tokens from addr1
       await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("2000", 18));
 
-      //Delegate addr1 to itself.
+      // Important: Delegate votes
+      await floth.connect(addr1).delegate(addr1.address);
       await flothPass.connect(addr1).delegate(addr1.address);
 
-      //Activate sale.
+      //Activate sale and mint
       await flothPass.connect(owner).setSaleActive(true);
-
-      //Mint 2 FlothPass token for addr1. (Spent 2000 Floth).
       await flothPass.connect(addr1).mint(2, { value: ethers.parseEther("2000") });
 
+      // Take snapshot
       await projectProposal.takeSnapshot();
 
+      // Additional time increase after snapshot
+      await ethers.provider.send("evm_increaseTime", [100]);
       await ethers.provider.send("evm_mine");
 
-      //Check total voting power.
-      const totalPower = await projectProposal.getTotalVotingPower(addr1.address);
-
+      // Now check voting powers
       const flothPassVotingPower = await projectProposal.getFlothPassVotingPower(addr1.address);
-
       expect(flothPassVotingPower).to.equal(400);
 
       const flothVotingPower = await projectProposal.getFlothVotingPower(addr1.address);
+      const totalPower = await projectProposal.getTotalVotingPower(addr1.address);
 
       expect(totalPower).to.equal(flothPassVotingPower + flothVotingPower);
     });

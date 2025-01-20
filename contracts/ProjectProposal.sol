@@ -801,7 +801,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         round.status = RoundStatus.Expired;
 
         //Send funds back to grant fund wallet.
-        (bool success, ) = floth.getGrantFundWallet().call{value: round.maxFlareAmount}("");
+        (bool success, ) = floth.grantFundWallet().call{value: round.maxFlareAmount}("");
         require(success);
 
         emit RoundKilled(_roundId);
@@ -965,7 +965,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             latestRound.status = RoundStatus.Expired;
 
             //Send funds back to grant fund wallet.
-            (bool success, ) = floth.getGrantFundWallet().call{value: latestRound.maxFlareAmount}("");
+            (bool success, ) = floth.grantFundWallet().call{value: latestRound.maxFlareAmount}("");
             require(success);
             
             emit RoundStatusUpdated(latestRound.id, RoundStatus.Expired);
@@ -1087,11 +1087,11 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             }
             
             // Send amount to the grant wallet
-            (bool success, ) = floth.getGrantFundWallet().call{value: proposal.amountRequested}("");
+            (bool success, ) = floth.grantFundWallet().call{value: proposal.amountRequested}("");
             require(success);
 
             emit RoundStatusUpdated(_roundId, RoundStatus.Expired);
-            emit FundsReclaimed(proposalId, floth.getGrantFundWallet(), proposal.amountRequested);
+            emit FundsReclaimed(proposalId, floth.grantFundWallet(), proposal.amountRequested);
         }
     }
 
