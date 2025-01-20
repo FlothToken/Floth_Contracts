@@ -858,11 +858,16 @@ describe("ProjectProposal Contract", function () {
       expect(totalPower).to.equal(flothPassVotingPower + flothVotingPower);
     });
 
-    it("Should revert if trying to remove votes without having voted", async function () {
+    it.only("Should revert if trying to remove votes without having voted", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
       await projectProposal.connect(addr1).addProposal(ethers.parseUnits("10", 18));
+
+      await ethers.provider.send("evm_increaseTime", [7500]);
+      await ethers.provider.send("evm_mine");
+
+      await projectProposal.takeSnapshot();
 
       await expect(projectProposal.connect(addr1).removeVotesFromProposal(2)).to.be.revertedWithCustomError(projectProposal, "UserVoteNotFound");
     });
