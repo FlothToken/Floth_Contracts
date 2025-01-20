@@ -8,7 +8,7 @@ import "./IFloth.sol";
 import "./IFlothPass.sol";
 
 /**
- * @title ProjectProposalUpgrade contract for the Floth protocol
+ * @title ProjectProposal contract for the Floth protocol
  * @author Ethereal Labs Ltd
  */
 contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
@@ -29,13 +29,18 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     // Gap for upgradeability
     uint256[50] private __gap;
 
+    /**
+     * @dev Initialize the contract
+     * @param _flothAddress The address of the Floth contract
+     * @param _flothPassAddress The address of the FlothPass contract
+     */
     function initialize(address _flothAddress, address _flothPassAddress) public initializer {
         __AccessControl_init();
         __ProjectProposal_init(_flothAddress, _flothPassAddress);
     }
 
     /**
-     * Initializer for the ProjectProposalUpgrade contract
+     * Initializer for the ProjectProposal contract
      * @param _flothAddress The address of the Floth contract
      * @param _flothPassAddress The address of the FlothPass contract
      */
@@ -47,7 +52,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         floth = IFloth(_flothAddress);
         flothPass = IFlothPass(_flothPassAddress);
 
-        nftMultiplier = 200;
+        nftMultiplier = 50_000_000;
 
         _setRoleAdmin(SNAPSHOTTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(ROUND_MANAGER_ROLE, ADMIN_ROLE);
@@ -63,16 +68,36 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         _disableInitializers();
     }
 
+    // Add this enum before the Proposal struct
+    enum ProposalState {
+        Active,     // Initial state when proposal is created
+        Winning,    // Proposal has won but funds not claimed
+        Claimed,    // Funds have been claimed
+        Expired,    // Claiming period expired (>30 days)
+        Abstained   // Was the abstain proposal
+    }
+
     // Proposal struct to store proposal data
     struct Proposal {
         uint256 id;
         uint256 roundId; //Tracked for claiming funds.
-        string title;
         uint256 amountRequested;
         uint256 votesReceived;
         address proposer; //The wallet that submitted the proposal.
         address receiver; //The wallet that will receive the funds.
-        bool fundsClaimed; //Tracked here incase funds are not claimed before new round begins.
+        ProposalState state;  // Replace fundsClaimed with state
+    }
+
+    
+    // Add round status enum
+    enum RoundStatus {
+        NotStarted,     // Initial state when round is created
+        SubmissionOpen, // Proposals can be submitted
+        SnapshotPending, // Snapshot is pending (we are past the expected snapshot datetime)
+        VotingOpen,     // Voting is active (after snapshot)
+        Completed,      // Round finished (voting ended)
+        Claimed,        // Winner has claimed funds
+        Expired        // Round expired (>30 days) or killed
     }
 
     // Round struct to store round data
@@ -86,7 +111,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         uint256 snapshotDatetime;
         uint256 snapshotBlock;
         uint256[] proposalIds;
-        bool isActive;
+        RoundStatus status;
     }
 
     //Used to return proposal ids and their vote count for a specific round. And used for votedOnProposals mapping.
@@ -101,50 +126,34 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     //Tracks ID number for each round.
     uint256 public roundId;
 
-    //Maps IDs to a proposal.
+    // Core data structures
+    struct UserRoundData {
+        uint256 proposalCount;
+        bool hasVoted;
+        uint256 votingPower;
+        uint256 flothPassesOwned;
+        Votes[] votedProposals;
+    }
+
+    struct RoundData {
+        Round round;
+        mapping(address => UserRoundData) userRoundData;
+    }
+
+    // Core mappings
     mapping(uint256 => Proposal) public proposals;
-
-    //Maps address to a bool for proposal winners.
+    mapping(uint256 => RoundData) public roundData;
+    mapping(uint256 => Proposal) public winningProposalByRoundId;
     mapping(address => bool) public hasWinningProposal;
-
-    //Maps winning address to winning proposals.
     mapping(address => Proposal[]) public winningProposals;
 
-    //Maps winning roundID to winning proposals.
-    mapping(uint256 => Proposal) public winningProposalByRoundId;
-
-    //Maps IDs to a round.
-    mapping(uint256 => Round) public rounds;
-
-    // Mappings of mappings //
-
-    // Number of proposals per wallet for a specific round.
-    mapping(address => mapping(uint256 => uint256))
-        public proposalsPerWalletPerRound; // (address => (roundId => count))
-
-    // Mapping to check if wallet has voted in particular round.
-    mapping(address => mapping(uint256 => bool)) public hasVotedByRound; // (address => (roundId => voted))
-
-    // Voting power for a wallet in a specific round.
-    mapping(address => mapping(uint256 => uint256)) public votingPowerByRound; // (address => (roundId => power))
-
-    // Tracks the proposals that an address has voted on.
-    mapping(address => mapping(uint256 => Votes[])) public votedOnProposals; // (address => (roundId => Votes[]))
-
-    // Tracks the FlothPass voting power at a snapshot block.
-    mapping(uint256 => mapping(address => uint256)) public flothPassesOwned; // (snapshotBlock => (FlothPass Owner => number of FlothPass' owned))
-
-    //Keeps track of all round IDs.
-    uint256[] roundIds;
-
     /**
-     * Events for the ProjectProposalUpgrade contract
+     * Events for the ProjectProposal contract
      */
     event ProposalAdded(
         address creator,
         uint256 proposalId,
         uint256 roundId,
-        string title,
         uint256 amountRequested
     );
     event ProposalReceiverAddressUpdated(
@@ -176,9 +185,10 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     );
     event RoundRuntimeUpdated(uint256 roundId, uint256 newRoundRuntime);
     event RoundMaxFlareSet(uint256 newMaxFlare);
+    event RoundStatusUpdated(uint256 indexed roundId, RoundStatus newStatus);
 
     /**
-     * Error messages for the ProjectProposalUpgrade contract
+     * Error messages for the ProjectProposal contract
      */
     error InvalidPermissions();
     error SubmissionWindowClosed();
@@ -197,6 +207,10 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     error NoProposalsInRound();
     error RoundIsOpen();
     error RoundIsClosed();
+    error RoundNotStarted();
+    error SubmissionWindowOpen();
+    error SnapshotIsNotPending();
+    error SnapshotAlreadyTaken();
     error InvalidSnapshotTime();
     error UserVoteNotFound();
     error ZeroAddress();
@@ -205,8 +219,9 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     error InvalidAbstainVote();
     error InvalidRoundRuntime();
     error InvalidPageNumberPageSize();
+    error TransferFailed();
 
-    //Modifiers for the ProjectProposalUpgrade contract
+    //Modifiers for the ProjectProposal contract
     modifier roundManagerOrAdmin() {
         if (
             !hasRole(ROUND_MANAGER_ROLE, msg.sender) && // Check if user does not have ROUND_MANAGER_ROLE
@@ -230,24 +245,20 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
 
     /**
      * Function to add a proposal to the contract
-     * @param _title The title of the proposal
      * @param _amountRequested The amount requested for the proposal
      */
     function addProposal(
-        string memory _title,
         uint256 _amountRequested
     ) external {
-        Round storage latestRound = getLatestRound();
+        RoundData storage currentRoundData = roundData[roundId];
+        Round storage latestRound = currentRoundData.round;
+        RoundStatus status = getRoundStatus(latestRound.id);
 
-        //If submission window is closed, revert.
-        if (!isSubmissionWindowOpen()) {
+        if (status != RoundStatus.SubmissionOpen) {
             revert SubmissionWindowClosed();
         }
 
-        if (
-            latestRound.maxFlareAmount < _amountRequested ||
-            _amountRequested == 0
-        ) {
+        if (latestRound.maxFlareAmount < _amountRequested || _amountRequested == 0) {
             revert InvalidAmountRequested();
         }
 
@@ -255,20 +266,15 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         Proposal storage newProposal = proposals[proposalId];
         newProposal.id = proposalId;
         newProposal.roundId = latestRound.id;
-        newProposal.title = _title;
         newProposal.amountRequested = _amountRequested;
         newProposal.receiver = msg.sender; //receiver set to msg.sender by default.
         newProposal.proposer = msg.sender;
-        newProposal.fundsClaimed = false;
-        rounds[latestRound.id].proposalIds.push(proposalId); //Add proposal ID to round struct.
-        proposalsPerWalletPerRound[msg.sender][latestRound.id]++; //Increase proposal count for a wallet by 1.
-        emit ProposalAdded(
-            msg.sender,
-            proposalId,
-            latestRound.id,
-            _title,
-            _amountRequested
-        );
+        newProposal.state = ProposalState.Active;
+
+        latestRound.proposalIds.push(proposalId);
+        currentRoundData.userRoundData[msg.sender].proposalCount++;
+        
+        emit ProposalAdded(msg.sender, proposalId, latestRound.id, _amountRequested);
     }
 
     /**
@@ -289,9 +295,15 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         address _newAddress
     ) external {
         Proposal storage proposalToUpdate = proposals[_proposalId];
+        RoundStatus status = getRoundStatus(proposalToUpdate.roundId);
 
-        //Prevent proposer updating receiver address during voting window.
-        if (isVotingPeriodOpen()) {
+        if (status == RoundStatus.Completed || 
+            status == RoundStatus.Claimed || 
+            status == RoundStatus.Expired) {
+            revert RoundIsClosed();
+        }
+
+        if (status == RoundStatus.VotingOpen) {
             revert VotingPeriodOpen();
         }
 
@@ -317,17 +329,17 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         uint256 _roundId,
         address _account
     ) public view returns (Proposal[] memory) {
-        uint256 count = proposalsPerWalletPerRound[_account][_roundId];
+        RoundData storage roundData_ = roundData[_roundId];
+        uint256 count = roundData_.userRoundData[_account].proposalCount;
         Proposal[] memory accountProposals = new Proposal[](count);
-        uint256 index = 0;
+        
+        uint256 currentIndex = 0;  // Tracks actual position in accountProposals
 
-        for (uint256 i = 0; i < rounds[_roundId].proposalIds.length; i++) {
-            Proposal storage proposal = proposals[
-                rounds[_roundId].proposalIds[i]
-            ];
+        for (uint256 i = 0; i < roundData_.round.proposalIds.length; i++) {
+            Proposal memory proposal = proposals[roundData_.round.proposalIds[i]];
             if (proposal.proposer == _account) {
-                accountProposals[index] = proposal;
-                index++;
+                accountProposals[currentIndex] = proposal;
+                currentIndex++;
             }
         }
         return accountProposals;
@@ -355,79 +367,86 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         uint256 _proposalId,
         uint256 _numberOfVotes
     ) external {
+        RoundData storage currentRoundData = roundData[roundId];
+        Round storage getRound = currentRoundData.round;
+        RoundStatus status = getRoundStatus(getRound.id);
+        UserRoundData storage userData = currentRoundData.userRoundData[msg.sender];
 
-        if(!isVotingPeriodOpen()){
-            Round storage getRound = getLatestRound();
-
-            if(block.timestamp > getRound.expectedSnapshotDatetime && getRound.snapshotDatetime == 0){
+        if(status != RoundStatus.VotingOpen) {
+            if(status == RoundStatus.SubmissionOpen && 
+               block.timestamp > getRound.expectedSnapshotDatetime && 
+               getRound.snapshotDatetime == 0) {
                 revert VotingPeriodBeginsSoon();
-            }else{
+            } else {
                 revert VotingPeriodClosed();
             }
         }
 
         Proposal storage proposal = proposals[_proposalId];
-        Round storage currentRound = getLatestRound();
 
-        bool hasVoted = hasVotedByRound[msg.sender][currentRound.id];
-        uint256 currentVotingPower;
-
-        //If they haven't voted yet, set votingPowerByRound, else retrieve current voting power.
-        if(!hasVoted){
-            currentVotingPower = getFlothVotingPower(msg.sender) + getFlothPassVotingPower(msg.sender);
-            votingPowerByRound[msg.sender][currentRound.id] = currentVotingPower;
-        }else{
-            currentVotingPower = votingPowerByRound[msg.sender][currentRound.id];
+        // Get initial voting power only if they haven't voted yet
+        if(!userData.hasVoted){
+            userData.votingPower = getFlothVotingPower(msg.sender) + getFlothPassVotingPower(msg.sender);
         }
 
-        //If voting for the Abstain proposal.
-        if (_proposalId == currentRound.abstainProposalId) {
-            //Abstain vote can only be given to one proposal.
-            
-            Votes[] memory votesByUser = votedOnProposals[msg.sender][currentRound.id]; 
-            //Remove votes on other proposals.
-            if(votesByUser.length > 0){
-                for (uint256 i = 0; i < votesByUser.length; i++) {
-                    //Remove votes from proposal.
-                    proposals[votesByUser[i].proposalId].votesReceived -= votesByUser[i].voteCount;
+        // Handle abstain votes
+        if (_proposalId == getRound.abstainProposalId) {
+            uint256 totalRemovedVotes = 0;
+
+            // Remove votes from previous proposals
+            if(userData.votedProposals.length > 0){
+                for (uint256 i = 0; i < userData.votedProposals.length; i++) {
+                    uint256 voteCount = userData.votedProposals[i].voteCount;
+                    uint256 votedProposalId = userData.votedProposals[i].proposalId;
+                    proposals[votedProposalId].votesReceived -= voteCount;
+                    totalRemovedVotes += voteCount;
+                    
+                    emit VotesRemoved(votedProposalId, msg.sender, voteCount);
                 }
             }
 
-             //Voting power re-retrieved as may be reduced if previously voted.
-            uint256 votingPower = getFlothVotingPower(msg.sender) + getFlothPassVotingPower(msg.sender);
+            // Clear existing votes array
+            delete userData.votedProposals;
             
-            proposal.votesReceived += votingPower; //Give all voting power to abstain proposal.
-            votingPowerByRound[msg.sender][currentRound.id] = 0; //All voting power is removed.
-            hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
-        
-        } else {
+            // Calculate total abstain votes (current voting power + removed votes)
+            uint256 abstainVotes = userData.votingPower + totalRemovedVotes;
+            
+            // Add votes to abstain proposal
+            proposal.votesReceived += abstainVotes;
+            
+            // Reset voting power and mark as voted
+            userData.votingPower = 0;
+            userData.hasVoted = true;
 
+            // Record abstain vote
+            userData.votedProposals.push(Votes({
+                proposalId: _proposalId,
+                voteCount: abstainVotes
+            }));
+
+            emit VotesAdded(_proposalId, msg.sender, abstainVotes);
+        } else {
             //Check if the user doesn't have any voting power set, revert. Checked here to let users call abstain if no power left.
-            if (currentVotingPower == 0) {
+            if (userData.votingPower == 0) {
                 revert InvalidVotingPower();
             } 
             
             //If the user doesn't have enough voting power, stop them from voting.
-            if (currentVotingPower < _numberOfVotes) {
+            if (userData.votingPower < _numberOfVotes) {
                 revert InsufficientVotingPower();
             }
 
-            //Vote is for non-abstain proposal.
-            if(_proposalId != currentRound.abstainProposalId) {            
-                proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
-                votingPowerByRound[msg.sender][currentRound.id] -= _numberOfVotes; //Reduce voting power in a round.
-                hasVotedByRound[msg.sender][currentRound.id] = true; //Set that the user has voted in a round.
+            proposal.votesReceived += _numberOfVotes; //Increase proposal vote count.
+            userData.votingPower -= _numberOfVotes; //Reduce voting power in a round.
+            userData.hasVoted = true; //Set that the user has voted in a round.
 
-                //Create votes struct object of the users vote.
-                Votes memory newVote = Votes({
-                    proposalId: _proposalId,
-                    voteCount: _numberOfVotes
-                });
+            userData.votedProposals.push(Votes({
+                proposalId: _proposalId,
+                voteCount: _numberOfVotes
+            }));
 
-                votedOnProposals[msg.sender][currentRound.id].push(newVote); //Track proposal votes given by a user.
-            }
+            emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
         }
-        emit VotesAdded(_proposalId, msg.sender, _numberOfVotes);
     }
 
     /**
@@ -435,31 +454,36 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * @param _proposalId The ID of the proposal
      */
     function removeVotesFromProposal(uint256 _proposalId) external {
-        Round storage currentRound = getLatestRound();
+        RoundData storage currentRoundData = roundData[roundId];
+        Round storage currentRound = currentRoundData.round;
+        UserRoundData storage userData = currentRoundData.userRoundData[msg.sender];
+        RoundStatus status = getRoundStatus(currentRound.id);
+
+        if (status != RoundStatus.VotingOpen) {
+            revert VotingPeriodClosed();
+        }
 
         //Check if the user hasn't voted.
-        if (!hasVotedByRound[msg.sender][currentRound.id]) {
+        if (!userData.hasVoted) {
             revert UserVoteNotFound();
         }
 
-        Votes[] storage votesByUser = votedOnProposals[msg.sender][currentRound.id];
+        Votes[] storage userVotes = userData.votedProposals;
+        for (uint256 i = 0; i < userVotes.length; i++) {
+            if(_proposalId == userVotes[i].proposalId) {
+                uint256 votesToRemove = userVotes[i].voteCount;
 
-        for (uint256 i = 0; i < votesByUser.length; i++) {
-            if(_proposalId == votesByUser[i].proposalId){
-                uint256 votesToRemove = votesByUser[i].voteCount;
-    
                 Proposal storage proposal = proposals[_proposalId];
-                proposal.votesReceived -= votesToRemove; //Remove votes given to proposal.
-                votingPowerByRound[msg.sender][currentRound.id] += votesToRemove; //Give voting power back to user.
-
-                // Copy last element to current element so last element can be popped
-                votesByUser[i] = votesByUser[votesByUser.length - 1];
+                
+                proposal.votesReceived -= votesToRemove;
+                userData.votingPower += votesToRemove;
 
                 // Remove the struct.
-                votesByUser.pop();
+                userVotes[i] = userVotes[userVotes.length - 1];
+                userVotes.pop();
 
-                if(votesByUser.length == 0){
-                    hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
+                if(userVotes.length == 0) {
+                    userData.hasVoted = false; //Remove users has voted status.
                 }
 
                 emit VotesRemoved(_proposalId, msg.sender, votesToRemove);
@@ -472,32 +496,33 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * Function for a user to remove all their votes from all proposals that they have voted on.
      */
     function removeAllVotesFromAllProposals() external {
-        Round storage currentRound = getLatestRound();
+        RoundData storage currentRoundData = roundData[roundId];
+        Round storage currentRound = currentRoundData.round;
+        UserRoundData storage userData = currentRoundData.userRoundData[msg.sender];
+        RoundStatus status = getRoundStatus(currentRound.id);
+
+        if (status != RoundStatus.VotingOpen) {
+            revert VotingPeriodClosed();
+        }
 
         //Check if the user hasn't voted.
-        if (!hasVotedByRound[msg.sender][currentRound.id]) {
+        if (!userData.hasVoted) {
             revert UserVoteNotFound();
         }
 
-        Votes[] storage votesByUser = votedOnProposals[msg.sender][currentRound.id];
-
-        for (uint256 i = 0; i < votesByUser.length; i++) {
-            uint256 votesToRemove = votesByUser[i].voteCount;
-
-            Proposal storage proposal = proposals[votesByUser[i].proposalId];
-
+        Votes[] storage userVotes = userData.votedProposals;
+        for (uint256 i = 0; i < userVotes.length; i++) {
+            uint256 votesToRemove = userVotes[i].voteCount;
+            Proposal storage proposal = proposals[userVotes[i].proposalId];
             proposal.votesReceived -= votesToRemove; //Remove votes given to proposal.
-            votingPowerByRound[msg.sender][currentRound.id] += votesToRemove; //Give voting power back to user.
+            userData.votingPower += votesToRemove; //Give voting power back to user.
         }
 
         // Clear the votes mapping.
-        delete votedOnProposals[msg.sender][currentRound.id];
+        delete userData.votedProposals;
+        userData.hasVoted = false;
 
-        if(votesByUser.length == 0){
-            hasVotedByRound[msg.sender][currentRound.id] = false; //Remove users has voted status.
-
-            emit AllVotesRemoved(msg.sender);
-        }
+        emit AllVotesRemoved(msg.sender);
     }
 
     /**
@@ -516,7 +541,8 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         }
 
         roundId++;
-        Round storage newRound = rounds[roundId]; //Needed for mappings in structs to work.
+        RoundData storage newRoundData = roundData[roundId];
+        Round storage newRound = newRoundData.round;
         newRound.id = roundId;
         newRound.maxFlareAmount = _maxFlareAmount;
         newRound.roundStartDatetime = block.timestamp;
@@ -524,24 +550,23 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         newRound.expectedSnapshotDatetime = _expectedSnapshotDatetime;
         newRound.snapshotBlock = 0;
         newRound.snapshotDatetime = 0; 
-        newRound.isActive = true;
+        newRound.status = RoundStatus.NotStarted;  // Set initial status
 
         //Add 'Abstain' proposal for the new round.
         proposalId++;
         Proposal storage abstainProposal = proposals[proposalId];
         abstainProposal.id = proposalId;
         abstainProposal.roundId = roundId;
-        abstainProposal.title = "Abstain";
         abstainProposal.amountRequested = 0;
         abstainProposal.receiver = msg.sender;
         abstainProposal.proposer = msg.sender;
-        abstainProposal.fundsClaimed = false;
+        abstainProposal.state = ProposalState.Active;  // Set initial state
 
         newRound.proposalIds.push(proposalId); //Add abstain proposal to round struct.
         newRound.abstainProposalId = proposalId; //Used to track the abstain proposal of the round.
 
-        roundIds.push(roundId); //Keep track of the round ids.
         emit RoundAdded(roundId, _maxFlareAmount, _roundRuntime);
+        emit RoundStatusUpdated(roundId, RoundStatus.NotStarted);
     }
 
     /**
@@ -549,12 +574,13 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      */
     function increaseRoundMaxFlare() external payable roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
+        RoundStatus status = getRoundStatus(roundToUpdate.id);
 
         if (msg.value == 0) {
             revert InvalidAmountRequested();
         }
 
-        if (!isSubmissionWindowOpen()) {
+        if (status != RoundStatus.SubmissionOpen) {
             revert SubmissionWindowClosed();
         }
 
@@ -566,21 +592,18 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * Function to extend the runtime of a round
      * @param _newRoundRuntime The new runtime for the round
      */
-    function extendRoundRuntime(
-        uint256 _newRoundRuntime
-    ) external roundManagerOrAdmin {
+    function extendRoundRuntime(uint256 _newRoundRuntime) external roundManagerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
+        RoundStatus status = getRoundStatus(roundToUpdate.id);
 
         // Ensure the new runtime is greater than the current round runtime
         if (_newRoundRuntime <= roundToUpdate.roundRuntime) {
             revert InvalidRoundRuntime();
         }
 
-        // Check if round is closed
-        if (
-            block.timestamp >
-            (roundToUpdate.roundStartDatetime + roundToUpdate.roundRuntime)
-        ) {
+        if (status == RoundStatus.Completed || 
+            status == RoundStatus.Claimed || 
+            status == RoundStatus.Expired) {
             revert RoundIsClosed();
         }
 
@@ -595,10 +618,21 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * Function to change the snapshot datetime of a round to a future datetime
      * @param _newExpectedSnapshotDatetime The extended time to add to snapshot datetime and round runtime for the round
      */
-    function extendRoundExpectedSnapshotDatetime(
-        uint256 _newExpectedSnapshotDatetime
-    ) external managerOrAdmin {
+    function extendRoundExpectedSnapshotDatetime(uint256 _newExpectedSnapshotDatetime) external managerOrAdmin {
         Round storage roundToUpdate = getLatestRound();
+        RoundStatus status = getRoundStatus(roundToUpdate.id);
+
+        // Ensure round isn't finished
+        if (status == RoundStatus.Completed || 
+            status == RoundStatus.Claimed || 
+            status == RoundStatus.Expired) {
+            revert RoundIsClosed();
+        }
+
+        // Add check to prevent extending after snapshot is taken
+        if (status == RoundStatus.VotingOpen) {
+            revert VotingPeriodOpen();
+        }
 
         // Ensure the new snapshot time is in the future and within the round runtime
         if (
@@ -620,10 +654,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         roundToUpdate.roundRuntime += timeDifference;
 
         // Emit events for updating the snapshot datetime and round runtime
-        emit expectedSnapshotDatetimeUpdated(
-            roundId,
-            _newExpectedSnapshotDatetime
-        );
+        emit expectedSnapshotDatetimeUpdated(roundId, _newExpectedSnapshotDatetime);
         emit RoundRuntimeUpdated(roundId, roundToUpdate.roundRuntime);
     }
 
@@ -631,47 +662,66 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * Function to take a snapshot of the current block
      */
     function takeSnapshot() external managerOrAdmin {
-        Round storage round = getLatestRound();
+        RoundData storage currentRoundData = roundData[roundId];
+        Round storage round = currentRoundData.round;
+        RoundStatus status = getRoundStatus(round.id);
 
-        if (block.timestamp < round.expectedSnapshotDatetime) {
-            revert InvalidSnapshotTime();
+         // Can't take snapshot if round hasn't started
+        if (status == RoundStatus.NotStarted) {
+            revert RoundNotStarted();
         }
 
-        if (block.timestamp > (round.roundStartDatetime + round.roundRuntime)) {
+        // Can't take snapshot if round is completed or expired
+        if (status == RoundStatus.Completed || 
+            status == RoundStatus.Claimed || 
+            status == RoundStatus.Expired) {
             revert RoundIsClosed();
         }
 
-        if(round.snapshotBlock == 0){
-            round.snapshotBlock = block.number;
-            round.snapshotDatetime = block.timestamp; //Set the actual snapshot time.
-            _getFlothPassesOwned(round.snapshotBlock);
+        if (status == RoundStatus.SubmissionOpen) {
+            revert SubmissionWindowOpen();
         }
 
+        // Can't take snapshot if already taken
+        if (round.snapshotBlock > 0) {
+            revert SnapshotAlreadyTaken();
+        }
+
+        if(status == RoundStatus.SnapshotPending) {
+            round.snapshotBlock = block.number;
+            round.snapshotDatetime = block.timestamp;
+            _getFlothPassesOwned(round.snapshotBlock);
+            round.status = RoundStatus.VotingOpen;
+        } else {
+            revert SnapshotIsNotPending();
+        }
+        
         emit SnapshotTaken(round.id, round.snapshotBlock);
+        emit RoundStatusUpdated(round.id, RoundStatus.VotingOpen);
     }
 
     function _getFlothPassesOwned(uint256 _snapshotBlock) internal {
-        uint256 numberMinted = flothPass.getNumberMinted();
-
-        //Starts at 1 as the first FlothPass minted is 1 not 0.
-        for (uint256 i = 1; i <= numberMinted; i++) {
-            address owner = flothPass.ownerOf(i);
-
-            //Update the mapping with the number of FlothPass' owned by an address.
-            flothPassesOwned[_snapshotBlock][owner]++;
+        RoundData storage currentRoundData = roundData[roundId];
+        uint16 totalSupply = flothPass.getNumberMinted();
+        
+        for (uint16 i = 0; i < totalSupply; i++) {
+            address owner = flothPass.ownerOf(i + 1);
+            uint256 votingPower = flothPass.getPastVotes(owner, _snapshotBlock);
+            if (votingPower > 0) {
+                UserRoundData storage userData = currentRoundData.userRoundData[owner];
+                userData.flothPassesOwned = votingPower;
+            }
         }
     }
 
     /**
      * Function to get the total votes for a round
      */
-    function getTotalVotesForRound(
-        uint256 _roundId
-    ) external view returns (uint256) {
+    function getTotalVotesForRound(uint256 _roundId) external view returns (uint256) {
+        RoundData storage roundData_ = roundData[_roundId];
         uint256 totalVotes = 0;
-        for (uint256 i = 0; i < rounds[_roundId].proposalIds.length; i++) {
-            totalVotes += proposals[rounds[_roundId].proposalIds[i]]
-                .votesReceived;
+        for (uint256 i = 0; i < roundData_.round.proposalIds.length; i++) {
+            totalVotes += proposals[roundData_.round.proposalIds[i]].votesReceived;
         }
         return totalVotes;
     }
@@ -684,7 +734,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         if (_id > roundId) {
             revert RoundIdOutOfRange();
         }
-        return rounds[_id];
+        return roundData[_id].round;
     }
 
     /**
@@ -704,7 +754,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
             revert RoundIdOutOfRange();
         }
 
-        Round storage round = rounds[_roundId];
+        Round storage round = roundData[_roundId].round;
         
         id = round.id;
         expectedSnapshotDatetime = round.expectedSnapshotDatetime;
@@ -719,18 +769,17 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * Function to get the latest round
      */
     function getLatestRound() internal view returns (Round storage) {
-        return rounds[roundId];
+        return roundData[roundId].round;
     }
 
     /**
      * Function to get all rounds
      */
     function getAllRounds() external view returns (Round[] memory) {
-        uint256 count = roundIds.length;
-        Round[] memory allRounds = new Round[](count);
-        for (uint256 i = 0; i < count; i++) {
-            Round storage round = rounds[roundIds[i]];
-            allRounds[i] = round;
+        Round[] memory allRounds = new Round[](roundId);
+        for (uint256 i = 1; i <= roundId; i++) {
+            Round storage round = roundData[i].round;
+            allRounds[i-1] = round;
         }
         return allRounds;
     }
@@ -740,15 +789,23 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * @param _roundId The ID of the round
      */
     function killRound(uint256 _roundId) external roundManagerOrAdmin {
-        uint256 maxFlareAmount = rounds[_roundId].maxFlareAmount;
-        //set round as inactive.
-        rounds[_roundId].isActive = false;
+        RoundData storage roundData_ = roundData[_roundId];
+        Round storage round = roundData_.round;
+        RoundStatus status = getRoundStatus(_roundId);
+        
+        // Can't kill rounds that are already claimed or expired
+        if (status == RoundStatus.Claimed || status == RoundStatus.Expired) {
+            revert RoundIsClosed();
+        }
+
+        round.status = RoundStatus.Expired;
 
         //Send funds back to grant fund wallet.
-        (bool success, ) = floth.grantFundWallet().call{value: maxFlareAmount}("");
+        (bool success, ) = floth.grantFundWallet().call{value: round.maxFlareAmount}("");
         require(success);
 
         emit RoundKilled(_roundId);
+        emit RoundStatusUpdated(_roundId, RoundStatus.Expired);
     }
 
     /**
@@ -773,15 +830,18 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
             revert InvalidPageNumberPageSize();
         }
 
-        if(rounds[_roundId].proposalIds.length <= (endIndex-1)){
-            endIndex = rounds[_roundId].proposalIds.length;
+        RoundData storage roundData_ = roundData[_roundId];
+        Round storage round = roundData_.round;
+        
+        if(round.proposalIds.length <= (endIndex-1)){
+            endIndex = round.proposalIds.length;
         }
 
         uint256 resultSize = endIndex - startIndex;
         Votes[] memory voteRetrievals = new Votes[](resultSize);
         for (uint256 i = 0; i < resultSize; i++) {
             Proposal storage proposal = proposals[
-                rounds[_roundId].proposalIds[startIndex + i]
+                round.proposalIds[startIndex + i]
             ];
             voteRetrievals[i] = Votes({
                 proposalId: proposal.id,
@@ -798,7 +858,8 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     function getRemainingVotingPower(
         address _address
     ) external view returns (uint256) {
-        return votingPowerByRound[_address][roundId];
+        RoundData storage currentRoundData = roundData[roundId];
+        return currentRoundData.userRoundData[_address].votingPower;
     }
 
     /**
@@ -817,7 +878,8 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         uint256 flothVotingPower = floth.getPastVotes(_address, snapshotBlock);
 
         //Get voting power for holding FlothPass.
-        uint256 nftVotingPower = flothPassesOwned[snapshotBlock][_address] * nftMultiplier;
+        //TODO getTotalVotingPower uses flothPassesOwned from the snapshot but getFlothPassVotingPower uses the current number of FlothPasses owned.
+        uint256 nftVotingPower = roundData[roundId].userRoundData[_address].flothPassesOwned * nftMultiplier;
 
         return flothVotingPower + nftVotingPower;
     }
@@ -842,14 +904,14 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * @param _address the address to get voting power
      */
     function getFlothPassVotingPower(address _address) public view returns (uint256) {
-        Round memory latestRound = getLatestRound();
-
-        if(latestRound.snapshotBlock == 0){
+        Round storage round = getLatestRound();
+        if(round.snapshotBlock == 0) {
             return 0;
         }
-        uint256 snapshotBlock = latestRound.snapshotBlock;
-
-        return flothPass.getPastVotes(_address, snapshotBlock) * nftMultiplier;
+        // Use the built-in votes functionality
+        //TODO shouldn't we use the flothPassesOwned from the snapshot?
+        uint256 votingPower = flothPass.getPastVotes(_address, round.snapshotBlock);
+        return votingPower * nftMultiplier;
     }
 
     /**
@@ -857,19 +919,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      */
     function isVotingPeriodOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
-        
-        if(latestRound.snapshotDatetime == 0){
-            return false;
-        }
-
-        // Check if the current time is within the voting period
-        if (block.timestamp >= latestRound.snapshotDatetime) {
-            if (block.timestamp <= latestRound.roundStartDatetime + latestRound.roundRuntime) {
-                return true;
-            }
-        }
-        
-        return false;
+        return getRoundStatus(latestRound.id) == RoundStatus.VotingOpen;
     }
     
 
@@ -878,31 +928,23 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      */
     function isSubmissionWindowOpen() public view returns (bool) {
         Round storage latestRound = getLatestRound();
-       
-        return
-            block.timestamp < latestRound.expectedSnapshotDatetime &&
-            block.timestamp >= latestRound.roundStartDatetime;
+        return getRoundStatus(latestRound.id) == RoundStatus.SubmissionOpen;
     }
     
-    //
     /**
      * Function to finish a round
      */
     function roundFinished() external roundManagerOrAdmin {
-        Round storage latestRound = getLatestRound();
+        RoundData storage currentRoundData = roundData[roundId];
+        Round storage latestRound = currentRoundData.round;
+        RoundStatus status = getRoundStatus(latestRound.id);
 
-        //Check if round is over.
-        if (
-            (latestRound.roundStartDatetime + latestRound.roundRuntime) <
-            block.timestamp
-        ) {
+        if (status != RoundStatus.VotingOpen) {
             revert RoundIsOpen();
         }
 
         //Check which proposal has the most votes.
-        Proposal memory mostVotedProposal = proposals[
-            latestRound.proposalIds[0]
-        ];
+        Proposal memory mostVotedProposal = proposals[latestRound.proposalIds[0]];
         for (uint256 i = 0; i < latestRound.proposalIds.length; i++) {
             Proposal memory proposal = proposals[latestRound.proposalIds[i]];
             if (proposal.votesReceived > mostVotedProposal.votesReceived) {
@@ -917,14 +959,23 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
 
         //Check if the winning proposal is the abstain proposal.
         if (mostVotedProposal.id == latestRound.abstainProposalId) {
-            //Set as claimed so winner cannot reclaim for the proposal.
-            mostVotedProposal.fundsClaimed = true; 
-            winningProposalByRoundId[mostVotedProposal.roundId].fundsClaimed = true;
-            proposals[mostVotedProposal.id].fundsClaimed = true;
+            mostVotedProposal.state = ProposalState.Abstained;
+            winningProposalByRoundId[mostVotedProposal.roundId].state = ProposalState.Abstained;
+            proposals[mostVotedProposal.id].state = ProposalState.Abstained;
+            latestRound.status = RoundStatus.Expired;
 
             //Send funds back to grant fund wallet.
             (bool success, ) = floth.grantFundWallet().call{value: latestRound.maxFlareAmount}("");
             require(success);
+            
+            emit RoundStatusUpdated(latestRound.id, RoundStatus.Expired);
+        } else {
+            latestRound.status = RoundStatus.Completed;
+            mostVotedProposal.state = ProposalState.Winning;
+            winningProposalByRoundId[latestRound.id].state = ProposalState.Winning;
+            proposals[mostVotedProposal.id].state = ProposalState.Winning;
+            
+            emit RoundStatusUpdated(latestRound.id, RoundStatus.Completed);
         }
 
         emit RoundCompleted(latestRound.id, mostVotedProposal.id);
@@ -936,6 +987,18 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * Function to claim funds for a winning proposal
      */
     function claimFunds(uint256 _roundId) external nonReentrant {
+        RoundData storage roundData_ = roundData[_roundId];
+        RoundStatus status = getRoundStatus(_roundId);
+        
+        if (status != RoundStatus.Completed) {
+            if (status == RoundStatus.Expired) {
+                revert FundsClaimingPeriodExpired();
+            } else if (status == RoundStatus.Claimed) {
+                revert FundsAlreadyClaimed();
+            } else {
+                revert InvalidPermissions();
+            }
+        }
 
         if (!hasWinningProposal[msg.sender]) {
             revert InvalidClaimer();
@@ -944,8 +1007,9 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         Proposal[] storage usersWinningProposals = winningProposals[msg.sender];
 
         for (uint256 i = 0; i < usersWinningProposals.length; i++) {
-            if(!usersWinningProposals[i].fundsClaimed && usersWinningProposals[i].roundId == _roundId){
-                Round storage claimRound = rounds[_roundId];
+            if(usersWinningProposals[i].state == ProposalState.Winning && 
+               usersWinningProposals[i].roundId == _roundId) {
+                Round storage claimRound = roundData_.round;
 
                 //Check if 30 days have passed since round finished. 86400 seconds in a day.
                 uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
@@ -961,49 +1025,73 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
                     revert InsufficientBalance();
                 }
 
-                //Set as claimed so winner cannot reclaim for the proposal.
-                usersWinningProposals[i].fundsClaimed = true; 
-                winningProposalByRoundId[usersWinningProposals[i].roundId].fundsClaimed = true;
-                proposals[usersWinningProposals[i].id].fundsClaimed = true;
+                uint256 amountToSend = usersWinningProposals[i].amountRequested;
+                address payable receiver = payable(usersWinningProposals[i].receiver);
+                uint256 winningProposalId = usersWinningProposals[i].id;
 
-                //Send amount requested to winner.
-                (bool success, ) = usersWinningProposals[i].receiver.call{value: amountRequested}("");
-                require(success);
+                // Update all state before external call
+                usersWinningProposals[i].state = ProposalState.Claimed;
+                winningProposalByRoundId[usersWinningProposals[i].roundId].state = ProposalState.Claimed;
+                proposals[winningProposalId].state = ProposalState.Claimed;
+                roundData[_roundId].round.status = RoundStatus.Claimed;
 
-                emit FundsClaimed(usersWinningProposals[i].id, msg.sender, amountRequested);
+                emit RoundStatusUpdated(_roundId, RoundStatus.Claimed);
+                emit FundsClaimed(winningProposalId, msg.sender, amountToSend);
+
+                // External call last (CEI pattern)
+                (bool success, ) = receiver.call{value: amountToSend}("");
+                if (!success) {
+                    revert TransferFailed();
+                }
                 return;
             }
         }
+
+        // Update round status through proposal state
+        roundData_.round.status = RoundStatus.Claimed;
+        emit RoundStatusUpdated(_roundId, RoundStatus.Claimed);
     }
 
     /**
      * Function to manually check if winning proposal hasn't been claimed.
      */
     function reclaimFunds(uint256 _roundId) external roundManagerOrAdmin {
+        RoundData storage roundData_ = roundData[_roundId];
+        Round storage round = roundData_.round;
         Proposal storage proposal = winningProposalByRoundId[_roundId];
-        Round memory claimRound = getRoundById(_roundId);
+        RoundStatus status = getRoundStatus(_roundId);
 
-        if(!proposal.fundsClaimed){
-            uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
-
-            if (daysPassed > 30) {
-                //Set bool for funds claimed to true in both mappings.
-                proposal.fundsClaimed = true; 
-
-                Proposal[] storage userProposals = winningProposals[proposal.receiver];
-                for (uint256 i = 0; i < userProposals.length; i++) {
-                    if (userProposals[i].id == proposal.id) {
-                        userProposals[i].fundsClaimed = true;
-                        proposals[userProposals[i].id].fundsClaimed = true;
-                    }
-                }
-                
-                // Send amount to the grant wallet.
-                (bool success, ) = floth.grantFundWallet().call{value: proposal.amountRequested}("");
-                require(success);
-
-                emit FundsReclaimed(proposalId, floth.grantFundWallet(), proposal.amountRequested);
+        if(status != RoundStatus.Completed) {
+            if(status == RoundStatus.Expired) {
+                revert FundsClaimingPeriodExpired();
+            } else if(status == RoundStatus.Claimed) {
+                revert FundsAlreadyClaimed();
+            } else {
+                revert InvalidPermissions();
             }
+        }
+
+        uint256 daysPassed = (block.timestamp - round.roundStartDatetime + round.roundRuntime) / 86400;
+
+        if (daysPassed > 30) {
+            // Update state to expired in all mappings
+            proposal.state = ProposalState.Expired;
+            round.status = RoundStatus.Expired;
+
+            Proposal[] storage userProposals = winningProposals[proposal.receiver];
+            for (uint256 i = 0; i < userProposals.length; i++) {
+                if (userProposals[i].id == proposal.id) {
+                    userProposals[i].state = ProposalState.Expired;
+                    proposals[userProposals[i].id].state = ProposalState.Expired;
+                }
+            }
+            
+            // Send amount to the grant wallet
+            (bool success, ) = floth.grantFundWallet().call{value: proposal.amountRequested}("");
+            require(success);
+
+            emit RoundStatusUpdated(_roundId, RoundStatus.Expired);
+            emit FundsReclaimed(proposalId, floth.grantFundWallet(), proposal.amountRequested);
         }
     }
 
@@ -1014,12 +1102,12 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     function getUnclaimedWinningRoundIds() view external roundManagerOrAdmin returns (uint256[] memory) {
         // Get the count of unclaimed proposals
         uint256 count = 0;
-        for (uint256 i = 1; i <= roundIds.length; i++) {
+        for (uint256 i = 1; i <= roundId; i++) {
             Proposal storage proposal = winningProposalByRoundId[i];
-            Round memory claimRound = getRoundById(i);
+            Round memory round = roundData[i].round;
 
-            if (!proposal.fundsClaimed) {
-                uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
+            if (proposal.state == ProposalState.Winning) { // Check if funds haven't been claimed
+                uint256 daysPassed = (block.timestamp - round.roundStartDatetime + round.roundRuntime) / 86400;
                 if (daysPassed > 30) {
                     count++;
                 }
@@ -1031,13 +1119,12 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         uint256 index = 0; // Index for the memory array
 
         // Populate the memory array with unclaimed round IDs
-        for (uint256 i = 1; i <= roundIds.length; i++) {
+        for (uint256 i = 1; i <= roundId; i++) {
             Proposal storage proposal = winningProposalByRoundId[i];
-            Round memory claimRound = getRoundById(i); // Define claimRound here as well
+            Round memory round = roundData[i].round;
 
-            if (!proposal.fundsClaimed) {
-                uint256 daysPassed = (block.timestamp - claimRound.roundStartDatetime + claimRound.roundRuntime) / 86400;
-
+            if (proposal.state == ProposalState.Winning) { // Check if funds haven't been claimed
+                uint256 daysPassed = (block.timestamp - round.roundStartDatetime + round.roundRuntime) / 86400;
                 if (daysPassed > 30) {
                     unclaimedWinningRoundIds[index] = i;
                     index++; // Move to the next position.
@@ -1055,10 +1142,52 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         return address(floth);
     }
 
-    /**
+    // Replace multiple round state checks with a single function
+    function getRoundStatus(uint256 _roundId) public view returns (RoundStatus) {
+        Round storage round = roundData[_roundId].round;
+        uint256 roundEndTime = round.roundStartDatetime + round.roundRuntime;
+        
+        // Check if round has started
+        if (block.timestamp < round.roundStartDatetime) {
+            return RoundStatus.NotStarted;
+        }
+
+        // If we are started, let's check if we are ended
+        if (block.timestamp > roundEndTime) {
+
+            // If we are ended let's check if claimed
+            if (winningProposalByRoundId[round.id].state == ProposalState.Claimed) {
+                return RoundStatus.Claimed;
+            }
+            
+            // Check if expired (30 days after end)
+            if ((block.timestamp - roundEndTime) > 30 days) {
+                return RoundStatus.Expired;
+            }
+            
+            // If not claimed or expired, round is completed
+            return RoundStatus.Completed;
+        }
+
+        // If we are started, we are not ended and we have a snapshot, we are in voting period
+        if (round.snapshotBlock > 0) {
+            return RoundStatus.VotingOpen;
+        }
+        
+        // If we are started, we are not ended, we do not have a snapshot, and we are past the expected snapshot datetime, we are in snapshot pending period
+        if (block.timestamp >= round.expectedSnapshotDatetime) {
+            return RoundStatus.SnapshotPending;
+        }
+
+        // If we are started, we are not ended, we do not have a snapshot, and we are not past the expected snapshot datetime, we are in submission period
+        return RoundStatus.SubmissionOpen;
+    }
+
+     /**
      * Test function to see if contract was upgraded.
      */
     function isContractUpgraded() external pure returns (string memory) {
         return "Contract is upgraded";
     }
+
 }

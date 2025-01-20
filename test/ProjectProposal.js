@@ -830,35 +830,31 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_increaseTime", [4000]);
       await ethers.provider.send("evm_mine");
 
-      // Transfer 4000 Floth tokens to addr1.
+      // Transfer 4000 Floth tokens to addr1
       await floth.transfer(addr1.address, ethers.parseUnits("4000", 18));
       expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("4000", 18));
 
       // Approve the FlothPass contract to spend Floth tokens from addr1
       await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("2000", 18));
 
-      // Important: Delegate votes
-      await floth.connect(addr1).delegate(addr1.address);
-      await flothPass.connect(addr1).delegate(addr1.address);
-
       //Activate sale and mint
       await flothPass.connect(owner).setSaleActive(true);
       await flothPass.connect(addr1).mint(2, { value: ethers.parseEther("2000") });
 
-      // Take snapshot
-      await projectProposal.takeSnapshot();
+      // Delegate both tokens
+      await floth.connect(addr1).delegate(addr1.address);
+      await flothPass.connect(addr1).delegate(addr1.address);
 
-      // Additional time increase after snapshot
-      await ethers.provider.send("evm_increaseTime", [100]);
+      // Take snapshot and mine a block
+      await projectProposal.takeSnapshot();
       await ethers.provider.send("evm_mine");
 
-      // Now check voting powers
+      // Check voting powers
       const flothPassVotingPower = await projectProposal.getFlothPassVotingPower(addr1.address);
-      expect(flothPassVotingPower).to.equal(400);
-
       const flothVotingPower = await projectProposal.getFlothVotingPower(addr1.address);
       const totalPower = await projectProposal.getTotalVotingPower(addr1.address);
 
+      expect(flothPassVotingPower).to.equal(400);
       expect(totalPower).to.equal(flothPassVotingPower + flothVotingPower);
     });
 
