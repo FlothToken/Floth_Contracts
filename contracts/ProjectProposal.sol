@@ -688,7 +688,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         }
 
         if(status == RoundStatus.SnapshotPending) {
-            round.snapshotBlock = block.number;
+            round.snapshotBlock = block.number-1;
             round.snapshotDatetime = block.timestamp;
             _getFlothPassesOwned(round.snapshotBlock);
             round.status = RoundStatus.VotingOpen;
