@@ -858,7 +858,7 @@ describe("ProjectProposal Contract", function () {
       expect(totalPower).to.equal(flothPassVotingPower + flothVotingPower);
     });
 
-    it.only("Should revert if trying to remove votes without having voted", async function () {
+    it("Should revert if trying to remove votes without having voted", async function () {
       await projectProposal.connect(owner).addRound(ethers.parseUnits("10", 18), 8000, currentTime + 7200, {
         value: ethers.parseUnits("10", 18),
       });
@@ -1151,13 +1151,13 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(addr2).addVotesToProposal(2, 10);
       // await projectProposal.connect(addr2).addVotesToProposal(3, 10); IF YOU COMMENT THIS IN, THE TEST FAILS, WHICH IS CORRECT.
 
-      const hasVotedBefore = await projectProposal.hasVotedByRound(addr2.address, 1);
+      const hasVotedBefore = await projectProposal.hasVotedByRound(1, addr2.address);
 
       expect(hasVotedBefore).to.equal(true);
 
       await projectProposal.connect(addr2).removeVotesFromProposal(2);
 
-      const hasVotedAfter = await projectProposal.hasVotedByRound(addr2.address, 1);
+      const hasVotedAfter = await projectProposal.hasVotedByRound(1, addr2.address);
 
       expect(hasVotedAfter).to.equal(false);
     });

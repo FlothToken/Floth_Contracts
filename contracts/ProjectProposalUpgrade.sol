@@ -921,8 +921,17 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         Round storage latestRound = getLatestRound();
         return getRoundStatus(latestRound.id) == RoundStatus.VotingOpen;
     }
-    
 
+    /**
+     * Function to check if an address has voted in a specific round
+     * @param _roundId The ID of the round
+     * @param _address The address to check
+     * @return bool True if the address has voted, false otherwise
+     */
+    function hasVotedByRound(uint256 _roundId, address _address) external view returns (bool) {
+        return roundData[_roundId].userRoundData[_address].hasVoted;
+    }
+    
     /**
      * Check if the submission window is open
      */

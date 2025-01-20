@@ -715,7 +715,6 @@ contract ProjectProposalTest is AccessControl {
         }
     }
     
-
     /**
      * Check if the submission window is open
      */
