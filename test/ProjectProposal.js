@@ -1335,8 +1335,13 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(addr2).addVotesToProposal(2, 10);
       await projectProposal.connect(owner).roundFinished();
 
+      expect(await projectProposal.hasWinningProposal(addr1.address)).to.be.true;
+
       //Remove funds from address(this).balance
       await ethers.provider.send("hardhat_setBalance", [await projectProposal.getAddress(), "0x0"]);
+
+      const newBalance = await ethers.provider.getBalance(await projectProposal.getAddress());
+      expect(newBalance).to.equal(0);
 
       await expect(projectProposal.connect(addr1).claimFunds(1)).to.be.revertedWithCustomError(projectProposal, "InsufficientBalance");
     });

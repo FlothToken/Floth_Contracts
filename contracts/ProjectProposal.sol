@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "hardhat/console.sol";
 import "./IFloth.sol";
 import "./IFlothPass.sol";
+import "hardhat/console.sol";  
 
 /**
  * @title ProjectProposal contract for the Floth protocol
@@ -947,7 +948,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     function roundFinished() external roundManagerOrAdmin {
         RoundData storage currentRoundData = roundData[roundId];
         Round storage latestRound = currentRoundData.round;
-        RoundStatus status = getRoundStatus(latestRound.id);
+        RoundStatus status = currentRoundData.round.status;
 
         if (status != RoundStatus.VotingOpen) {
             revert RoundIsOpen();
@@ -963,7 +964,6 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         }
 
         //Add winning proposal to mappings.
-        winningProposals[mostVotedProposal.receiver].push(mostVotedProposal);
         winningProposalByRoundId[latestRound.id] = mostVotedProposal;
         hasWinningProposal[mostVotedProposal.receiver] = true;
 
@@ -973,6 +973,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             winningProposalByRoundId[mostVotedProposal.roundId].state = ProposalState.Abstained;
             proposals[mostVotedProposal.id].state = ProposalState.Abstained;
             latestRound.status = RoundStatus.Expired;
+            winningProposals[mostVotedProposal.receiver].push(mostVotedProposal);
 
             //Send funds back to grant fund wallet.
             (bool success, ) = floth.grantFundWallet().call{value: latestRound.maxFlareAmount}("");
@@ -984,6 +985,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             mostVotedProposal.state = ProposalState.Winning;
             winningProposalByRoundId[latestRound.id].state = ProposalState.Winning;
             proposals[mostVotedProposal.id].state = ProposalState.Winning;
+            winningProposals[mostVotedProposal.receiver].push(mostVotedProposal);   
             
             emit RoundStatusUpdated(latestRound.id, RoundStatus.Completed);
         }
@@ -998,7 +1000,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      */
     function claimFunds(uint256 _roundId) external nonReentrant {
         RoundData storage roundData_ = roundData[_roundId];
-        RoundStatus status = getRoundStatus(_roundId);
+        RoundStatus status = roundData_.round.status;
         
         if (status != RoundStatus.Completed) {
             if (status == RoundStatus.Expired) {
