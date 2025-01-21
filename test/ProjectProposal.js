@@ -1200,7 +1200,7 @@ describe("ProjectProposal Contract", function () {
       //Addr1 claims funds.
       await projectProposal.connect(addr1).claimFunds(1);
       const proposal = await projectProposal.proposals(2);
-      expect(proposal.fundsClaimed).to.be.true;
+      expect(proposal.state).to.equal(2); //2 is the state for claimed proposal.
     });
 
     it("Should allow the winner to claim funds on the 29th day", async function () {
