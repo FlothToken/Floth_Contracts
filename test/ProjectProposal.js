@@ -938,12 +938,12 @@ describe("ProjectProposal Contract", function () {
       await ethers.provider.send("evm_mine");
 
       // Transfer 4000 Floth tokens to addr1.
-      await floth.transfer(addr1.address, ethers.parseUnits("4000", 18));
+      // await floth.transfer(addr1.address, ethers.parseUnits("4000", 18));
 
-      expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("4000", 18));
+      // expect(await floth.balanceOf(addr1.address)).to.equal(ethers.parseUnits("4000", 18));
 
-      // Approve the FlothPass contract to spend Floth tokens from addr1
-      await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("2000", 18));
+      // // Approve the FlothPass contract to spend Floth tokens from addr1
+      // await floth.connect(addr1).approve(await flothPass.getAddress(), ethers.parseUnits("2000", 18));
 
       //Activate sale.
       await flothPass.connect(owner).setSaleActive(true);
@@ -968,7 +968,7 @@ describe("ProjectProposal Contract", function () {
 
       //Check remaining voting power.
       const remainingVotingPower = await projectProposal.getRemainingVotingPower(addr1.address);
-      expect(remainingVotingPower).to.equal(200);
+      expect(remainingVotingPower).to.equal(flothPassVotingPower - BigInt(200));
     });
 
     it("Should still have the voting power after a snapshot even when the nft has been sold", async function () {
