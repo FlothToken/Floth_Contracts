@@ -853,7 +853,8 @@ describe("ProjectProposal Contract", function () {
       const flothVotingPower = await projectProposal.getFlothVotingPower(addr1.address);
       const totalPower = await projectProposal.getTotalVotingPower(addr1.address);
 
-      expect(flothPassVotingPower).to.equal(400);
+      const nftMultiplier = await projectProposal.nftMultiplier();
+      expect(flothPassVotingPower).to.equal(nftMultiplier * BigInt(2));
       expect(totalPower).to.equal(flothPassVotingPower + flothVotingPower);
     });
 
@@ -905,8 +906,10 @@ describe("ProjectProposal Contract", function () {
       //Check flothpass voting power.
       const flothPassVotingPower = await projectProposal.getFlothPassVotingPower(addr1.address);
 
-      //Expect flothPassVotingPower = 400;
-      expect(flothPassVotingPower).to.equal(400);
+      const nftMultiplier = await projectProposal.nftMultiplier();
+
+      //Expect flothPassVotingPower = nftMultiplier*2
+      expect(flothPassVotingPower).to.equal(nftMultiplier * BigInt(2));
     });
 
     it("Should return 0 if getting the FlothPass voting power before a snapshot", async function () {
@@ -957,7 +960,8 @@ describe("ProjectProposal Contract", function () {
 
       //Check flothpass voting power.
       const flothPassVotingPower = await projectProposal.getFlothPassVotingPower(addr1.address);
-      expect(flothPassVotingPower).to.equal(400);
+      const nftMultiplier = await projectProposal.nftMultiplier();
+      expect(flothPassVotingPower).to.equal(nftMultiplier * BigInt(2));
 
       //Vote 200 FlothPass voting power.
       await projectProposal.connect(addr1).addVotesToProposal(2, 200);
@@ -999,8 +1003,10 @@ describe("ProjectProposal Contract", function () {
       //Check flothpass voting power.
       const flothPassVotingPower = await projectProposal.getFlothPassVotingPower(addr1.address);
 
-      //Expect flothPassVotingPower = 400 (2 FlothPass tokens * 200 nftmultiplier)
-      expect(flothPassVotingPower).to.equal(400);
+      const nftMultiplier = await projectProposal.nftMultiplier();
+
+      //Expect flothPassVotingPower = nftMultiplier*2
+      expect(flothPassVotingPower).to.equal(nftMultiplier * BigInt(2));
 
       //Sell the NFT.
       await flothPass.connect(addr1).transferFrom(addr1.address, addr2.address, 1);
@@ -1008,8 +1014,8 @@ describe("ProjectProposal Contract", function () {
       //Check flothpass voting power still the same.
       const flothPassVotingPowerAfterSale = await projectProposal.getFlothPassVotingPower(addr1.address);
 
-      //Expect flothPassVotingPower = 400;
-      expect(flothPassVotingPowerAfterSale).to.equal(400);
+      //Expect flothPassVotingPower = nftMultiplier*2
+      expect(flothPassVotingPowerAfterSale).to.equal(nftMultiplier * BigInt(2));
     });
 
     it("Should get total votes for a round", async function () {
