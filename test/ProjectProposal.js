@@ -1249,7 +1249,7 @@ describe("ProjectProposal Contract", function () {
       expect(balanceAfter).to.equal(expectedBalanceAfter);
 
       const proposal = await projectProposal.proposals(2);
-      expect(proposal.fundsClaimed).to.be.true;
+      expect(proposal.state).to.equal(2); //2 is the state for claimed proposal.
     });
 
     it("Should send funds to the grant wallet if abstain wins a round", async function () {
