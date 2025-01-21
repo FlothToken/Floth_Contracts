@@ -1403,7 +1403,7 @@ describe("ProjectProposal Contract", function () {
       await projectProposal.connect(owner).reclaimFunds(1);
 
       const proposalAfter = await projectProposal.proposals(2);
-      expect(proposalAfter.fundsClaimed).to.be.true;
+      expect(proposalAfter.state).to.equal(3);
 
       //Balance after reclaiming funds.
       const balanceAfter = await ethers.provider.getBalance(await floth.grantFundWallet());

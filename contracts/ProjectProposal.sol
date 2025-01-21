@@ -989,7 +989,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             
             emit RoundStatusUpdated(latestRound.id, RoundStatus.Completed);
         }
-
+        
         emit RoundCompleted(latestRound.id, mostVotedProposal.id);
     }
 
@@ -1071,7 +1071,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         RoundData storage roundData_ = roundData[_roundId];
         Round storage round = roundData_.round;
         Proposal storage proposal = winningProposalByRoundId[_roundId];
-        RoundStatus status = getRoundStatus(_roundId);
+        RoundStatus status = roundData_.round.status;
 
         if(status != RoundStatus.Completed) {
             if(status == RoundStatus.Expired) {
@@ -1096,7 +1096,10 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
                     userProposals[i].state = ProposalState.Expired;
                     proposals[userProposals[i].id].state = ProposalState.Expired;
                 }
+
+                winningProposalByRoundId[_roundId].state = ProposalState.Expired;
             }
+            
             
             // Send amount to the grant wallet
             (bool success, ) = floth.grantFundWallet().call{value: proposal.amountRequested}("");
