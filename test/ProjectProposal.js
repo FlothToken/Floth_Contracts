@@ -1513,8 +1513,9 @@ describe("ProjectProposal Contract", function () {
       //Activate sale.
       await flothPass.connect(owner).setSaleActive(true);
 
-      //Mint 2 FlothPass token for addr1.
+      //Mint FlothPass token for addr1.
       await flothPass.connect(addr1).mint(1, { value: ethers.parseEther("1000") });
+      await flothPass.connect(addr1).delegate(addr1.address);
 
       await ethers.provider.send("evm_increaseTime", [7300]);
       await ethers.provider.send("evm_mine");
@@ -1527,9 +1528,12 @@ describe("ProjectProposal Contract", function () {
       const round = await projectProposal.getRoundById(1);
       const snapshotBlock = round.snapshotBlock;
 
-      const power = (await projectProposal.flothPassesOwned(snapshotBlock, addr1.address)) * (await projectProposal.nftMultiplier());
+      //Get the FlothPassesOwned from the roundData.
+      const flothPassPower = await projectProposal.getFlothPassVotingPower(addr1.address);
 
-      expect(power).to.equal(1 * 200);
+      const nftMultiplier = await projectProposal.nftMultiplier();
+
+      expect(flothPassPower).to.equal(nftMultiplier);
     });
 
     it("Should return zero Floth voting power if snapshot has not been taken", async function () {

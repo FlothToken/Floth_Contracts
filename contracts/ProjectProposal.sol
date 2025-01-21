@@ -690,6 +690,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
         if(status == RoundStatus.SnapshotPending) {
             round.snapshotBlock = block.number-1;
+            console.log("Snapshot block set to:", round.snapshotBlock);
             round.snapshotDatetime = block.timestamp;
             _getFlothPassesOwned(round.snapshotBlock);
             round.status = RoundStatus.VotingOpen;
@@ -906,12 +907,16 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      */
     function getFlothPassVotingPower(address _address) public view returns (uint256) {
         Round storage round = getLatestRound();
+
+        console.log("Snapshot block is", round.snapshotBlock);
         if(round.snapshotBlock == 0) {
+            console.log("No snapshot block found");
             return 0;
         }
         // Use the built-in votes functionality
         //TODO shouldn't we use the flothPassesOwned from the snapshot?
         uint256 votingPower = flothPass.getPastVotes(_address, round.snapshotBlock);
+        console.log("Voting power is", votingPower);
         return votingPower * nftMultiplier;
     }
 
@@ -989,7 +994,7 @@ contract ProjectProposal is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             
             emit RoundStatusUpdated(latestRound.id, RoundStatus.Completed);
         }
-        
+
         emit RoundCompleted(latestRound.id, mostVotedProposal.id);
     }
 
