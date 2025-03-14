@@ -20,19 +20,10 @@ import {CommonValidators} from "./lib/CommonValidators.sol";
 contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
 
     // More readable and gas efficient way to write large numbers
-    uint256 private constant DECIMALS = 18; //TODO: We can use decimals() from ERC20 contract here.
     uint256 private constant BILLION = 1_000_000_000;
-    uint256 private constant _MAX_SUPPLY = 30 * BILLION * 10**DECIMALS;
-    uint256 private constant _WALLET_LIMIT = 25 * (BILLION / 10) * 10**DECIMALS; // 2.5 billion
+    uint256 private constant _MAX_SUPPLY = 30 * BILLION * 10**18;
+    uint256 private constant _WALLET_LIMIT = 25 * (BILLION / 10) * 10**18; // 2.5 billion
     uint256 private constant _EXCHANGE_RATE = 10_000;
-
-    // Pack variables together to save storage slots
-    //TODO: This can go in the interface.
-    struct PresaleInfo {
-        uint256 startTime;
-        uint256 endTime;
-        bool paused;
-    }
     
     PresaleInfo public presaleInfo;
 
@@ -235,18 +226,5 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
         isActive = block.timestamp >= presaleInfo.startTime && 
                    block.timestamp <= presaleInfo.endTime && 
                    !presaleInfo.paused;
-    }
-
-    // Implement interface getter functions
-    function MAX_SUPPLY() external pure override returns (uint256) {
-        return _MAX_SUPPLY;
-    }
-    
-    function WALLET_LIMIT() external pure override returns (uint256) {
-        return _WALLET_LIMIT;
-    }
-    
-    function EXCHANGE_RATE() external pure override returns (uint256) {
-        return _EXCHANGE_RATE;
     }
 }

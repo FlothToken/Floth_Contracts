@@ -11,6 +11,14 @@ import "./IBaseEvents.sol";
  * @notice Interface for the pFloth token functionality
  */
 interface IpFloth is IERC20, IBaseEvents {
+
+    // Pack variables together to save storage slots
+    struct PresaleInfo {
+        uint256 startTime;
+        uint256 endTime;
+        bool paused;
+    }
+
     // pFloth-specific errors
     error PresaleEnded();
     error ExceedsSupply();
@@ -34,14 +42,9 @@ interface IpFloth is IERC20, IBaseEvents {
     event TokenRecovered(address token, uint256 amount);
     event Withdraw(address owner, uint256 amount);
     event TokenReturned(address indexed token, address indexed sender, uint256 amount);
-
-    // Constants
-    function MAX_SUPPLY() external view returns (uint256);
-    function WALLET_LIMIT() external view returns (uint256);
-    function EXCHANGE_RATE() external view returns (uint256);
     
     // View functions
-    function pFLOTHBalance(address account) external view returns (uint256);
+    function pFLOTHPurchases(address account) external view returns (uint256);
     function tokenSenders(address token, address sender) external view returns (uint256);
     
     // Main functions
