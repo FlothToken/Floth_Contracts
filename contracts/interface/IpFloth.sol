@@ -4,7 +4,6 @@ pragma solidity 0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./IBaseEvents.sol";
 
-//TODO: Tidy up interface, errors, events, etc.
 /**
  * @title IpFloth - Presale Floth token contract interface
  * @author Ethereal Labs Ltd
@@ -24,10 +23,11 @@ interface IpFloth is IERC20, IBaseEvents {
     error ExceedsSupply();
     error PresaleNotStarted();
     error PresaleIsPaused();
-    error ExceedsWalletLimit();
     error InvalidRecoveryToken();
     error InvalidRecoveryAmount();
     error UnauthorizedRecovery();
+    error InvalidPresaleTime();
+    error UnauthorizedTransfer();
 
     // pFloth-specific events
     event PresaleStarted(uint256 startTime, uint256 endTime);
@@ -42,9 +42,10 @@ interface IpFloth is IERC20, IBaseEvents {
     event TokenRecovered(address token, uint256 amount);
     event Withdraw(address owner, uint256 amount);
     event TokenReturned(address indexed token, address indexed sender, uint256 amount);
+    event AuthorizedReceiverUpdated(address indexed receiver, bool authorized);
     
     // View functions
-    function pFLOTHPurchases(address account) external view returns (uint256);
+    function pFLOTHBalance(address account) external view returns (uint256);
     function tokenSenders(address token, address sender) external view returns (uint256);
     
     // Main functions

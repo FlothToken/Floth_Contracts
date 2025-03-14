@@ -14,6 +14,9 @@ interface IBaseEvents {
     error InsufficientFunds();
     error InsufficientRole();
     error TransferFailed();
+    error ExceedsWalletLimit();
+    error InvalidAmount();
+    error InsufficientBalance();
     
     // Common events
     event EmergencyPause(bool indexed paused);

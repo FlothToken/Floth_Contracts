@@ -7,10 +7,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/IpFloth.sol";
 import {CommonValidators} from "./lib/CommonValidators.sol";
 
-
-//TODO: Should not allow transfers only for purchases of FlothPass and exchanges to Floth.
-//TODO: We need to track the burned amount.
-
 /**
  * @title Presale Floth Token
  * @author Ethereal Labs
@@ -24,7 +20,14 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
     uint256 private constant _MAX_SUPPLY = 30 * BILLION * 10**18;
     uint256 private constant _WALLET_LIMIT = 25 * (BILLION / 10) * 10**18; // 2.5 billion
     uint256 private constant _EXCHANGE_RATE = 10_000;
-    
+
+    // Track burned amount
+    uint256 private _burnedAmount;
+
+    // Authorized addresses that can receive pFLOTH transfers (e.g., FlothPass contract)
+    mapping(address => bool) public authorizedReceivers;
+
+    // Pack variables together to save storage slots
     PresaleInfo public presaleInfo;
 
     // Mappings
@@ -33,12 +36,15 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
 
     /**
      * @dev Constructor for the pFloth contract
-     * @param _presaleDuration The duration of the presale in seconds
+     * @param _startTime The unix timestamp when the presale starts
+     * @param _endTime The unix timestamp when the presale ends
      */
-    constructor(uint256 _presaleDuration) ERC20("Presale Floth", "pFloth") {
-        //TODO: Provide start and end time in constructor as unix timestamps.
-        presaleInfo.startTime = block.timestamp;
-        presaleInfo.endTime = block.timestamp + _presaleDuration;
+    constructor(uint256 _startTime, uint256 _endTime) ERC20("Presale Floth", "pFloth") {
+        if (_startTime >= _endTime) revert InvalidPresaleTime();
+        if (_startTime < block.timestamp) revert InvalidPresaleTime();
+        
+        presaleInfo.startTime = _startTime;
+        presaleInfo.endTime = _endTime;
         emit PresaleStarted(presaleInfo.startTime, presaleInfo.endTime);
     }
 
@@ -54,10 +60,11 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
      * @dev Main presale function to purchase pFLOTH tokens
      */
     function presale() external payable onlyDuringPresale nonReentrant {
+        // Validate parameters
+        if (CommonValidators.isZeroAmount(msg.value)) revert InvalidAmount();
         
         uint256 amountpFLOTH = msg.value * _EXCHANGE_RATE;
         
-        //TODO: Add param validators here
         if (totalSupply() + amountpFLOTH > _MAX_SUPPLY) revert ExceedsSupply();
         if (pFLOTHPurchases[msg.sender] + amountpFLOTH > _WALLET_LIMIT) revert ExceedsWalletLimit();
         
@@ -72,15 +79,27 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
         );
     }
     
-    //TODO: Change this to a setter for end time rather than extending.
     /**
-     * @dev Function to extend the presale duration
-     * @param _additionalTime The duration in seconds to extend the presale by
+     * @dev Function to set the presale end time
+     * @param _newEndTime The new end time for the presale (unix timestamp)
      * Only the owner can call this function
      */
-    function extendPresale(uint256 _additionalTime) external onlyOwner {
+    function setPresaleEndTime(uint256 _newEndTime) external onlyOwner {
+        if (_newEndTime <= block.timestamp) revert InvalidPresaleTime();
         uint256 oldEndTime = presaleInfo.endTime;
-        presaleInfo.endTime += _additionalTime;
+        presaleInfo.endTime = _newEndTime;
+        emit PresaleExtended(oldEndTime, presaleInfo.endTime);
+    }
+
+    /**
+     * @dev Compatibility function for the interface
+     * @param _additionalTime The duration to extend the presale by
+     */
+    function extendPresale(uint256 _additionalTime) external override onlyOwner {
+        uint256 newEndTime = presaleInfo.endTime + _additionalTime;
+        if (newEndTime <= block.timestamp) revert InvalidPresaleTime();
+        uint256 oldEndTime = presaleInfo.endTime;
+        presaleInfo.endTime = newEndTime;
         emit PresaleExtended(oldEndTime, presaleInfo.endTime);
     }
 
@@ -93,22 +112,38 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
         presaleInfo.paused = !presaleInfo.paused;
         emit PresalePaused(presaleInfo.paused);
     }
-
     
-    //TODO: Add an amount parameter to this function.
-    //TODO: We may also want a recipient parameter.
     /**
      * @dev Function to withdraw FLR collected during the presale
+     * Interface compatibility method
+     * Only the owner can call this function
+     */
+    function withdraw() external override onlyOwner nonReentrant {
+        uint256 amount = address(this).balance;
+        (bool success, ) = owner().call{value: amount}("");
+        if (!success) revert TransferFailed();
+        
+        emit Withdraw(owner(), amount);
+    }
+    
+    /**
+     * @dev Extended function to withdraw FLR collected during the presale
+     * @param _amount Amount to withdraw (0 for full balance)
+     * @param _recipient Address to receive funds (default: owner)
      * Only the owner can call this function
      * Implements nonReentrant pattern for security
      * Emits a Withdraw event upon successful withdrawal
      */
-    function withdraw() external onlyOwner nonReentrant {
-        uint256 _amount = address(this).balance;
-        (bool success, ) = owner().call{value: _amount}("");
+    function withdrawTo(uint256 _amount, address _recipient) external onlyOwner nonReentrant {
+        address recipient = _recipient == address(0) ? owner() : _recipient;
+        uint256 withdrawAmount = _amount == 0 ? address(this).balance : _amount;
+        
+        if (withdrawAmount > address(this).balance) revert InsufficientBalance();
+        
+        (bool success, ) = recipient.call{value: withdrawAmount}("");
         if (!success) revert TransferFailed();
 
-        emit Withdraw(msg.sender, _amount);
+        emit Withdraw(recipient, withdrawAmount);
     }
 
     /**
@@ -148,6 +183,17 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
     }
 
     /**
+     * @dev Add or remove authorized receiver for pFLOTH transfers
+     * @param _receiver The address to authorize/deauthorize
+     * @param _authorized Whether the address is authorized
+     */
+    function setAuthorizedReceiver(address _receiver, bool _authorized) external onlyOwner {
+        if (CommonValidators.isZeroAddress(_receiver)) revert ZeroAddress();
+        authorizedReceivers[_receiver] = _authorized;
+        emit AuthorizedReceiverUpdated(_receiver, _authorized);
+    }
+
+    /**
      * @dev Override for the _beforeTokenTransfer function
      * @param from The address sending the tokens
      * @param to The address receiving the tokens
@@ -155,14 +201,17 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
      */
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
         if (from == address(0)) {
-            // Mint
+            // Mint - allowed
             super._beforeTokenTransfer(from, to, amount);
         } else if (to == address(0)) {
-            // Burn
+            // Burn - track the amount
+            _burnedAmount += amount;
             super._beforeTokenTransfer(from, to, amount);
         } else {
-            // Transfer
-            //TODO: Don't allow transfers unless for purchasing of FlothPass/Exchanging for Floth.
+            // Transfer - only allow to authorized receivers
+            if (!authorizedReceivers[to] && from != owner()) {
+                revert UnauthorizedTransfer();
+            }
             super._beforeTokenTransfer(from, to, amount);
         }
     }
@@ -211,20 +260,32 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
      * @dev View function to get comprehensive presale statistics
      * @return totalRaised The total amount of FLR raised
      * @return totalMinted The total amount of pFLOTH tokens minted
+     * @return totalBurned The total amount of pFLOTH tokens burned
      * @return remaining The remaining amount of pFLOTH tokens available
      * @return isActive Whether the presale is currently active
      */
     function getPresaleStats() external view returns (
         uint256 totalRaised,
         uint256 totalMinted,
+        uint256 totalBurned,
         uint256 remaining,
         bool isActive
     ) {
         totalRaised = address(this).balance;
         totalMinted = totalSupply();
+        totalBurned = _burnedAmount;
         remaining = _MAX_SUPPLY - totalMinted;
         isActive = block.timestamp >= presaleInfo.startTime && 
                    block.timestamp <= presaleInfo.endTime && 
                    !presaleInfo.paused;
+    }
+
+    /**
+     * @dev Implements the interface function to get pFLOTH balance
+     * @param account The address to check the balance of
+     * @return uint256 The balance of pFLOTH for the account
+     */
+    function pFLOTHBalance(address account) external view override returns (uint256) {
+        return pFLOTHPurchases[account];
     }
 }
