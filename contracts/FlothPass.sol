@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721VotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "./interface/IFlothPass.sol";
 import "./FtsoV2Consumer.sol";
-
+import {CommonValidators} from "./lib/CommonValidators.sol";
 
 /**
  * @title FlothPass contract for minting Floth Pass NFTs.
@@ -15,9 +15,9 @@ import "./FtsoV2Consumer.sol";
  */
 contract FlothPass is
     ERC721VotesUpgradeable,
-    ERC721EnumerableUpgradeable,
     AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardUpgradeable,
+    IFlothPass
 {
     
     // Pack related storage variables together to save slots
@@ -65,26 +65,6 @@ contract FlothPass is
     // Gap for upgradeability
     uint256[50] private __gap;
 
-    // Events
-    event FallbackCalled(address indexed sender, uint256 value, bytes data);
-    event PriceUpdated(uint256 newPrice);
-    event BaseURIUpdated(string newUri);
-    event TokensMinted(address indexed to, uint16 quantity, uint256 price);
-    event NameUpdated(string newName);
-    event SymbolUpdated(string newSymbol);
-
-    // Custom errors for gas savings
-    error SaleInactive();
-    error InsufficientFunds();
-    error InsufficientFundsInContract();
-    error InsufficientRole();
-    error ExceedsMaxSupply();
-    error TransferFailed();
-    error ZeroAddress();
-    error InvalidPrice();
-    error ExceedsWalletLimit();
-    error InvalidMaxSupply();
-
     // Function to receive Ether. msg.data must be empty.
     receive() external payable {}
 
@@ -99,14 +79,13 @@ contract FlothPass is
      * Calls the internal initialize function.
      */
     function initialize(address _ftsoV2ConsumerAddress) public initializer {
-        if (_ftsoV2ConsumerAddress == address(0)) {
+        if (CommonValidators.isZeroAddress(_ftsoV2ConsumerAddress)) {
             revert ZeroAddress();
         }
 
         _name = "Floth Pass";
         _symbol = "FPASS";
         __ERC721_init(_name, _symbol);
-        __ERC721Enumerable_init();
         __ERC721Votes_init();
         __AccessControl_init();
         __ReentrancyGuard_init();
@@ -246,8 +225,8 @@ contract FlothPass is
      * @param interfaceId the interface id to check
      * @return whether the interface is supported
      */
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721Upgradeable, ERC721EnumerableUpgradeable, AccessControlUpgradeable) returns (bool) {
-        return ERC721EnumerableUpgradeable.supportsInterface(interfaceId) || AccessControlUpgradeable.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControlUpgradeable, ERC721Upgradeable, IERC165Upgradeable) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 
     /**
@@ -283,14 +262,6 @@ contract FlothPass is
     function setSaleActive(bool _saleActive) external onlyRole(ADMIN_ROLE) {
         saleConfig.saleActive = _saleActive;
     }
-
-    /**
-     * @dev Setter for the price to mint a token
-     * @param _newPrice the new price to mint a token
-     */
-    // function setMintPrice(uint256 _newPrice) external onlyRole(ADMIN_ROLE) {
-    //     price = _newPrice;
-    // }
 
     /**
      * @dev Setter for the price increment
@@ -333,7 +304,7 @@ contract FlothPass is
      * @param _withdrawAddress the new withdraw address
      */
     function setWithdrawAddress(address payable _withdrawAddress) external onlyRole(ADMIN_ROLE) {
-        if(_withdrawAddress == address(0)){
+        if(CommonValidators.isZeroAddress(_withdrawAddress)){
             revert ZeroAddress();
         }
         withdrawAddress = _withdrawAddress;
@@ -386,7 +357,7 @@ contract FlothPass is
         address to,
         uint256 tokenId,
         uint256 batchSize
-    ) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
+    ) internal override {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
 
         if (from != address(0)) {
@@ -422,7 +393,7 @@ contract FlothPass is
         address to,
         uint256 tokenId,
         uint256 batchSize
-    ) internal override(ERC721Upgradeable, ERC721VotesUpgradeable) {
+    ) internal override {
         super._afterTokenTransfer(from, to, tokenId, batchSize);
 
         // Auto-delegate for new owner if they haven't delegated before
@@ -437,8 +408,24 @@ contract FlothPass is
     }
 
     // Add explicit delegation function
-    function delegate(address delegatee) public override {
+    function delegate(address delegatee) public override(IFlothPass, VotesUpgradeable) {
         _delegate(_msgSender(), delegatee);
+    }
+
+    /**
+     * Override the getPastVotes function from VotesUpgradeable to implement the IFlothPass interface
+     * @param account The address to get voting power for
+     * @param timepoint The block to check voting power at
+     * @return uint256 The voting power of the account at the given timepoint
+     */
+    function getPastVotes(address account, uint256 timepoint) 
+        public 
+        view 
+        virtual 
+        override(VotesUpgradeable, IFlothPass) 
+        returns (uint256) 
+    {
+        return super.getPastVotes(account, timepoint);
     }
 }
 

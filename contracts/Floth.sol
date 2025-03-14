@@ -4,57 +4,32 @@ pragma solidity 0.8.20;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./interface/IFloth.sol";
+import {CommonValidators} from "./lib/CommonValidators.sol";
 
-//TODO: On dex swap, swap FLOTH to Flare - take % and add to grant fund wallet.
+//TODO: On dex swap, swap FLOTH to Flare and then wrap to wFlare - take % and add to grant fund wallet.
 /**
  * @title Floth ERC20 token on Flare.
  * @author Ethereal Labs Ltd
  */
-contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
+contract Floth is ERC20Votes, Ownable, ReentrancyGuard, IFloth {
     uint256 private constant INITIAL_SUPPLY = 100 * 10**9; // 100 billion
-    uint256 private constant BASIS_POINTS = 10**18;     
+    uint256 private constant BASIS_POINTS = 10**18; //todo check if we need this (decimals?)     
     uint256 private constant MAX_TAX = 5 * 10**16;     // 5% (0.05 * 10^18)
     uint256 private constant MAX_LP_TAX = 25 * 10**15; // 2.5% (0.025 * 10^18)
 
     // Packing similar storage variables together to save slots
-    struct TaxInfo {
-        uint256 buyTax;
-        uint256 sellTax;
-        uint256 lpTax;
-        bool lpTaxIsActive; // Flag to enable/disable LP tax
-        bool paused; // Flag to enable/disable emergency pause
-    }
-
     TaxInfo public taxInfo;
 
     // Store DEX addresses to calculate if buy/sell/transfer.
     mapping(address => bool) public dexAddresses;
 
+    // Accepted liquidity providers.
+    mapping(address => bool) public liquidityProviders;
+
      // FLOTH protocol wallets.
     address public grantFundWallet = 0x315c76C23e8815Fe0dFd8DD626782C49647924Ba; // TODO Update to actual wallet.
     address public lpFundWallet = 0x86d9c457969bd9Bb102D0876D959601aF681882D; // TODO Update to actual wallet.
-    
-    // Events - indexed important parameters for better filtering
-    event SellTaxUpdate(uint256 indexed newTax);
-    event BuyTaxUpdate(uint256 indexed newTax);
-    event DexAddressAdded(address indexed dexAddress);
-    event DexAddressRemoved(address indexed dexAddress);
-    event EmergencyPause(bool indexed paused);
-    event GrantFundWalletUpdated(address indexed newGrantFundWallet);
-    event LpFundWalletUpdated(address indexed newLpFundWallet);
-    event LpTaxUpdate(uint256 indexed newTax);
-    event LpTaxStatusUpdate(bool indexed status);
-    event LiquidityProviderUpdated(address indexed provider, bool indexed status);
-    // Custom errors save gas compared to require statements
-    error InvalidTaxAmount();
-    error ZeroAddress();
-    error SelfTransfer();
-    error InvalidTokenNameOrSymbol();
-    error Paused();
-    error ZeroAmount();
-    error UnauthorizedLiquidityProvider();
-
-    mapping(address => bool) public liquidityProviders;
 
     /**
      * Constructor to initialize the contract.
@@ -67,7 +42,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         string memory _name,
         string memory _symbol
     ) ERC20(_name, _symbol) ERC20Permit(_name) {
-        if (bytes(_name).length == 0 || bytes(_symbol).length == 0) {
+        if (CommonValidators.isEmptyString(_name) || CommonValidators.isEmptyString(_symbol)) {
             revert InvalidTokenNameOrSymbol();
         }
 
@@ -90,15 +65,6 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Modifier to check if amount is valid
-     * @param amount Amount to be checked.
-     */
-    modifier validAmount(uint256 amount) {
-        if (amount == 0) revert ZeroAmount();
-        _;
-    }
-
-    /**
      * @dev Emergency pause functionality modifier.
      */
     modifier whenNotPaused() {
@@ -107,11 +73,27 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     }
 
     /**
+     * Override the getPastVotes function from ERC20Votes to implement the IFloth interface
+     * @param account The address to get voting power for
+     * @param timepoint The block to check voting power at
+     * @return uint256 The voting power of the account at the given timepoint
+     */
+    function getPastVotes(address account, uint256 timepoint) 
+        public 
+        view 
+        virtual 
+        override(ERC20Votes, IFloth) 
+        returns (uint256) 
+    {
+        return super.getPastVotes(account, timepoint);
+    }
+
+    /**
      * @dev Set sell tax with validation
      * @param _newSellTax New sell tax to be set.
      */
     function setSellTax(uint256 _newSellTax) external onlyOwner {
-        if (_newSellTax > MAX_TAX) revert InvalidTaxAmount();
+        if (CommonValidators.exceedsMaximum(_newSellTax, MAX_TAX)) revert InvalidTaxAmount();
         taxInfo.sellTax = _newSellTax;
         emit SellTaxUpdate(_newSellTax);
     }
@@ -121,7 +103,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param _newBuyTax New buy tax to be set.
      */
     function setBuyTax(uint256 _newBuyTax) external onlyOwner {
-        if (_newBuyTax > MAX_TAX) revert InvalidTaxAmount();
+        if (CommonValidators.exceedsMaximum(_newBuyTax, MAX_TAX)) revert InvalidTaxAmount();
         taxInfo.buyTax = _newBuyTax;
         emit BuyTaxUpdate(_newBuyTax);
     }
@@ -131,7 +113,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param _newLpTax New LP tax to be set.
      */
     function setLpTax(uint256 _newLpTax) external onlyOwner {
-        if (_newLpTax > MAX_LP_TAX) revert InvalidTaxAmount();
+        if (CommonValidators.exceedsMaximum(_newLpTax, MAX_LP_TAX)) revert InvalidTaxAmount();
         taxInfo.lpTax = _newLpTax;
         emit LpTaxUpdate(_newLpTax);
     }
@@ -141,7 +123,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param _newGrantFundWallet New grant fund wallet to be set.
      */
     function setGrantFundWallet(address _newGrantFundWallet) external onlyOwner {
-        if (_newGrantFundWallet == address(0)) revert ZeroAddress();
+        if (CommonValidators.isZeroAddress(_newGrantFundWallet)) revert ZeroAddress();
         grantFundWallet = _newGrantFundWallet;
         emit GrantFundWalletUpdated(_newGrantFundWallet);
     }
@@ -151,7 +133,7 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param _newLpFundWallet New LP fund wallet to be set.
      */
     function setLpFundWallet(address _newLpFundWallet) external onlyOwner {
-        if (_newLpFundWallet == address(0)) revert ZeroAddress();
+        if (CommonValidators.isZeroAddress(_newLpFundWallet)) revert ZeroAddress();
         lpFundWallet = _newLpFundWallet;
         emit LpFundWalletUpdated(_newLpFundWallet);
     }
@@ -162,6 +144,46 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     function togglePause() external onlyOwner {
         taxInfo.paused = !taxInfo.paused;
         emit EmergencyPause(taxInfo.paused);
+    }
+
+    /**
+     * @dev Add DEX address to mapping
+     * @param _dexAddress Address to be added.
+     */
+    function addDexAddress(address _dexAddress) external onlyOwner {
+        if (CommonValidators.isZeroAddress(_dexAddress)) revert ZeroAddress();
+        dexAddresses[_dexAddress] = true;
+        emit DexAddressAdded(_dexAddress);
+    }
+
+    /**
+     * @dev Remove DEX address from mapping
+     * @param _dexAddress Address to be removed.
+     */
+    function removeDexAddress(address _dexAddress) external onlyOwner {
+        if (CommonValidators.isZeroAddress(_dexAddress)) revert ZeroAddress();
+        dexAddresses[_dexAddress] = false;
+        emit DexAddressRemoved(_dexAddress);
+    }
+
+    /**
+     * @dev Setter for LP Tax status.
+     * @param _status New status for LP tax.
+     */
+    function setLpTaxStatus(bool _status) external onlyOwner {
+        taxInfo.lpTaxIsActive = _status;
+        emit LpTaxStatusUpdate(_status);
+    }
+
+    /**
+     * @dev Set or remove liquidity provider status
+     * @param _provider Address to update
+     * @param _status New status
+     */
+    function setLiquidityProvider(address _provider, bool _status) external onlyOwner {
+        if (CommonValidators.isZeroAddress(_provider)) revert ZeroAddress();
+        liquidityProviders[_provider] = _status;
+        emit LiquidityProviderUpdated(_provider, _status);
     }
 
     /**
@@ -189,46 +211,6 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Add DEX address to mapping
-     * @param _dexAddress Address to be added.
-     */
-    function addDexAddress(address _dexAddress) external onlyOwner {
-        if (_dexAddress == address(0)) revert ZeroAddress();
-        dexAddresses[_dexAddress] = true;
-        emit DexAddressAdded(_dexAddress);
-    }
-
-    /**
-     * @dev Remove DEX address from mapping
-     * @param _dexAddress Address to be removed.
-     */
-    function removeDexAddress(address _dexAddress) external onlyOwner {
-        if (_dexAddress == address(0)) revert ZeroAddress();
-        dexAddresses[_dexAddress] = false;
-        emit DexAddressRemoved(_dexAddress);
-    }
-
-    /**
-     * @dev Setter for LP Tax status.
-     * @param _status New status for LP tax.
-     */
-    function setLpTaxStatus(bool _status) external onlyOwner {
-        taxInfo.lpTaxIsActive = _status;
-        emit LpTaxStatusUpdate(_status);
-    }
-
-    /**
-     * @dev Set or remove liquidity provider status
-     * @param _provider Address to update
-     * @param _status New status
-     */
-    function setLiquidityProvider(address _provider, bool _status) external onlyOwner {
-        if (_provider == address(0)) revert ZeroAddress();
-        liquidityProviders[_provider] = _status;
-        emit LiquidityProviderUpdated(_provider, _status);
-    }
-
-    /**
      * @dev Transfer tokens with/without tax, based on buy/sell.
      * @param _sender Address of the sender.
      * @param _recipient Address of the recipient.
@@ -238,10 +220,9 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
         address _sender,
         address _recipient,
         uint256 _amount
-    ) internal override whenNotPaused nonReentrant validAmount(_amount) {
-        if (_sender == _recipient) revert SelfTransfer();
+    ) internal override whenNotPaused nonReentrant {
 
-        // Allow tax-free transfers for liquidity providers
+        // Allow tax-free transfers for liquidity providers/non-dex addresses
         if ((!dexAddresses[_sender] && !dexAddresses[_recipient]) || liquidityProviders[_sender]) {
             super._transfer(_sender, _recipient, _amount);
             _handleDelegation(_recipient);
@@ -262,6 +243,8 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
                 taxAmount = (_amount * _taxInfo.buyTax) / BASIS_POINTS;
             }
 
+            //TODO: Swap FLOTH to Flare and wrap to wFlare. Add wFlare to grant fund wallet.    
+
             //Transfer tax amount to grant fund wallet
             super._transfer(_sender, grantFundWallet, taxAmount);
 
@@ -274,6 +257,8 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
                 taxAmount = (_amount * _taxInfo.sellTax) / BASIS_POINTS;
             }
 
+            //TODO: Swap Flare to Floth and wrap to wFloth. Add wFloth to LP fund wallet.
+
             //Transfer tax amount to grant fund wallet
             super._transfer(_sender, grantFundWallet, taxAmount);
 
@@ -282,6 +267,8 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
                 unchecked {
                     lpTaxAmount = (_amount * _taxInfo.lpTax) / BASIS_POINTS;
                 }
+
+                //TODO: Swap Flare to Floth and send to LP fund wallet (do not wrap)
                 super._transfer(_sender, lpFundWallet, lpTaxAmount);
             }
         }
@@ -298,7 +285,12 @@ contract Floth is ERC20Votes, Ownable, ReentrancyGuard {
      * @param account Address of the account to handle delegation for.
      */
     function _handleDelegation(address account) private {
-        // Check if the account is already delegated to itself.
+        // Skip delegation for DEX addresses and liquidity providers
+        if (dexAddresses[account] || liquidityProviders[account]) {
+            return;
+        }
+        
+        // Only delegate if the account hasn't already set up delegation
         if (!isDelegate(account, account)) {
             _delegate(account, account);
         }
