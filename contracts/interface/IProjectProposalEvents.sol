@@ -56,7 +56,6 @@ interface IProjectProposalEvents is IBaseEvents {
     error InvalidAmountRequested();
     error InvalidVotingPower();
     error InsufficientVotingPower();
-    error InsufficientBalance();
     error InsufficientFundsForRound();
     error FundsAlreadyClaimed();
     error FundsClaimingPeriodExpired();

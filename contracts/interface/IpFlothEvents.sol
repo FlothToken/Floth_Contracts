@@ -14,7 +14,6 @@ interface IpFlothEvents is IBaseEvents {
     error ExceedsSupply();
     error PresaleNotStarted();
     error PresaleIsPaused();
-    error ExceedsWalletLimit();
     error InvalidRecoveryToken();
     error InvalidRecoveryAmount();
     error UnauthorizedRecovery();

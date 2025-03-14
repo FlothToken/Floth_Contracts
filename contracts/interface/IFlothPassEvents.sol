@@ -11,7 +11,6 @@ import "./IBaseEvents.sol";
 interface IFlothPassEvents is IBaseEvents {
     // FlothPass-specific errors
     error SaleInactive();
-    error ExceedsWalletLimit();
     error ExceedsMaxSupply();
     error InvalidMaxSupply();
     error InsufficientFundsInContract();

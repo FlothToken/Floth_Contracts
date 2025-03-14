@@ -17,9 +17,9 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
 
     // More readable and gas efficient way to write large numbers
     uint256 private constant BILLION = 1_000_000_000;
-    uint256 private constant _MAX_SUPPLY = 30 * BILLION * 10**18;
-    uint256 private constant _WALLET_LIMIT = 25 * (BILLION / 10) * 10**18; // 2.5 billion
-    uint256 private constant _EXCHANGE_RATE = 10_000;
+    uint256 private constant MAX_SUPPLY = 30 * BILLION * 10**18;
+    uint256 private constant WALLET_LIMIT = 25 * (BILLION / 10) * 10**18; // 2.5 billion
+    uint256 private constant EXCHANGE_RATE = 10_000;
 
     // Track burned amount
     uint256 private _burnedAmount;
@@ -63,10 +63,10 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
         // Validate parameters
         if (CommonValidators.isZeroAmount(msg.value)) revert InvalidAmount();
         
-        uint256 amountpFLOTH = msg.value * _EXCHANGE_RATE;
+        uint256 amountpFLOTH = msg.value * EXCHANGE_RATE;
         
-        if (totalSupply() + amountpFLOTH > _MAX_SUPPLY) revert ExceedsSupply();
-        if (pFLOTHPurchases[msg.sender] + amountpFLOTH > _WALLET_LIMIT) revert ExceedsWalletLimit();
+        if (totalSupply() + amountpFLOTH > MAX_SUPPLY) revert ExceedsSupply();
+        if (pFLOTHPurchases[msg.sender] + amountpFLOTH > WALLET_LIMIT) revert ExceedsWalletLimit();
         
         pFLOTHPurchases[msg.sender] += amountpFLOTH;
         _mint(msg.sender, amountpFLOTH);
@@ -88,18 +88,6 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
         if (_newEndTime <= block.timestamp) revert InvalidPresaleTime();
         uint256 oldEndTime = presaleInfo.endTime;
         presaleInfo.endTime = _newEndTime;
-        emit PresaleExtended(oldEndTime, presaleInfo.endTime);
-    }
-
-    /**
-     * @dev Compatibility function for the interface
-     * @param _additionalTime The duration to extend the presale by
-     */
-    function extendPresale(uint256 _additionalTime) external override onlyOwner {
-        uint256 newEndTime = presaleInfo.endTime + _additionalTime;
-        if (newEndTime <= block.timestamp) revert InvalidPresaleTime();
-        uint256 oldEndTime = presaleInfo.endTime;
-        presaleInfo.endTime = newEndTime;
         emit PresaleExtended(oldEndTime, presaleInfo.endTime);
     }
 
@@ -243,7 +231,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
      * @return uint256 The number of tokens still available for presale
      */
     function remainingSupply() external view returns (uint256) {
-        return _MAX_SUPPLY - totalSupply();
+        return MAX_SUPPLY - totalSupply();
     }
 
     /**
@@ -274,7 +262,7 @@ contract pFloth is ERC20, Ownable, ReentrancyGuard, IpFloth {
         totalRaised = address(this).balance;
         totalMinted = totalSupply();
         totalBurned = _burnedAmount;
-        remaining = _MAX_SUPPLY - totalMinted;
+        remaining = MAX_SUPPLY - totalMinted;
         isActive = block.timestamp >= presaleInfo.startTime && 
                    block.timestamp <= presaleInfo.endTime && 
                    !presaleInfo.paused;

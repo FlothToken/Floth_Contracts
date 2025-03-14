@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./IFloth.sol";
+import "./interface/IFloth.sol";
 
 /**
  * @title ProjectProposalTest contract for the Floth protocol

@@ -4,8 +4,8 @@ pragma solidity 0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "hardhat/console.sol";
-import "./IFloth.sol";
-import "./IFlothPass.sol";
+import "./interface/IFloth.sol";
+import "./interface/IFlothPass.sol";
 
 /**
  * @title ProjectProposal contract for the Floth protocol

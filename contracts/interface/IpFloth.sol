@@ -50,7 +50,6 @@ interface IpFloth is IERC20, IBaseEvents {
     
     // Main functions
     function presale() external payable;
-    function extendPresale(uint256 _additionalTime) external;
     function togglePresalePause() external;
     function withdraw() external;
     function recoverTokens(address _token, uint256 _amount) external;
