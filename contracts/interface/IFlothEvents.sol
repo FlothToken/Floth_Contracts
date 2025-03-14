@@ -11,9 +11,7 @@ import "./IBaseEvents.sol";
 interface IFlothEvents is IBaseEvents {
     // Floth-specific errors
     error InvalidTaxAmount();
-    error SelfTransfer();
     error InvalidTokenNameOrSymbol();
-    error UnauthorizedLiquidityProvider();
 
     // Floth-specific events
     event SellTaxUpdate(uint256 indexed newTax);
