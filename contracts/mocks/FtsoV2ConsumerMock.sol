@@ -18,7 +18,7 @@ contract FtsoV2ConsumerMock {
         return (50000000000000000000, 18, 1234567890);
     }
 
-    function getInputAmount(address /*pairAddress*/, address /*inputToken*/, uint256 /*outputAmount*/) public view returns (uint256 inputAmount) {
+    function getInputAmount(address /*pairAddress*/, address /*inputToken*/, uint256 /*outputAmount*/) public pure returns (uint256 inputAmount) {
         // Hardcoded return value
         return 1000000000000000000; // 1 FLR
     }

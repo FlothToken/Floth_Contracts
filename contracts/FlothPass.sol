@@ -5,7 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721VotesU
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "./interface/IFlothPass.sol";
-import "./FtsoV2Consumer.sol";
+import "./ftso/FtsoV2Consumer.sol";
 import {CommonValidators} from "./lib/CommonValidators.sol";
 
 /**

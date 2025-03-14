@@ -2,13 +2,13 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./interface/IFloth.sol";
+import "../interface/IFloth.sol";
 
 /**
- * @title ProjectProposalTest contract for the Floth protocol
+ * @title ProjectProposalMock contract for the Floth protocol
  * @author Ethereal Labs Ltd
  */
-contract ProjectProposalTest is AccessControl {
+contract ProjectProposalMock is AccessControl {
     // Define roles for the contract
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant SNAPSHOTTER_ROLE = keccak256("SNAPSHOTTER_ROLE");

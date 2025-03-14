@@ -4,8 +4,8 @@ pragma solidity 0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./interface/IpFloth.sol";
-import {CommonValidators} from "./lib/CommonValidators.sol";
+import "../interface/IpFloth.sol";
+import {CommonValidators} from "../lib/CommonValidators.sol";
 
 /**
  * @title Test Presale Floth Token
@@ -13,7 +13,7 @@ import {CommonValidators} from "./lib/CommonValidators.sol";
  */
 
 // ERC20 test contract for presale floth token
-contract pFLOTHTest is ERC20, Ownable, ReentrancyGuard, IpFloth {
+contract pFLOTHMock is ERC20, Ownable, ReentrancyGuard, IpFloth {
 
     // More readable and gas efficient way to write large numbers
     uint256 private constant BILLION = 1_000_000_000;
