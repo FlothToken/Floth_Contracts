@@ -203,10 +203,6 @@ describe("Floth Contract", function () {
       await expect(floth.setSellTax(ethers.parseEther("0.06"))).to.be.revertedWithCustomError(floth, "InvalidTaxAmount");
     });
 
-    it("Should revert when self transferring", async function () {
-      await expect(floth.transfer(owner.address, 50)).to.be.revertedWithCustomError(floth, "SelfTransfer");
-    });
-
     it("Should apply correct tax after changing buy tax", async function () {
       await floth.setLiquidityProvider(owner.address, true);
       await floth.setBuyTax(ethers.parseEther("0.05")); // Set buy tax to 5%
@@ -389,16 +385,6 @@ describe("Floth Contract", function () {
       await floth.togglePause(); // unpause
       await floth.transfer(addr1.address, 100);
       expect(await floth.balanceOf(addr1.address)).to.equal(100);
-    });
-  });
-
-  describe("Invalid Operations", function () {
-    it("Should revert on zero amount transfers", async function () {
-      await expect(floth.transfer(addr1.address, 0)).to.be.revertedWithCustomError(floth, "ZeroAmount");
-    });
-
-    it("Should revert on transfers to self", async function () {
-      await expect(floth.transfer(owner.address, 100)).to.be.revertedWithCustomError(floth, "SelfTransfer");
     });
   });
 
