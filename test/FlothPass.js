@@ -92,7 +92,7 @@ describe("FlothPass Contract", function () {
     it("Should update the price after every 10 NFTs sold", async function () {
       await flothPass.setSaleActive(true);
 
-      const initialPrice = await flothPass.getCurrentPriceInFlr.staticCall();
+      const initialPrice = await flothPass.getCurrentPriceInFlr(1);
 
       // Mint 10 NFTs
       for (let i = 0; i < 10; i++) {
@@ -100,24 +100,34 @@ describe("FlothPass Contract", function () {
       }
 
       // The price should still be the same as the mock always returns 2 FLR
-      expect(await flothPass.getCurrentPriceInFlr.staticCall()).to.equal(initialPrice);
+      expect(await flothPass.getCurrentPriceInFlr(1)).to.equal(initialPrice);
 
       // Mint one more
       await flothPass.connect(addr1).mint(1, { value: initialPrice });
 
       // The price should still be the same as the mock always returns 2 FLR
-      expect(await flothPass.getCurrentPriceInFlr.staticCall()).to.equal(initialPrice);
+      expect(await flothPass.getCurrentPriceInFlr(1)).to.equal(initialPrice);
     });
 
     it("Should revert if user tries to mint without enough funds", async function () {
       await flothPass.setSaleActive(true);
 
-      const initialPrice = await flothPass.getCurrentPriceInFlr.staticCall();
+      const initialPrice = await flothPass.getCurrentPriceInFlr(1);
 
       await expect(flothPass.connect(addr1).mint(1, { value: initialPrice - BigInt(1) })).to.be.revertedWithCustomError(
         flothPass,
         "InsufficientFunds"
       );
+    });
+
+    it("Should emit TokensMinted event on successful mint", async function () {
+      await flothPass.setSaleActive(true);
+      const quantity = 1;
+      const price = await flothPass.getCurrentPriceInFlr(quantity);
+      
+      await expect(flothPass.connect(addr1).mint(quantity, { value: price }))
+        .to.emit(flothPass, "TokensMinted")
+        .withArgs(addr1.address, quantity, price);
     });
   });
 
@@ -163,6 +173,17 @@ describe("FlothPass Contract", function () {
       const newOwnedByAddr2 = await flothPass.tokensOfOwner(addr2.address);
       expect(newOwnedByAddr2.length).to.equal(1);
       expect(newOwnedByAddr2[0]).to.equal(1);
+    });
+
+    it("Should emit TokenTransferred event on transfer", async function () {
+      await flothPass.setSaleActive(true);
+      const quantity = 1;
+      const price = await flothPass.getCurrentPriceInFlr(quantity);
+      await flothPass.connect(addr1).mint(quantity, { value: price });
+
+      await expect(flothPass.connect(addr1).transferFrom(addr1.address, addr2.address, 1))
+        .to.emit(flothPass, "TokenTransferred")
+        .withArgs(1, addr1.address, addr2.address);
     });
   });
 
@@ -230,6 +251,17 @@ describe("FlothPass Contract", function () {
 
     it("Should revert when withdrawing flare with insufficient role", async function () {
       await expect(flothPass.connect(addr1).withdraw(0, true)).to.be.revertedWithCustomError(flothPass, "InsufficientRole");
+    });
+
+    it("Should emit WithdrawExecuted event on withdrawal", async function () {
+      await flothPass.setSaleActive(true);
+      const quantity = 1;
+      const price = await flothPass.getCurrentPriceInFlr(quantity);
+      await flothPass.connect(addr1).mint(quantity, { value: price });
+
+      await expect(flothPass.withdraw(price, false))
+        .to.emit(flothPass, "WithdrawExecuted")
+        .withArgs(owner.address, price, false);
     });
   });
 

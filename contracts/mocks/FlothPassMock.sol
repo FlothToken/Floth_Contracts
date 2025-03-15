@@ -70,6 +70,8 @@ contract FlothPassMock is
     event TokensMinted(address indexed to, uint16 quantity, uint256 price);
     event NameUpdated(string newName);
     event SymbolUpdated(string newSymbol);
+    event WithdrawExecuted(address indexed recipient, uint256 amount, bool all);
+    event TokenTransferred(uint256 tokenId, address from, address to);
 
     // Custom errors for gas savings
     error SaleInactive();
@@ -134,18 +136,10 @@ contract FlothPassMock is
     }
 
     /**
-     * @dev Calculate current NFT price in FLR based on the dynamic FLR/USD price
-     * @return Current NFT price in FLR
+     * @dev Mock implementation that always returns 2 FLR per token
      */
-    function getCurrentPriceInFlr() public payable returns (uint256) {
-        // Calculate the base USD price (starting price + increments)
-        uint256 usdPrice = priceConfig.usdStartPrice + ((saleConfig.numberMinted / 50) * priceConfig.usdPriceIncrement);
-
-        // Use FtsoV2Consumer's dynamic price function
-        // TODO Need to calculate fee for using this feed and send it to this function (NOT msg.value!)
-        uint256 flrPrice = ftsoV2Consumer.getDynamicPrice(usdPrice);
-
-        return flrPrice;
+    function getCurrentPriceInFlr(uint16 _quantity) public pure returns (uint256) {
+        return 2 ether * _quantity;  // Always return 2 FLR per token for testing
     }
 
      /**
@@ -166,7 +160,7 @@ contract FlothPassMock is
         }
 
         uint256 totalPrice = 0;
-        uint256 currentPrice = getCurrentPriceInFlr();
+        uint256 currentPrice = getCurrentPriceInFlr(_quantity);
 
         // Optimize gas by using unchecked for arithmetic operations
         unchecked {
@@ -215,6 +209,8 @@ contract FlothPassMock is
         if (!success) {
             revert TransferFailed();
         }
+
+        emit WithdrawExecuted(recipient, amountToWithdraw, _withdrawAll);
     }
 
     /**
@@ -378,6 +374,8 @@ contract FlothPassMock is
         if (to != address(0)) {
             _ownedTokens[to].push(tokenId);
         }
+
+        emit TokenTransferred(tokenId, from, to);
     }
 
     /**

@@ -10,6 +10,21 @@ import "./IFlothPassEvents.sol";
  * @notice Interface for the FlothPass NFT functionality
  */
 interface IFlothPass is IERC721Upgradeable, IFlothPassEvents {
+
+    // Pack related storage variables together to save slots
+    struct SaleConfig {
+        uint16 numberMinted;
+        uint16 maxSupply;           // 1000 NFTs
+        uint16 maxWalletLimit;     // 25 NFTs
+        bool saleActive;
+    }
+
+    // Pack price-related variables
+    struct PriceConfig {
+        uint128 usdStartPrice;
+        uint128 usdPriceIncrement;
+    }
+
     // Core functions
     function getPastVotes(address account, uint256 timepoint) external view returns (uint256);
     function getCurrentPriceInFlr(uint16 _quantity) external returns (uint256 totalPrice);

@@ -19,23 +19,9 @@ contract FlothPass is
     ReentrancyGuardUpgradeable,
     IFlothPass
 {
-    
-    // Pack related storage variables together to save slots
-    struct SaleConfig {
-        uint16 numberMinted;
-        uint16 maxSupply;           // 1000 NFTs
-        uint16 maxWalletLimit;     // 25 NFTs
-        bool saleActive;
-    }
 
     // Pack sale-related variables
     SaleConfig public saleConfig;
-
-    // Pack price-related variables
-    struct PriceConfig {
-        uint128 usdStartPrice;
-        uint128 usdPriceIncrement;
-    }
     
     // Pack price-related variables
     PriceConfig public priceConfig;
@@ -209,6 +195,8 @@ contract FlothPass is
         if (!success) {
             revert TransferFailed();
         }
+
+        emit WithdrawExecuted(recipient, amountToWithdraw, _withdrawAll);
     }
 
     /**
@@ -378,6 +366,8 @@ contract FlothPass is
             _ownedTokens[to].push(tokenId);
             _ownedTokensIndex[tokenId] = _ownedTokens[to].length - 1;
         }
+
+        emit TokenTransferred(tokenId, from, to);
     }
 
     /**

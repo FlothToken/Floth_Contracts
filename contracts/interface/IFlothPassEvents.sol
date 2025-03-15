@@ -15,10 +15,15 @@ interface IFlothPassEvents is IBaseEvents {
     error InvalidMaxSupply();
     error InsufficientFundsInContract();
     error InvalidPrice();
+    error UnauthorizedTransfer();
+    error InvalidRecoveryToken();
 
     // FlothPass-specific events
     event FallbackCalled(address indexed sender, uint256 value, bytes data);
     event PriceUpdated(uint256 newPrice);
     event BaseURIUpdated(string newUri);
     event TokensMinted(address indexed to, uint16 quantity, uint256 price);
+    event PriceIncrementUpdated(uint128 newIncrement);
+    event MaxSupplyUpdated(uint16 newMaxSupply);
+    event SaleStatusUpdated(bool isActive);
 } 
