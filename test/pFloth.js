@@ -117,6 +117,39 @@ describe("pFLOTH Contract", function () {
       await expect(pFLOTH.connect(addr1).presale({ value: ethers.parseUnits("1", 18) }))
         .to.not.be.reverted;
     });
+
+    it("Should handle multiple consecutive presale purchases", async function () {
+      const amountFLR1 = ethers.parseUnits("1", 18);
+      const amountFLR2 = ethers.parseUnits("2", 18);
+      
+      await pFLOTH.connect(addr1).presale({ value: amountFLR1 });
+      await pFLOTH.connect(addr1).presale({ value: amountFLR2 });
+      
+      const totalExpected = (amountFLR1 + amountFLR2) * EXCHANGE_RATE;
+      expect(await pFLOTH.balanceOf(addr1.address)).to.equal(totalExpected);
+    });
+
+    it("Should handle combined scenarios", async function () {
+      // 1. Make a presale purchase
+      const amountFLR = ethers.parseUnits("1", 18);
+      const amountpFLOTH = amountFLR * EXCHANGE_RATE;
+      await pFLOTH.connect(addr1).presale({ value: amountFLR });
+      
+      // 2. Try unauthorized transfer
+      await expect(pFLOTH.connect(addr1).transfer(addr2.address, amountpFLOTH))
+        .to.be.revertedWithCustomError(pFLOTH, "UnauthorizedTransfer");
+      
+      // 3. Authorize transfer and try again
+      await pFLOTH.connect(owner).setAuthorizedReceiver(addr2.address, true);
+      await pFLOTH.connect(addr1).transfer(addr2.address, amountpFLOTH);
+      
+      // 4. Try to recover tokens (should fail for pFLOTH tokens)
+      await expect(pFLOTH.connect(owner).recoverTokens(await pFLOTH.getAddress(), amountpFLOTH))
+        .to.be.revertedWithCustomError(pFLOTH, "InvalidRecoveryToken");
+      
+      // 5. Verify final balances
+      expect(await pFLOTH.balanceOf(addr2.address)).to.equal(amountpFLOTH);
+    });
   });
 
   describe("Presale Time Management", function () {

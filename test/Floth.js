@@ -59,7 +59,7 @@ describe("Floth Contract", function () {
       expect(addr2Balance).to.equal(50);
     });
 
-    it("Should fail if sender doesn’t have enough tokens", async function () {
+    it("Should fail if sender doesn't have enough tokens", async function () {
       const initialOwnerBalance = await floth.balanceOf(owner.address);
       await expect(floth.connect(addr1).transfer(owner.address, 1)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
 
@@ -627,6 +627,53 @@ describe("Floth Contract", function () {
       const totalSupply = await floth.totalSupply();
       await floth.transfer(addr1.address, totalSupply);
       expect(await floth.balanceOf(addr1.address)).to.equal(totalSupply);
+    });
+
+    it("Should handle very small transfer amounts with tax", async function () {
+      await floth.setLiquidityProvider(owner.address, true);
+      const smallAmount = 100n; // Very small amount
+      
+      // Transfer to DEX
+      await floth.transfer(dexAddress.address, smallAmount);
+      
+      // Buy transaction with small amount
+      await floth.connect(dexAddress).transfer(addr1.address, smallAmount);
+      
+      // Verify tax was applied correctly even for small amounts
+      const expectedAmount = smallAmount - (smallAmount * BigInt(ethers.parseEther("0.25")) / BigInt(ethers.parseEther("1")));
+      expect(await floth.balanceOf(addr1.address)).to.equal(expectedAmount);
+    });
+
+    it("Should handle delegation with DEX transfers correctly", async function () {
+      await floth.setLiquidityProvider(owner.address, true);
+      await floth.transfer(dexAddress.address, 1000);
+      
+      // Buy transaction should trigger delegation
+      await floth.connect(dexAddress).transfer(addr1.address, 1000);
+      
+      // Check delegation
+      expect(await floth.delegates(addr1.address)).to.equal(addr1.address);
+      expect(await floth.delegates(dexAddress.address)).to.equal(zeroAddress); // DEX should not be delegated
+    });
+
+    it("Should handle multiple DEX addresses correctly", async function () {
+      const dexAddress2 = addrs[0];
+      await floth.addDexAddress(dexAddress2.address);
+      await floth.setLiquidityProvider(owner.address, true);
+      
+      // Transfer to both DEXes
+      await floth.transfer(dexAddress.address, 1000);
+      await floth.transfer(dexAddress2.address, 1000);
+      
+      // Buy from first DEX
+      await floth.connect(dexAddress).transfer(addr1.address, 1000);
+      
+      // Buy from second DEX
+      await floth.connect(dexAddress2).transfer(addr2.address, 1000);
+      
+      // Both should have buy tax applied
+      expect(await floth.balanceOf(addr1.address)).to.equal(750); // 1000 - 25% tax
+      expect(await floth.balanceOf(addr2.address)).to.equal(750); // 1000 - 25% tax
     });
   });
 
