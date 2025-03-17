@@ -10,7 +10,7 @@ import "./IProjectProposalEvents.sol";
  * @notice Interface for the ProjectProposal functionality
  */
 interface IProjectProposal is IAccessControlUpgradeable, IProjectProposalEvents {
-    // Structs
+    // Core data structures
     struct Proposal {
         uint256 id;
         uint256 roundId;
@@ -37,6 +37,19 @@ interface IProjectProposal is IAccessControlUpgradeable, IProjectProposalEvents 
     struct Votes {
         uint256 proposalId;
         uint256 voteCount;
+    }
+
+    struct UserRoundData {
+        uint256 proposalCount;
+        bool hasVoted;
+        uint256 votingPower;
+        uint256 flothPassesOwned;
+        Votes[] votedProposals;
+    }
+
+    struct RoundData {
+        Round round;
+        mapping(address => UserRoundData) userRoundData;
     }
     
     // Core functions
