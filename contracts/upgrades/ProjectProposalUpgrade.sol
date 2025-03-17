@@ -3,15 +3,16 @@ pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "hardhat/console.sol";
-import "./interface/IFloth.sol";
-import "./interface/IFlothPass.sol";
+import "../interface/IFloth.sol";
+import "../interface/IFlothPass.sol";
+import "../interface/IProjectProposal.sol";
+import {CommonValidators} from "../lib/CommonValidators.sol";
 
 /**
  * @title ProjectProposal contract for the Floth protocol
  * @author Ethereal Labs Ltd
  */
-contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
+contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgradeable, IProjectProposal {
     // Define roles for the contract
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant SNAPSHOTTER_ROLE = keccak256("SNAPSHOTTER_ROLE");
@@ -44,7 +45,6 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * @param _flothAddress The address of the Floth contract
      * @param _flothPassAddress The address of the FlothPass contract
      */
-
     function __ProjectProposal_init(address _flothAddress, address _flothPassAddress) internal initializer {
         if (_flothAddress == address(0) || _flothPassAddress == address(0)) {
             revert ZeroAddress();
@@ -68,7 +68,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         _disableInitializers();
     }
 
-    // Add this enum before the Proposal struct
+    // Define core enums
     enum ProposalState {
         Active,     // Initial state when proposal is created
         Winning,    // Proposal has won but funds not claimed
@@ -77,19 +77,6 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         Abstained   // Was the abstain proposal
     }
 
-    // Proposal struct to store proposal data
-    struct Proposal {
-        uint256 id;
-        uint256 roundId; //Tracked for claiming funds.
-        uint256 amountRequested;
-        uint256 votesReceived;
-        address proposer; //The wallet that submitted the proposal.
-        address receiver; //The wallet that will receive the funds.
-        ProposalState state;  // Replace fundsClaimed with state
-    }
-
-    
-    // Add round status enum
     enum RoundStatus {
         NotStarted,     // Initial state when round is created
         SubmissionOpen, // Proposals can be submitted
@@ -100,7 +87,17 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         Expired        // Round expired (>30 days) or killed
     }
 
-    // Round struct to store round data
+    // Define core structs
+    struct Proposal {
+        uint256 id;
+        uint256 roundId; //Tracked for claiming funds.
+        uint256 amountRequested;
+        uint256 votesReceived;
+        address proposer; //The wallet that submitted the proposal.
+        address receiver; //The wallet that will receive the funds.
+        ProposalState state;  // Replace fundsClaimed with state
+    }
+
     struct Round {
         uint256 id;
         uint256 abstainProposalId;
@@ -114,17 +111,10 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         RoundStatus status;
     }
 
-    //Used to return proposal ids and their vote count for a specific round. And used for votedOnProposals mapping.
     struct Votes {
         uint256 proposalId;
         uint256 voteCount;
     }
-
-    //Tracks ID number for each proposal.
-    uint256 public proposalId;
-
-    //Tracks ID number for each round.
-    uint256 public roundId;
 
     // Core data structures
     struct UserRoundData {
@@ -146,6 +136,12 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     mapping(uint256 => Proposal) public winningProposalByRoundId;
     mapping(address => bool) public hasWinningProposal;
     mapping(address => Proposal[]) public winningProposals;
+
+    //Tracks ID number for each proposal.
+    uint256 public proposalId;
+
+    //Tracks ID number for each round.
+    uint256 public roundId;
 
     /**
      * Events for the ProjectProposal contract
@@ -290,7 +286,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * @param _proposalId The ID of the proposal
      * @param _newAddress The new address of the receiver
      */
-    function setProposalReceiverAddress(
+    function updateProposalReceiverAddress(
         uint256 _proposalId,
         address _newAddress
     ) external {
@@ -363,7 +359,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      * @param _proposalId The ID of the proposal
      * @param _numberOfVotes The number of votes to add
      */
-    function addVotesToProposal(
+    function castVotes(
         uint256 _proposalId,
         uint256 _numberOfVotes
     ) external {
@@ -452,8 +448,9 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     /**
      * Function to remove votes from a proposal
      * @param _proposalId The ID of the proposal
+     * @param _voteCount The number of votes to remove (not used, will remove all votes for the proposal)
      */
-    function removeVotesFromProposal(uint256 _proposalId) external {
+    function removeVotes(uint256 _proposalId, uint256 _voteCount) external {
         RoundData storage currentRoundData = roundData[roundId];
         Round storage currentRound = currentRoundData.round;
         UserRoundData storage userData = currentRoundData.userRoundData[msg.sender];
@@ -495,7 +492,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     /**
      * Function for a user to remove all their votes from all proposals that they have voted on.
      */
-    function removeAllVotesFromAllProposals() external {
+    function removeAllVotes() external {
         RoundData storage currentRoundData = roundData[roundId];
         Round storage currentRound = currentRoundData.round;
         UserRoundData storage userData = currentRoundData.userRoundData[msg.sender];
@@ -590,11 +587,12 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
 
     /**
      * Function to extend the runtime of a round
+     * @param _roundId The ID of the round
      * @param _newRoundRuntime The new runtime for the round
      */
-    function extendRoundRuntime(uint256 _newRoundRuntime) external roundManagerOrAdmin {
-        Round storage roundToUpdate = getLatestRound();
-        RoundStatus status = getRoundStatus(roundToUpdate.id);
+    function updateRoundRuntime(uint256 _roundId, uint256 _newRoundRuntime) external roundManagerOrAdmin {
+        Round storage roundToUpdate = roundData[_roundId].round;
+        RoundStatus status = getRoundStatus(_roundId);
 
         // Ensure the new runtime is greater than the current round runtime
         if (_newRoundRuntime <= roundToUpdate.roundRuntime) {
@@ -611,16 +609,17 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         roundToUpdate.roundRuntime = _newRoundRuntime;
 
         // Emit an event for updating the round runtime
-        emit RoundRuntimeUpdated(roundId, _newRoundRuntime);
+        emit RoundRuntimeUpdated(_roundId, _newRoundRuntime);
     }
 
     /**
      * Function to change the snapshot datetime of a round to a future datetime
+     * @param _roundId The ID of the round
      * @param _newExpectedSnapshotDatetime The extended time to add to snapshot datetime and round runtime for the round
      */
-    function extendRoundExpectedSnapshotDatetime(uint256 _newExpectedSnapshotDatetime) external managerOrAdmin {
-        Round storage roundToUpdate = getLatestRound();
-        RoundStatus status = getRoundStatus(roundToUpdate.id);
+    function updateExpectedSnapshotDatetime(uint256 _roundId, uint256 _newExpectedSnapshotDatetime) external managerOrAdmin {
+        Round storage roundToUpdate = roundData[_roundId].round;
+        RoundStatus status = getRoundStatus(_roundId);
 
         // Ensure round isn't finished
         if (status == RoundStatus.Completed || 
@@ -654,8 +653,8 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
         roundToUpdate.roundRuntime += timeDifference;
 
         // Emit events for updating the snapshot datetime and round runtime
-        emit expectedSnapshotDatetimeUpdated(roundId, _newExpectedSnapshotDatetime);
-        emit RoundRuntimeUpdated(roundId, roundToUpdate.roundRuntime);
+        emit expectedSnapshotDatetimeUpdated(_roundId, _newExpectedSnapshotDatetime);
+        emit RoundRuntimeUpdated(_roundId, roundToUpdate.roundRuntime);
     }
 
     /**
@@ -943,7 +942,7 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
     /**
      * Function to finish a round
      */
-    function roundFinished() external roundManagerOrAdmin {
+    function completeRound() external roundManagerOrAdmin {
         RoundData storage currentRoundData = roundData[roundId];
         Round storage latestRound = currentRoundData.round;
         RoundStatus status = getRoundStatus(latestRound.id);
@@ -1197,6 +1196,149 @@ contract ProjectProposalUpgrade is AccessControlUpgradeable, ReentrancyGuardUpgr
      */
     function isContractUpgraded() external pure returns (string memory) {
         return "Contract is upgraded";
+    }
+
+    /**
+     * Function to kill a proposal
+     * @param _proposalId The ID of the proposal to kill
+     */
+    function killProposal(uint256 _proposalId) external onlyRole(ADMIN_ROLE) {
+        Proposal storage proposal = proposals[_proposalId];
+        
+        // Ensure we're not killing a proposal that has already been processed
+        if (proposal.state != ProposalState.Active) {
+            revert InvalidPermissions();
+        }
+        
+        // Set the proposal state to Expired
+        proposal.state = ProposalState.Expired;
+        
+        emit ProposalKilled(_proposalId);
+    }
+    
+    /**
+     * Get paginated list of proposals
+     * @param _pageNumber The page number to return
+     * @param _pageSize The number of proposals per page
+     */
+    function getProposals(uint256 _pageNumber, uint256 _pageSize) external view returns (Proposal[] memory) {
+        if (_pageNumber == 0 || _pageSize == 0) {
+            revert InvalidPageNumberPageSize();
+        }
+        
+        uint256 startIndex = (_pageNumber - 1) * _pageSize;
+        uint256 endIndex = startIndex + _pageSize;
+        
+        if (endIndex > proposalId) {
+            endIndex = proposalId;
+        }
+        
+        uint256 resultSize = endIndex - startIndex;
+        Proposal[] memory result = new Proposal[](resultSize);
+        
+        for (uint256 i = 0; i < resultSize; i++) {
+            result[i] = proposals[startIndex + i + 1]; // +1 because proposalId starts from 1
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Get paginated list of rounds
+     * @param _pageNumber The page number to return
+     * @param _pageSize The number of rounds per page
+     */
+    function getRounds(uint256 _pageNumber, uint256 _pageSize) external view returns (Round[] memory) {
+        if (_pageNumber == 0 || _pageSize == 0) {
+            revert InvalidPageNumberPageSize();
+        }
+        
+        uint256 startIndex = (_pageNumber - 1) * _pageSize;
+        uint256 endIndex = startIndex + _pageSize;
+        
+        if (endIndex > roundId) {
+            endIndex = roundId;
+        }
+        
+        uint256 resultSize = endIndex - startIndex;
+        Round[] memory result = new Round[](resultSize);
+        
+        for (uint256 i = 0; i < resultSize; i++) {
+            result[i] = roundData[startIndex + i + 1].round; // +1 because roundId starts from 1
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Get the winning proposal for a specific round
+     * @param _roundId The ID of the round
+     */
+    function getWinningProposalForRound(uint256 _roundId) external view returns (Proposal memory) {
+        return winningProposalByRoundId[_roundId];
+    }
+    
+    /**
+     * Get user's data for a specific round
+     * @param _roundId The ID of the round
+     * @param _user The address of the user
+     */
+    function getUserRoundData(uint256 _roundId, address _user) external view returns (
+        uint256 proposalCount,
+        bool hasVoted,
+        uint256 votingPower,
+        uint256 flothPassesOwned,
+        Votes[] memory votedProposals
+    ) {
+        UserRoundData storage userData = roundData[_roundId].userRoundData[_user];
+        
+        return (
+            userData.proposalCount,
+            userData.hasVoted,
+            userData.votingPower,
+            userData.flothPassesOwned,
+            userData.votedProposals
+        );
+    }
+    
+    /**
+     * Get voting power for a user for a specific round
+     * @param _user The address of the user
+     * @param _roundId The ID of the round
+     */
+    function getVotingPower(address _user, uint256 _roundId) external view returns (uint256) {
+        Round memory round = roundData[_roundId].round;
+        
+        if (round.snapshotBlock == 0) {
+            return 0;
+        }
+        
+        uint256 flothVotingPower = floth.getPastVotes(_user, round.snapshotBlock);
+        uint256 nftVotingPower = roundData[_roundId].userRoundData[_user].flothPassesOwned * nftMultiplier;
+        
+        return flothVotingPower + nftVotingPower;
+    }
+    
+    /**
+     * Get all proposals for a specific round
+     * @param _roundId The ID of the round
+     */
+    function getProposalsByRound(uint256 _roundId) external view returns (Proposal[] memory) {
+        Round storage round = roundData[_roundId].round;
+        Proposal[] memory result = new Proposal[](round.proposalIds.length);
+        
+        for (uint256 i = 0; i < round.proposalIds.length; i++) {
+            result[i] = proposals[round.proposalIds[i]];
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Get the current (latest) round
+     */
+    function getCurrentRound() external view returns (Round memory) {
+        return roundData[roundId].round;
     }
 
 }
