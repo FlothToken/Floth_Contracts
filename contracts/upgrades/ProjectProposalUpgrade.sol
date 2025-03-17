@@ -86,20 +86,6 @@ contract ProjectProposal is
     // Tracks ID number for each round.
     uint256 public roundId;
 
-    // Core data structures
-    struct UserRoundData {
-        uint256 proposalCount;
-        bool hasVoted;
-        uint256 votingPower;
-        uint256 flothPassesOwned;
-        Votes[] votedProposals;
-    }
-
-    struct RoundData {
-        Round round;
-        mapping(address => UserRoundData) userRoundData;
-    }
-
     // Core mappings
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => RoundData) public roundData;
