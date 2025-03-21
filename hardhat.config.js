@@ -13,7 +13,7 @@ module.exports = {
           evmVersion: "london",
           optimizer: {
             enabled: true,
-            runs: 50,
+            runs: 200,
           },
         },
       },
