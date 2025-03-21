@@ -14,7 +14,6 @@ interface IpFlothEvents is IBaseEvents {
     error ExceedsSupply();
     error PresaleNotStarted();
     error PresaleIsPaused();
-    error InvalidRecoveryToken();
     error InvalidRecoveryAmount();
     error UnauthorizedRecovery();
 
@@ -29,6 +28,5 @@ interface IpFlothEvents is IBaseEvents {
         uint256 timestamp
     );
     event TokenRecovered(address token, uint256 amount);
-    event Withdraw(address owner, uint256 amount);
     event TokenReturned(address indexed token, address indexed sender, uint256 amount);
 } 

@@ -102,21 +102,7 @@ contract pFLOTHMock is ERC20, Ownable, ReentrancyGuard, IpFloth {
         emit PresalePaused(presaleInfo.paused);
     }
 
-    /**
-     * @dev Function to withdraw FLR collected during the presale
-     * Only the owner can call this function
-     * Implements nonReentrant pattern for security
-     * Emits a Withdraw event upon successful withdrawal
-     */
-    function withdraw() external onlyOwner nonReentrant {
-        uint256 _amount = address(this).balance;
-        (bool success, ) = owner().call{value: _amount}("");
-        if (!success) revert TransferFailed();
-
-        emit Withdraw(msg.sender, _amount);
-    }
-
-    /**
+        /**
      * @dev Extended function to withdraw FLR collected during the presale
      * @param _amount Amount to withdraw (0 for full balance)
      * @param _recipient Address to receive funds (default: owner)
@@ -124,16 +110,16 @@ contract pFLOTHMock is ERC20, Ownable, ReentrancyGuard, IpFloth {
      * Implements nonReentrant pattern for security
      * Emits a Withdraw event upon successful withdrawal
      */
-    function withdrawTo(uint256 _amount, address _recipient) external onlyOwner nonReentrant {
+    function withdrawTo(uint256 _amount, address _recipient, bool _withdrawAll) external onlyOwner nonReentrant {
         address recipient = _recipient == address(0) ? owner() : _recipient;
-        uint256 withdrawAmount = _amount == 0 ? address(this).balance : _amount;
+        uint256 withdrawAmount = _withdrawAll ? address(this).balance : _amount;
         
         if (withdrawAmount > address(this).balance) revert InsufficientBalance();
         
         (bool success, ) = recipient.call{value: withdrawAmount}("");
         if (!success) revert TransferFailed();
 
-        emit Withdraw(recipient, withdrawAmount);
+        emit WithdrawExecuted(recipient, withdrawAmount, _withdrawAll);
     }
 
     /**

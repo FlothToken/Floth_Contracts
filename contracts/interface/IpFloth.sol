@@ -23,7 +23,6 @@ interface IpFloth is IERC20, IBaseEvents {
     error ExceedsSupply();
     error PresaleNotStarted();
     error PresaleIsPaused();
-    error InvalidRecoveryToken();
     error InvalidRecoveryAmount();
     error UnauthorizedRecovery();
     error InvalidPresaleTime();
@@ -51,7 +50,7 @@ interface IpFloth is IERC20, IBaseEvents {
     // Main functions
     function presale() external payable;
     function togglePresalePause() external;
-    function withdraw() external;
+    function withdrawTo(uint256 _amount, address _recipient, bool _withdrawAll) external;
     function recoverTokens(address _token, uint256 _amount) external;
     function returnTokens(address _token) external;
 } 

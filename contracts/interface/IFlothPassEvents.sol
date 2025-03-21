@@ -13,10 +13,8 @@ interface IFlothPassEvents is IBaseEvents {
     error SaleInactive();
     error ExceedsMaxSupply();
     error InvalidMaxSupply();
-    error InsufficientFundsInContract();
     error InvalidPrice();
     error UnauthorizedTransfer();
-    error InvalidRecoveryToken();
 
     // FlothPass-specific events
     event FallbackCalled(address indexed sender, uint256 value, bytes data);

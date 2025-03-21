@@ -172,31 +172,23 @@ contract FlothPass is
     }
     
     /**
-     * @dev Withdraw function to withdraw flare funds from the contract.
-     * Requires the caller to have the WITHDRAW_ROLE or ADMIN_ROLE.
-     * @param _amount the amount to withdraw
-     * @param _withdrawAll whether to withdraw all the funds
+     * @dev Extended function to withdraw FLR collected during the presale
+     * @param _amount Amount to withdraw (0 for full balance)
+     * @param _recipient Address to receive funds (default: owner)
+     * Only the owner can call this function
+     * Implements nonReentrant pattern for security
+     * Emits a Withdraw event upon successful withdrawal
      */
-    function withdraw(uint256 _amount, bool _withdrawAll) external nonReentrant {
-        if (!hasRole(WITHDRAW_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender)) {
-            revert InsufficientRole();
-        }
-
-        uint256 balance = address(this).balance;
-        uint256 amountToWithdraw = _withdrawAll ? balance : _amount;
+    function withdrawTo(uint256 _amount, address _recipient, bool _withdrawAll) external onlyRole(ADMIN_ROLE) nonReentrant {
+        if(CommonValidators.isZeroAddress(_recipient)) revert ZeroAddress();
+        uint256 withdrawAmount = _withdrawAll ? address(this).balance : _amount;
         
-        if (!_withdrawAll && amountToWithdraw > balance) {
-            revert InsufficientFundsInContract();
-        }
+        if (withdrawAmount > address(this).balance) revert InsufficientBalance();
+        
+        (bool success, ) = _recipient.call{value: withdrawAmount}("");
+        if (!success) revert TransferFailed();
 
-        address payable recipient = withdrawAddress != address(0) ? withdrawAddress : payable(msg.sender);
-
-        (bool success, ) = recipient.call{value: amountToWithdraw}("");
-        if (!success) {
-            revert TransferFailed();
-        }
-
-        emit WithdrawExecuted(recipient, amountToWithdraw, _withdrawAll);
+        emit WithdrawExecuted(_recipient, withdrawAmount, _withdrawAll);
     }
 
     /**

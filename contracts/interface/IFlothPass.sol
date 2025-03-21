@@ -29,7 +29,7 @@ interface IFlothPass is IERC721Upgradeable, IFlothPassEvents {
     function getPastVotes(address account, uint256 timepoint) external view returns (uint256);
     function getCurrentPriceInFlr(uint16 _quantity) external returns (uint256 totalPrice);
     function mint(uint16 _quantity) external payable;
-    function withdraw(uint256 _amount, bool _withdrawAll) external;
+    function withdrawTo(uint256 _amount, address _recipient, bool _withdrawAll) external;
     
     // State getters
     function getNumberMinted() external view returns (uint16);
