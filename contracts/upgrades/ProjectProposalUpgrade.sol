@@ -10,10 +10,10 @@ import {CommonValidators} from "../lib/CommonValidators.sol";
 import "hardhat/console.sol";
 
 /**
- * @title ProjectProposal contract for the Floth protocol
+ * @title ProjectProposalUpgrade contract for the Floth protocol
  * @author Ethereal Labs Ltd
  */
-contract ProjectProposal is 
+contract ProjectProposalUpgrade is 
     AccessControlUpgradeable, 
     ReentrancyGuardUpgradeable, 
     IProjectProposal 
@@ -34,6 +34,19 @@ contract ProjectProposal is
 
     // Gap for upgradeability
     uint256[50] private __gap;
+
+    // Tracks ID number for each proposal.
+    uint256 public proposalId;
+
+    // Tracks ID number for each round.
+    uint256 public roundId;
+
+    // Core mappings
+    mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => RoundData) public roundData;
+    mapping(uint256 => Proposal) public winningProposalByRoundId;
+    mapping(address => bool) public hasWinningProposal;
+    mapping(address => Proposal[]) public winningProposals;
 
     /**
      * @dev Initialize the contract
@@ -79,19 +92,6 @@ contract ProjectProposal is
     constructor() {
         _disableInitializers();
     }
-
-    // Tracks ID number for each proposal.
-    uint256 public proposalId;
-
-    // Tracks ID number for each round.
-    uint256 public roundId;
-
-    // Core mappings
-    mapping(uint256 => Proposal) public proposals;
-    mapping(uint256 => RoundData) public roundData;
-    mapping(uint256 => Proposal) public winningProposalByRoundId;
-    mapping(address => bool) public hasWinningProposal;
-    mapping(address => Proposal[]) public winningProposals;
 
     // Modifiers for the ProjectProposal contract
     modifier roundManagerOrAdmin() {
