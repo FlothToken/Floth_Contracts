@@ -57,9 +57,9 @@ interface IProjectProposal is IAccessControlUpgradeable, IProjectProposalEvents 
     function addProposal(uint256 _amountRequested) external;
     function updateProposalReceiverAddress(uint256 _proposalId, address _newAddress) external;
     function killProposal(uint256 _proposalId) external;
-    function castVotes(uint256 _proposalId, uint256 _voteCount) external;
-    function removeVotes(uint256 _proposalId, uint256 _voteCount) external;
-    function removeAllVotes() external;
+    function addVotesToProposal(uint256 _proposalId, uint256 _voteCount) external;
+    function removeVotesFromProposal(uint256 _proposalId) external;
+    function removeAllVotesFromAllProposals() external;
     function addRound(uint256 _maxFlareAmount, uint256 _roundRuntime) external;
     function killRound(uint256 _roundId) external;
     function takeSnapshot() external;
